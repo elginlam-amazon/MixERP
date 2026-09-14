@@ -18,8 +18,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.WebControls.Common;
-using System.Web.UI;
-using System.Web.UI.WebControls;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {

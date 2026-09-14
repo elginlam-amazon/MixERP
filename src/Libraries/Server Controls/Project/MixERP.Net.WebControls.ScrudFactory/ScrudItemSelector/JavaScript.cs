@@ -19,8 +19,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common.Helpers;
 using System.Security.Permissions;
-using System.Web;
-using System.Web.UI;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web;
 
 [assembly: WebResource("MixERP.Net.WebControls.ScrudFactory.ScrudItemSelector.js", "application/x-javascript", PerformSubstitution = true)]
 

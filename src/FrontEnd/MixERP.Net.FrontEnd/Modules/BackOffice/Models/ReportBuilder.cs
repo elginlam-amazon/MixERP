@@ -21,7 +21,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Web.Hosting;
+using Microsoft.AspNetCore.Hosting;
 using System.Xml;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Models

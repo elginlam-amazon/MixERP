@@ -22,7 +22,7 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.Core.Modules.BackOffice.Data;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Web.Hosting;
+using Microsoft.AspNetCore.Hosting;
 using System.Xml;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Models

@@ -17,9 +17,9 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web.HtmlControls;
+using MixERP.Net.Framework.Web.WebControls;
 
 namespace MixERP.Net.Common.Helpers
 {

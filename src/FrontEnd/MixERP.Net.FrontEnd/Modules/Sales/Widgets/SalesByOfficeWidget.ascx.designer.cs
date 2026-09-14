@@ -19,7 +19,7 @@ namespace MixERP.Net.Core.Modules.Sales.Widgets {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal TitleLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal TitleLiteral;
         
         /// <summary>
         /// SalesByOfficeGridView control.
@@ -28,6 +28,6 @@ namespace MixERP.Net.Core.Modules.Sales.Widgets {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.GridView SalesByOfficeGridView;
+        protected global::MixERP.Net.Framework.Web.WebControls.GridView SalesByOfficeGridView;
     }
 }

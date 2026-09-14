@@ -19,7 +19,7 @@ namespace MixERP.Net.FrontEnd.Reports {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder ReportPlaceholder;
+        protected global::MixERP.Net.Framework.Web.WebControls.PlaceHolder ReportPlaceholder;
         
         /// <summary>
         /// IFramePlaceholder control.
@@ -28,6 +28,6 @@ namespace MixERP.Net.FrontEnd.Reports {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder IFramePlaceholder;
+        protected global::MixERP.Net.Framework.Web.WebControls.PlaceHolder IFramePlaceholder;
     }
 }

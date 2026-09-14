@@ -18,8 +18,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System.ComponentModel;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Framework.Web.Script.Services;
+using MixERP.Net.Framework.Web.Services;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common.Extensions;
 using MixERP.Net.Core.Modules.Inventory.Data.Transactions;

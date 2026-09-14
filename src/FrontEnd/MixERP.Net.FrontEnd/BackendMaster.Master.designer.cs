@@ -19,7 +19,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.ContentPlaceHolder ScriptContentPlaceholder;
+        protected global::MixERP.Net.Framework.Web.WebControls.ContentPlaceHolder ScriptContentPlaceholder;
         
         /// <summary>
         /// StyleSheetContentPlaceholder control.
@@ -28,7 +28,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.ContentPlaceHolder StyleSheetContentPlaceholder;
+        protected global::MixERP.Net.Framework.Web.WebControls.ContentPlaceHolder StyleSheetContentPlaceholder;
         
         /// <summary>
         /// form1 control.
@@ -37,7 +37,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlForm form1;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlForm form1;
         
         /// <summary>
         /// SwallowSubmit control.
@@ -46,7 +46,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Button SwallowSubmit;
+        protected global::MixERP.Net.Framework.Web.WebControls.Button SwallowSubmit;
         
         /// <summary>
         /// ScriptManager1 control.
@@ -55,7 +55,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.ScriptManager ScriptManager1;
+        protected global::MixERP.Net.Framework.Web.ScriptManager ScriptManager1;
         
         /// <summary>
         /// VersionLiteral control.
@@ -64,7 +64,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal VersionLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal VersionLiteral;
         
         /// <summary>
         /// CatalogLiteral control.
@@ -73,7 +73,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal CatalogLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal CatalogLiteral;
         
         /// <summary>
         /// BranchNameLiteral control.
@@ -82,7 +82,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal BranchNameLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal BranchNameLiteral;
         
         /// <summary>
         /// NotificationLiteral control.
@@ -91,7 +91,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal NotificationLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal NotificationLiteral;
         
         /// <summary>
         /// MixERPDocumentationLiteral control.
@@ -100,7 +100,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal MixERPDocumentationLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal MixERPDocumentationLiteral;
         
         /// <summary>
         /// UserGreetingLiteral control.
@@ -109,7 +109,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal UserGreetingLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal UserGreetingLiteral;
         
         /// <summary>
         /// ChangePasswordLiteral control.
@@ -118,7 +118,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal ChangePasswordLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal ChangePasswordLiteral;
         
         /// <summary>
         /// ManageProfileLiteral control.
@@ -127,7 +127,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal ManageProfileLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal ManageProfileLiteral;
         
         /// <summary>
         /// SignOutLiteral control.
@@ -136,7 +136,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal SignOutLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal SignOutLiteral;
         
         /// <summary>
         /// BodyContentPlaceholder control.
@@ -145,7 +145,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.ContentPlaceHolder BodyContentPlaceholder;
+        protected global::MixERP.Net.Framework.Web.WebControls.ContentPlaceHolder BodyContentPlaceholder;
         
         /// <summary>
         /// BottomScriptContentPlaceholder control.
@@ -154,6 +154,6 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.ContentPlaceHolder BottomScriptContentPlaceholder;
+        protected global::MixERP.Net.Framework.Web.WebControls.ContentPlaceHolder BottomScriptContentPlaceholder;
     }
 }

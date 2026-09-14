@@ -19,7 +19,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Admin {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder ScrudPlaceholder;
+        protected global::MixERP.Net.Framework.Web.WebControls.PlaceHolder ScrudPlaceholder;
         
         /// <summary>
         /// MessageLiteral control.
@@ -28,7 +28,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Admin {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal MessageLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal MessageLiteral;
         
         /// <summary>
         /// VacuumButton control.
@@ -37,7 +37,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Admin {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Button VacuumButton;
+        protected global::MixERP.Net.Framework.Web.WebControls.Button VacuumButton;
         
         /// <summary>
         /// FullVacuumButton control.
@@ -46,7 +46,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Admin {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Button FullVacuumButton;
+        protected global::MixERP.Net.Framework.Web.WebControls.Button FullVacuumButton;
         
         /// <summary>
         /// AnalyzeButton control.
@@ -55,6 +55,6 @@ namespace MixERP.Net.Core.Modules.BackOffice.Admin {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Button AnalyzeButton;
+        protected global::MixERP.Net.Framework.Web.WebControls.Button AnalyzeButton;
     }
 }

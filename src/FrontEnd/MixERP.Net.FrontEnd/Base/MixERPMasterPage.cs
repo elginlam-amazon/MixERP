@@ -25,7 +25,7 @@ using MixERP.Net.i18n;
 using System;
 using System.Globalization;
 using System.Threading;
-using System.Web.UI;
+using MixERP.Net.Framework.Web;
 
 namespace MixERP.Net.FrontEnd.Base
 {

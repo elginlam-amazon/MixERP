@@ -20,8 +20,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common.Extensions;
 using MixERP.Net.Entities.Core;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Framework.Web.Script.Services;
+using MixERP.Net.Framework.Web.Services;
 
 
 namespace MixERP.Net.Core.Modules.Sales.Services.Receipt
@@ -33,13 +33,13 @@ namespace MixERP.Net.Core.Modules.Sales.Services.Receipt
     public class Currencies : WebService
     {
         [WebMethod]
-        public System.Collections.ObjectModel.Collection<System.Web.UI.WebControls.ListItem> GetCurrencies()
+        public System.Collections.ObjectModel.Collection<MixERP.Net.Framework.Web.WebControls.ListItem> GetCurrencies()
         {
-            System.Collections.ObjectModel.Collection<System.Web.UI.WebControls.ListItem> values = new System.Collections.ObjectModel.Collection<System.Web.UI.WebControls.ListItem>();
+            System.Collections.ObjectModel.Collection<MixERP.Net.Framework.Web.WebControls.ListItem> values = new System.Collections.ObjectModel.Collection<MixERP.Net.Framework.Web.WebControls.ListItem>();
 
             foreach (Currency currency in Data.Helpers.Currencies.GetCurrencies(AppUsers.GetCurrentUserDB()))
             {
-                values.Add(new System.Web.UI.WebControls.ListItem(currency.CurrencyCode, currency.CurrencyCode));
+                values.Add(new MixERP.Net.Framework.Web.WebControls.ListItem(currency.CurrencyCode, currency.CurrencyCode));
             }
 
             return values;

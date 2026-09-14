@@ -20,7 +20,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Configuration;
-using System.Web.Hosting;
+using Microsoft.AspNetCore.Hosting;
 
 namespace MixERP.Net.Common.Helpers
 {
@@ -33,7 +33,7 @@ namespace MixERP.Net.Common.Helpers
                 return string.Empty;
             }
 
-            string path = HostingEnvironment.MapPath(ConfigurationManager.AppSettings[configFileName]);
+            string path = ResolvePath(ConfigurationManager.AppSettings[configFileName]);
 
             ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap {ExeConfigFilename = path};
             Configuration config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap,
@@ -69,7 +69,13 @@ namespace MixERP.Net.Common.Helpers
 
         public static string GetResourceDirectory()
         {
-            return HostingEnvironment.MapPath(ConfigurationManager.AppSettings["ResourceDirectory"]);
+            return ResolvePath(ConfigurationManager.AppSettings["ResourceDirectory"]);
+        }
+
+        private static string ResolvePath(string configuredPath)
+        {
+            string relativePath = (configuredPath ?? string.Empty).TrimStart('~').TrimStart('/', '\\');
+            return System.IO.Path.GetFullPath(System.IO.Path.Combine(System.AppContext.BaseDirectory, relativePath));
         }
 
         public static string GetStockTransactionFactoryParameter(string key)

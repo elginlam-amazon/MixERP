@@ -22,8 +22,8 @@ using MixERP.Net.i18n;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Web;
-using System.Web.UI;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web;
 
 namespace MixERP.Net.Common.jQueryHelper
 {

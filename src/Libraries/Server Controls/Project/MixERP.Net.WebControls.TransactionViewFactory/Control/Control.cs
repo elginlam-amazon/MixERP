@@ -1,8 +1,8 @@
 ﻿using System.Security.Permissions;
-using System.Web;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web.HtmlControls;
+using MixERP.Net.Framework.Web.WebControls;
 
 [assembly: WebResource("MixERP.Net.WebControls.TransactionViewFactory.TransactionViewFactory.js", "application/x-javascript")]
 

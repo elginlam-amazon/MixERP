@@ -19,7 +19,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.ContentPlaceHolder head;
+        protected global::MixERP.Net.Framework.Web.WebControls.ContentPlaceHolder head;
         
         /// <summary>
         /// form1 control.
@@ -28,7 +28,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlForm form1;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlForm form1;
         
         /// <summary>
         /// ScriptManager1 control.
@@ -37,7 +37,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.ScriptManager ScriptManager1;
+        protected global::MixERP.Net.Framework.Web.ScriptManager ScriptManager1;
         
         /// <summary>
         /// BodyContentPlaceholder control.
@@ -46,6 +46,6 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.ContentPlaceHolder BodyContentPlaceholder;
+        protected global::MixERP.Net.Framework.Web.WebControls.ContentPlaceHolder BodyContentPlaceholder;
     }
 }

@@ -1,8 +1,8 @@
 ﻿using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
 using System.Security.Permissions;
-using System.Web;
-using System.Web.UI;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web;
 using ConfigurationHelper = MixERP.Net.WebControls.AttachmentFactory.Helpers.ConfigurationHelper;
 
 [assembly:

@@ -1,34 +1,19 @@
-﻿/********************************************************************************
-Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
-
-This file is part of MixERP.
-
-MixERP is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-MixERP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
-***********************************************************************************/
-
-using Microsoft.Owin;
-using Owin;
-
-[assembly: OwinStartup(typeof(MixERP.Net.FrontEnd.Hubs.Startup))]
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+using MixERP.Net.FrontEnd.Modules.BackOffice.Hubs;
+using MixERP.Net.FrontEnd.Modules.Finance.Hubs;
 
 namespace MixERP.Net.FrontEnd.Hubs
 {
-    public class Startup
+    public static class Startup
     {
-        public void Configuration(IAppBuilder app)
+        public static IEndpointRouteBuilder MapMixErpHubs(this IEndpointRouteBuilder endpoints)
         {
-            app.MapSignalR();
+            endpoints.MapHub<BaseHub>("/hubs/base");
+            endpoints.MapHub<UpdateHub>("/hubs/update");
+            endpoints.MapHub<DbHub>("/hubs/database");
+            endpoints.MapHub<DayOperationHub>("/hubs/day-operation");
+            return endpoints;
         }
     }
 }

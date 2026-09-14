@@ -18,7 +18,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System.Configuration;
-using System.Web.Hosting;
+using Microsoft.AspNetCore.Hosting;
 
 namespace PetaPoco
 {
@@ -31,7 +31,9 @@ namespace PetaPoco
                 return string.Empty;
             }
 
-            string path = HostingEnvironment.MapPath(ConfigurationManager.AppSettings[configFileName]);
+            string configuredPath = ConfigurationManager.AppSettings[configFileName];
+            string relativePath = (configuredPath ?? string.Empty).TrimStart('~').TrimStart('/', '\\');
+            string path = System.IO.Path.GetFullPath(System.IO.Path.Combine(System.AppContext.BaseDirectory, relativePath));
 
             ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap {ExeConfigFilename = path};
             Configuration config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap,

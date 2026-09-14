@@ -28,7 +28,7 @@ using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
-using System.Web.UI.WebControls;
+using MixERP.Net.Framework.Web.WebControls;
 using System.Xml;
 
 namespace MixERP.Net.WebControls.ReportEngine

@@ -1,5 +1,5 @@
 ﻿using MixERP.Net.WebControls.Flag;
-using System.Web.UI;
+using MixERP.Net.Framework.Web;
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {

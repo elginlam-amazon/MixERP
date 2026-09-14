@@ -22,7 +22,7 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.WebControls.ScrudFactory.Data;
 using System.Data;
 using System.Globalization;
-using System.Web.UI.WebControls;
+using MixERP.Net.Framework.Web.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {

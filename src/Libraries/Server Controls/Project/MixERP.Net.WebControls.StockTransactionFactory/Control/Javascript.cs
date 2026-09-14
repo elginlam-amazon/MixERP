@@ -21,8 +21,8 @@ using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.Entities;
 using System.Security.Permissions;
-using System.Web;
-using System.Web.UI;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web;
 
 [assembly: WebResource("MixERP.Net.WebControls.StockTransactionFactory.Includes.Script.StockTransactionForm.js", "application/x-javascript", PerformSubstitution = true)]
 

@@ -1,6 +1,6 @@
 ﻿using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.StockAdjustmentFactory.Helpers;
-using System.Web.UI.HtmlControls;
+using MixERP.Net.Framework.Web.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockAdjustmentFactory
 {

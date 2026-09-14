@@ -3,11 +3,11 @@ using System;
 using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Security.Permissions;
-using System.Web;
-using System.Web.Script.Serialization;
-using System.Web.Script.Services;
-using System.Web.Services;
-using System.Web.Services.Protocols;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web.Script.Serialization;
+using MixERP.Net.Framework.Web.Script.Services;
+using MixERP.Net.Framework.Web.Services;
+using MixERP.Net.Framework.Web.Services.Protocols;
 
 namespace MixERP.Net.WebControls.AttachmentFactory.Handlers
 {

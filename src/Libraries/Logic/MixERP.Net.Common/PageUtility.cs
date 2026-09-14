@@ -24,11 +24,11 @@ using System.Configuration;
 using System.Globalization;
 using System.IO;
 using System.Net;
-using System.Web;
-using System.Web.Hosting;
-using System.Web.SessionState;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
+using MixERP.Net.Framework.Web;
+using Microsoft.AspNetCore.Hosting;
+using MixERP.Net.Framework.Web.SessionState;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web.HtmlControls;
 using MixERP.Net.Common.Helpers;
 
 namespace MixERP.Net.Common
@@ -100,7 +100,8 @@ namespace MixERP.Net.Common
                 return PathHelper.NormalizePhysicalPath(path);
             }
 
-            return HostingEnvironment.MapPath(path);
+            string relativePath = (path ?? string.Empty).TrimStart('~').TrimStart('/', '\\');
+            return PathHelper.NormalizePhysicalPath(Path.Combine(AppContext.BaseDirectory, relativePath));
         }
 
 

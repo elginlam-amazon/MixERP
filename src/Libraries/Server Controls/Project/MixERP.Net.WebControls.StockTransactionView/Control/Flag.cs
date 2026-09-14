@@ -24,7 +24,7 @@ using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.Flag;
 using MixERP.Net.WebControls.StockTransactionViewFactory.Helpers;
 using System.Linq;
-using System.Web.UI;
+using MixERP.Net.Framework.Web;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {

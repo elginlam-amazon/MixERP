@@ -19,7 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Entities;
 using MixERP.Net.WebControls.Common;
-using System.Web.UI.HtmlControls;
+using MixERP.Net.Framework.Web.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {

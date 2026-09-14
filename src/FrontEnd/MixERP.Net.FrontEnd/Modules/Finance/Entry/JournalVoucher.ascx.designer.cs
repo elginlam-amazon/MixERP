@@ -19,7 +19,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Label TitleLabel;
+        protected global::MixERP.Net.Framework.Web.WebControls.Label TitleLabel;
         
         /// <summary>
         /// ValueDateLiteral control.
@@ -28,7 +28,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal ValueDateLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal ValueDateLiteral;
         
         /// <summary>
         /// ValueDateTextBox control.
@@ -55,7 +55,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal ReferenceNumberLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal ReferenceNumberLiteral;
         
         /// <summary>
         /// ReferenceNumberInputText control.
@@ -64,7 +64,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlInputText ReferenceNumberInputText;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlInputText ReferenceNumberInputText;
         
         /// <summary>
         /// StatementReferenceLiteral control.
@@ -73,7 +73,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal StatementReferenceLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal StatementReferenceLiteral;
         
         /// <summary>
         /// AccountNumberLiteral control.
@@ -82,7 +82,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal AccountNumberLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal AccountNumberLiteral;
         
         /// <summary>
         /// AccountLiteral control.
@@ -91,7 +91,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal AccountLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal AccountLiteral;
         
         /// <summary>
         /// CashRepositoryLiteral control.
@@ -100,7 +100,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal CashRepositoryLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal CashRepositoryLiteral;
         
         /// <summary>
         /// CurrencyLiteral control.
@@ -109,7 +109,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal CurrencyLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal CurrencyLiteral;
         
         /// <summary>
         /// DebitLiteral control.
@@ -118,7 +118,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal DebitLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal DebitLiteral;
         
         /// <summary>
         /// CreditLiteral control.
@@ -127,7 +127,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal CreditLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal CreditLiteral;
         
         /// <summary>
         /// ERLiteral control.
@@ -136,7 +136,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal ERLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal ERLiteral;
         
         /// <summary>
         /// LCDebitLiteral control.
@@ -145,7 +145,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal LCDebitLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal LCDebitLiteral;
         
         /// <summary>
         /// LCCreditLiteral control.
@@ -154,7 +154,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal LCCreditLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal LCCreditLiteral;
         
         /// <summary>
         /// ActionLiteral control.
@@ -163,7 +163,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal ActionLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal ActionLiteral;
         
         /// <summary>
         /// AddInputButton control.
@@ -172,7 +172,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlInputButton AddInputButton;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlInputButton AddInputButton;
         
         /// <summary>
         /// AttachmentLabel control.
@@ -181,7 +181,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Label AttachmentLabel;
+        protected global::MixERP.Net.Framework.Web.WebControls.Label AttachmentLabel;
         
         /// <summary>
         /// Placeholder1 control.
@@ -190,7 +190,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder Placeholder1;
+        protected global::MixERP.Net.Framework.Web.WebControls.PlaceHolder Placeholder1;
         
         /// <summary>
         /// CostCenterLiteral control.
@@ -199,7 +199,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal CostCenterLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal CostCenterLiteral;
         
         /// <summary>
         /// DebitTotalLiteral control.
@@ -208,7 +208,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal DebitTotalLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal DebitTotalLiteral;
         
         /// <summary>
         /// CreditTotalLiteral control.
@@ -217,7 +217,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal CreditTotalLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal CreditTotalLiteral;
         
         /// <summary>
         /// PostTransactionLiteral control.
@@ -226,7 +226,7 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal PostTransactionLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal PostTransactionLiteral;
         
         /// <summary>
         /// ErrorLabelBottom control.
@@ -235,6 +235,6 @@ namespace MixERP.Net.Core.Modules.Finance.Entry {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Label ErrorLabelBottom;
+        protected global::MixERP.Net.Framework.Web.WebControls.Label ErrorLabelBottom;
     }
 }

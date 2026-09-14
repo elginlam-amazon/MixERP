@@ -19,6 +19,6 @@ namespace MixERP.Net.FrontEnd.Dashboard {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder WidgetPlaceholder;
+        protected global::MixERP.Net.Framework.Web.WebControls.PlaceHolder WidgetPlaceholder;
     }
 }

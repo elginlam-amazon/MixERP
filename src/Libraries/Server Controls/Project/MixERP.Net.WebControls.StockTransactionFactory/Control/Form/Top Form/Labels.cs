@@ -20,7 +20,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.StockTransactionFactory.Helpers;
-using System.Web.UI.HtmlControls;
+using MixERP.Net.Framework.Web.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {

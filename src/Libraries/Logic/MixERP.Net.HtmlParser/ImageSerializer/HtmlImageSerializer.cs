@@ -2,7 +2,7 @@
 using MixERP.Net.i18n.Resources;
 using System;
 using System.Drawing.Imaging;
-using System.Web.Hosting;
+using Microsoft.AspNetCore.Hosting;
 
 namespace MixERP.Net.HtmlParser.ImageSerializer
 {

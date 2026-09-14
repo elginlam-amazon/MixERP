@@ -24,8 +24,8 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Framework.Web.Script.Services;
+using MixERP.Net.Framework.Web.Services;
 
 namespace MixERP.Net.FrontEnd.Services
 {

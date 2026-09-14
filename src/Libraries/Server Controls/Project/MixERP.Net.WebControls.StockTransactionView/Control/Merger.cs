@@ -20,7 +20,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.WebControls.StockTransactionViewFactory.Data;
 using MixERP.Net.WebControls.StockTransactionViewFactory.Data.Models;
 using System.Collections.ObjectModel;
-using System.Web;
+using MixERP.Net.Framework.Web;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {

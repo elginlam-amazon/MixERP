@@ -23,7 +23,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.Caching;
-using System.Web;
+using MixERP.Net.Framework.Web;
 
 namespace MixERP.Net.ApplicationState.Cache
 {

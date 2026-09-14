@@ -21,7 +21,7 @@ using MixERP.Net.i18n.Resources;
 using System;
 using System.Linq;
 using System.Threading;
-using System.Web.UI.WebControls;
+using MixERP.Net.Framework.Web.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
 {

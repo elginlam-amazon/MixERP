@@ -21,7 +21,7 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.FrontEnd.Base;
 using MixERP.Net.i18n.Resources;
 using System;
-using System.Web.UI.HtmlControls;
+using MixERP.Net.Framework.Web.HtmlControls;
 
 namespace MixERP.Net.FrontEnd.Site
 {

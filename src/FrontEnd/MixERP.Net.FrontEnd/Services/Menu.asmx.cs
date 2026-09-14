@@ -22,8 +22,8 @@ using MixERP.Net.Common.Extensions;
 using MixERP.Net.FrontEnd.Models;
 using Newtonsoft.Json;
 using System.ComponentModel;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Framework.Web.Script.Services;
+using MixERP.Net.Framework.Web.Services;
 
 namespace MixERP.Net.FrontEnd.Services
 {

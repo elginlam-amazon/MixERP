@@ -30,10 +30,10 @@ using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
-using System.Web.Hosting;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using Microsoft.AspNetCore.Hosting;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web.HtmlControls;
+using MixERP.Net.Framework.Web.WebControls;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Admin
 {

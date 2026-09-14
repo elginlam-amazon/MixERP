@@ -25,9 +25,9 @@ using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Web;
-using System.Web.UI;
-using System.Web.UI.WebControls;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web.WebControls;
 using Image = System.Drawing.Image;
 
 namespace MixERP.Net.Common
