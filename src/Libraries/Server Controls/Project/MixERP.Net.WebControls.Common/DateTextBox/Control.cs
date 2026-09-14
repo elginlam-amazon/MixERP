@@ -24,8 +24,8 @@ using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.Common.Helpers;
 using System;
 using System.Globalization;
-using System.Web.UI;
-using System.Web.UI.WebControls;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web.WebControls;
 
 namespace MixERP.Net.WebControls.Common
 {

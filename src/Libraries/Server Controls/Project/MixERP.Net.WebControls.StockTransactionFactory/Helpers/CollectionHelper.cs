@@ -21,7 +21,7 @@ using MixERP.Net.Common;
 using MixERP.Net.Entities.Core;
 using MixERP.Net.Entities.Models.Transactions;
 using System.Collections.ObjectModel;
-using System.Web.Script.Serialization;
+using MixERP.Net.Framework.Web.Script.Serialization;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory.Helpers
 {

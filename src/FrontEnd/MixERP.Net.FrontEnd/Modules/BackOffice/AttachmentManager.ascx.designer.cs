@@ -19,7 +19,7 @@ namespace MixERP.Net.Core.Modules.BackOffice {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal TitleLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal TitleLiteral;
         
         /// <summary>
         /// Placeholder1 control.
@@ -28,7 +28,7 @@ namespace MixERP.Net.Core.Modules.BackOffice {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder Placeholder1;
+        protected global::MixERP.Net.Framework.Web.WebControls.PlaceHolder Placeholder1;
         
         /// <summary>
         /// SubTitleLiteral control.
@@ -37,7 +37,7 @@ namespace MixERP.Net.Core.Modules.BackOffice {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal SubTitleLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal SubTitleLiteral;
         
         /// <summary>
         /// OKLiteral control.
@@ -46,6 +46,6 @@ namespace MixERP.Net.Core.Modules.BackOffice {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal OKLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal OKLiteral;
     }
 }

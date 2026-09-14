@@ -1,5 +1,5 @@
-﻿using System.Web.UI;
-using System.Web.UI.HtmlControls;
+﻿using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web.HtmlControls;
 
 namespace MixERP.Net.WebControls.AttachmentFactory
 {

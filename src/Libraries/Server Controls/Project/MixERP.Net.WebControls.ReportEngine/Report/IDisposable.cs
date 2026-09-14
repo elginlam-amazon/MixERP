@@ -19,7 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Collections.ObjectModel;
 using System.Data;
-using System.Web.UI.WebControls;
+using MixERP.Net.Framework.Web.WebControls;
 
 namespace MixERP.Net.WebControls.ReportEngine
 {

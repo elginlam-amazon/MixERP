@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using MixERP.Net.Framework;
 using MixERP.Net.i18n.Resources;
 using Npgsql;
@@ -21,7 +22,7 @@ namespace PetaPoco
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState?.StartsWith("P", StringComparison.Ordinal) == true)
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -42,7 +43,7 @@ namespace PetaPoco
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState?.StartsWith("P", StringComparison.Ordinal) == true)
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -63,7 +64,7 @@ namespace PetaPoco
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState?.StartsWith("P", StringComparison.Ordinal) == true)
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -84,7 +85,7 @@ namespace PetaPoco
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState?.StartsWith("P", StringComparison.Ordinal) == true)
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -96,9 +97,9 @@ namespace PetaPoco
 
         private static string GetDBErrorResource(NpgsqlException ex)
         {
-            string message = DbErrors.Get(ex.Code);
+            string message = DbErrors.Get(ex.SqlState);
 
-            if (message == ex.Code)
+            if (message == ex.SqlState)
             {
                 return ex.Message;
             }
@@ -119,12 +120,10 @@ namespace PetaPoco
             {
                 Host = ConfigurationHelper.GetDbServerParameter("Server"),
                 Database = database,
-                UserName = ConfigurationHelper.GetDbServerParameter("UserId"),
+                Username = ConfigurationHelper.GetDbServerParameter("UserId"),
                 Password = ConfigurationHelper.GetDbServerParameter("Password"),
                 Port = int.Parse(ConfigurationHelper.GetDbServerParameter("Port")),
-                SyncNotification = true,
                 Pooling = true,
-                SSL = true,
                 SslMode = SslMode.Prefer,
                 MinPoolSize = 10,
                 MaxPoolSize = 100,

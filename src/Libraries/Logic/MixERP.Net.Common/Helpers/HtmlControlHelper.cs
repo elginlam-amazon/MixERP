@@ -19,8 +19,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Globalization;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using MixERP.Net.Framework.Web.HtmlControls;
+using MixERP.Net.Framework.Web.WebControls;
 
 namespace MixERP.Net.Common.Helpers
 {

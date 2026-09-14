@@ -19,9 +19,9 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Security.Permissions;
-using System.Web;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web.HtmlControls;
 
 [assembly: WebResource("MixERP.Net.WebControls.StockTransactionFactory.Includes.Style.StockTransactionFactory.css", "text/css", PerformSubstitution = true)]
 

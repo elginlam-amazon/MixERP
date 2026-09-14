@@ -19,7 +19,7 @@ namespace MixERP.Net.Core.Modules.Inventory.Setup {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlGenericControl container;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlGenericControl container;
         
         /// <summary>
         /// ScrudPlaceholder control.
@@ -28,6 +28,6 @@ namespace MixERP.Net.Core.Modules.Inventory.Setup {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder ScrudPlaceholder;
+        protected global::MixERP.Net.Framework.Web.WebControls.PlaceHolder ScrudPlaceholder;
     }
 }

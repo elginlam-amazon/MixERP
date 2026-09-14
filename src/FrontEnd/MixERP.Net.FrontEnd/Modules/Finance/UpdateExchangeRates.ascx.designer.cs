@@ -19,7 +19,7 @@ namespace MixERP.Net.Core.Modules.Finance {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlInputText OfficeInputText;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlInputText OfficeInputText;
         
         /// <summary>
         /// CurrencyInputText control.
@@ -28,6 +28,6 @@ namespace MixERP.Net.Core.Modules.Finance {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlInputText CurrencyInputText;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlInputText CurrencyInputText;
     }
 }

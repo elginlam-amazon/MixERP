@@ -4,7 +4,7 @@ using PetaPoco;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web;
+using MixERP.Net.Framework.Web;
 
 namespace MixERP.Net.Entities.Transactions
 {

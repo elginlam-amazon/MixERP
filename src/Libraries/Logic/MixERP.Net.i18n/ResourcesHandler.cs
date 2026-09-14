@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Web;
+using MixERP.Net.Framework.Web;
 
 namespace MixERP.Net.i18n
 {
@@ -23,10 +23,8 @@ namespace MixERP.Net.i18n
             context.Response.ContentType = "text/javascript";
 
             context.Response.ContentEncoding = System.Text.Encoding.UTF8;
-            context.Response.Cache.SetLastModifiedFromFileDependencies();
-            context.Response.Cache.SetETagFromFileDependencies();
-            context.Response.Cache.SetCacheability(HttpCacheability.Public);
-            context.Response.Cache.SetMaxAge(new TimeSpan(24, 0, 0));
+            context.Response.Headers["Cache-Control"] = "public,max-age=86400";
+            context.Response.Headers["Vary"] = "Accept-Encoding";
 
             context.Response.Write(script);
             context.Response.End();
@@ -63,7 +61,7 @@ namespace MixERP.Net.i18n
                         localized = resource.Original;
                     }
 
-                    script.Append(HttpUtility.JavaScriptStringEncode(localized));                    
+                    script.Append(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(localized));
 
                     script.Append("\";");
                     script.Append("},");

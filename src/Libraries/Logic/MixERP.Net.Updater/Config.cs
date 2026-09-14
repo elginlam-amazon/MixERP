@@ -1,5 +1,5 @@
 ﻿using System.Configuration;
-using System.Web.Hosting;
+using Microsoft.AspNetCore.Hosting;
 using MixERP.Net.Common.Helpers;
 
 namespace MixERP.Net.Updater

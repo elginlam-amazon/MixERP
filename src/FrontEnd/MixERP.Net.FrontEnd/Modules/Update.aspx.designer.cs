@@ -19,7 +19,7 @@ namespace MixERP.Net.FrontEnd.Modules {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Panel ReleasePanel;
+        protected global::MixERP.Net.Framework.Web.WebControls.Panel ReleasePanel;
         
         /// <summary>
         /// ErrorLabel control.
@@ -28,7 +28,7 @@ namespace MixERP.Net.FrontEnd.Modules {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Label ErrorLabel;
+        protected global::MixERP.Net.Framework.Web.WebControls.Label ErrorLabel;
         
         /// <summary>
         /// UpToDatePanel control.
@@ -37,6 +37,6 @@ namespace MixERP.Net.FrontEnd.Modules {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Panel UpToDatePanel;
+        protected global::MixERP.Net.Framework.Web.WebControls.Panel UpToDatePanel;
     }
 }

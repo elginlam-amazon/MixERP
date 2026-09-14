@@ -19,7 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.IO;
-using System.Web.Hosting;
+using Microsoft.AspNetCore.Hosting;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common.Helpers;
 using Serilog;

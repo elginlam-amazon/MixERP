@@ -19,6 +19,6 @@ namespace MixERP.Net.FrontEnd.Modules {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder DefaultContentPlaceholder;
+        protected global::MixERP.Net.Framework.Web.WebControls.PlaceHolder DefaultContentPlaceholder;
     }
 }

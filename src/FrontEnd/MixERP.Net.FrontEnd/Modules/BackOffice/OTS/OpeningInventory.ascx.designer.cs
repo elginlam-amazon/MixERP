@@ -19,6 +19,6 @@ namespace MixERP.Net.Core.Modules.BackOffice.OTS {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder Placeholder1;
+        protected global::MixERP.Net.Framework.Web.WebControls.PlaceHolder Placeholder1;
     }
 }

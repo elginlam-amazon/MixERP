@@ -21,7 +21,7 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.Framework;
 using System.Collections.Generic;
 using System.IO;
-using System.Web.Hosting;
+using Microsoft.AspNetCore.Hosting;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Models
 {

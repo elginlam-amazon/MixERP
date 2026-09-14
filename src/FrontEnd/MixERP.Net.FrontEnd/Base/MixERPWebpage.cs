@@ -28,9 +28,9 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
-using System.Web;
-using System.Web.Security;
-using System.Web.UI;
+using MixERP.Net.Framework.Web;
+using Microsoft.AspNetCore.Identity;
+using MixERP.Net.Framework.Web;
 
 namespace MixERP.Net.FrontEnd.Base
 {

@@ -27,7 +27,7 @@ using System.Linq;
 
 namespace MixERP.Net.FrontEnd
 {
-    public partial class Install : System.Web.UI.Page
+    public partial class Install : MixERP.Net.Framework.Web.Page
     {
         protected void Page_Init(object sender, EventArgs e)
         {

@@ -19,7 +19,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlForm form1;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlForm form1;
         
         /// <summary>
         /// TestLiteral control.
@@ -28,7 +28,7 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal TestLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal TestLiteral;
         
         /// <summary>
         /// Placeholder1 control.
@@ -37,6 +37,6 @@ namespace MixERP.Net.FrontEnd {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder Placeholder1;
+        protected global::MixERP.Net.Framework.Web.WebControls.PlaceHolder Placeholder1;
     }
 }

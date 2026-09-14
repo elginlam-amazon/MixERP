@@ -25,9 +25,9 @@ using MixERP.Net.i18n.Resources;
 using Serilog;
 using System.ComponentModel;
 using System.Threading;
-using System.Web;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Framework.Web;
+using MixERP.Net.Framework.Web.Script.Services;
+using MixERP.Net.Framework.Web.Services;
 using MixERP.Net.FrontEnd.Application;
 
 namespace MixERP.Net.FrontEnd.Services

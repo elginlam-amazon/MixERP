@@ -19,7 +19,7 @@ namespace MixERP.Net.Core.Modules.Sales.Widgets {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Literal TopSellingProductsLiteral;
+        protected global::MixERP.Net.Framework.Web.WebControls.Literal TopSellingProductsLiteral;
         
         /// <summary>
         /// TopSellingProductsGridView control.
@@ -28,6 +28,6 @@ namespace MixERP.Net.Core.Modules.Sales.Widgets {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.GridView TopSellingProductsGridView;
+        protected global::MixERP.Net.Framework.Web.WebControls.GridView TopSellingProductsGridView;
     }
 }

@@ -37,7 +37,7 @@ namespace MixERP.Net.Core.Modules.Inventory {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlInputText OfficeTextBox;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlInputText OfficeTextBox;
         
         /// <summary>
         /// StoreTextBox control.
@@ -46,7 +46,7 @@ namespace MixERP.Net.Core.Modules.Inventory {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlInputText StoreTextBox;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlInputText StoreTextBox;
         
         /// <summary>
         /// AuthorizedTextBox control.
@@ -55,7 +55,7 @@ namespace MixERP.Net.Core.Modules.Inventory {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlInputText AuthorizedTextBox;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlInputText AuthorizedTextBox;
         
         /// <summary>
         /// DeliveredTextBox control.
@@ -64,7 +64,7 @@ namespace MixERP.Net.Core.Modules.Inventory {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlInputText DeliveredTextBox;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlInputText DeliveredTextBox;
         
         /// <summary>
         /// ReceivedTextBox control.
@@ -73,7 +73,7 @@ namespace MixERP.Net.Core.Modules.Inventory {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlInputText ReceivedTextBox;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlInputText ReceivedTextBox;
         
         /// <summary>
         /// UserTextBox control.
@@ -82,7 +82,7 @@ namespace MixERP.Net.Core.Modules.Inventory {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlInputText UserTextBox;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlInputText UserTextBox;
         
         /// <summary>
         /// ReferenceNumberTextBox control.
@@ -91,7 +91,7 @@ namespace MixERP.Net.Core.Modules.Inventory {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlInputText ReferenceNumberTextBox;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlInputText ReferenceNumberTextBox;
         
         /// <summary>
         /// StatementReferenceTextBox control.
@@ -100,7 +100,7 @@ namespace MixERP.Net.Core.Modules.Inventory {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.HtmlControls.HtmlInputText StatementReferenceTextBox;
+        protected global::MixERP.Net.Framework.Web.HtmlControls.HtmlInputText StatementReferenceTextBox;
         
         /// <summary>
         /// ShowButton control.
@@ -109,7 +109,7 @@ namespace MixERP.Net.Core.Modules.Inventory {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.Button ShowButton;
+        protected global::MixERP.Net.Framework.Web.WebControls.Button ShowButton;
         
         /// <summary>
         /// GridViewPlaceholder control.
@@ -118,6 +118,6 @@ namespace MixERP.Net.Core.Modules.Inventory {
         /// Auto-generated field.
         /// To modify move field declaration from designer file to code-behind file.
         /// </remarks>
-        protected global::System.Web.UI.WebControls.PlaceHolder GridViewPlaceholder;
+        protected global::MixERP.Net.Framework.Web.WebControls.PlaceHolder GridViewPlaceholder;
     }
 }

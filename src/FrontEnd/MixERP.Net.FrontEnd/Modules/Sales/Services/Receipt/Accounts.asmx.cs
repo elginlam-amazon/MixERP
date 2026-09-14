@@ -24,9 +24,9 @@ using MixERP.Net.Entities.Office;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
-using System.Web.Script.Services;
-using System.Web.Services;
-using System.Web.UI.WebControls;
+using MixERP.Net.Framework.Web.Script.Services;
+using MixERP.Net.Framework.Web.Services;
+using MixERP.Net.Framework.Web.WebControls;
 
 namespace MixERP.Net.Core.Modules.Sales.Services.Receipt
 {

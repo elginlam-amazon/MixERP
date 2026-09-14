@@ -20,7 +20,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.Common;
 using MixERP.Net.WebControls.ScrudFactory.Controls;
 using MixERP.Net.WebControls.ScrudFactory.Data;
-using System.Web.UI;
+using MixERP.Net.Framework.Web;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {

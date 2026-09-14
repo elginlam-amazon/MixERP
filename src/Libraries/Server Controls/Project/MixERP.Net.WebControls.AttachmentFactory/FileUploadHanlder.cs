@@ -5,7 +5,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Web;
+using MixERP.Net.Framework.Web;
 
 namespace MixERP.Net.WebControls.AttachmentFactory
 {
