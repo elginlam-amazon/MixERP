@@ -221,7 +221,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Policy
             {
                 string url = e.Row.Cells[5].Text;
 
-                url = Server.HtmlDecode(url).Trim();
+                url = System.Net.WebUtility.HtmlDecode(url).Trim();
 
                 using (HtmlAnchor anchor = new HtmlAnchor())
                 {

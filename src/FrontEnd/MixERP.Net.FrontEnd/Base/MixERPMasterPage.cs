@@ -77,7 +77,7 @@ namespace MixERP.Net.FrontEnd.Base
 
         private int Update()
         {
-            if (Conversion.TryCastBoolean(Application["UpdateAvailable"]) &&
+            if (Conversion.TryCastBoolean(System.Web.HttpContext.Current?.Application?["UpdateAvailable"]) &&
                 AppUsers.GetCurrent().View.IsAdmin.ToBool())
             {
                 return 1;

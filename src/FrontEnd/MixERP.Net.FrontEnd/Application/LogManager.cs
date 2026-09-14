@@ -68,7 +68,7 @@ namespace MixERP.Net.FrontEnd.Application
 
             return
                 new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
-                    .WriteTo.RollingFile(GetLogFileName());
+                    .WriteTo.File(GetLogFileName());
         }
 
         internal static void IntializeLogger()

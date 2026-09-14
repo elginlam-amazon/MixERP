@@ -44,14 +44,14 @@ namespace MixERP.Net.Updater.Installation.Tasks
             task.Wait();
         }
 
-        private Task DownloadTask(string downloadFrom, string destination)
+        private async Task DownloadTask(string downloadFrom, string destination)
         {
-            using (WebClient client = new WebClient())
+            using (var client = new System.Net.Http.HttpClient())
             {
-                client.DownloadProgressChanged += this.OnDownloadProgress;
-                client.DownloadFileCompleted += this.OnDownloadComplete;
-
-                return client.DownloadFileTaskAsync(new Uri(downloadFrom), destination);
+                var response = await client.GetAsync(downloadFrom);
+                response.EnsureSuccessStatusCode();
+                var bytes = await response.Content.ReadAsByteArrayAsync();
+                await System.IO.File.WriteAllBytesAsync(destination, bytes);
             }
         }
 

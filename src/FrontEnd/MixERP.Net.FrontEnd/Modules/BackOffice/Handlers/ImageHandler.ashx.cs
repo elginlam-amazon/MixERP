@@ -78,6 +78,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
                     path = context.Server.MapPath("~/Static/images/document.png");
                 }
 
+#pragma warning disable CA1416
                 using (Bitmap originalImage = new Bitmap(path))
                 {
                     byte[] buffer = ImageHelper.GetResizedImage(originalImage, width, height);
@@ -91,6 +92,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
                     context.Response.OutputStream.Write(buffer, 0, buffer.Length);
                     context.Response.End();
                 }
+#pragma warning restore CA1416
             }
         }
 
@@ -98,7 +100,9 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
         {
             try
             {
+#pragma warning disable CA1416
                 using (new Bitmap(path))
+#pragma warning restore CA1416
                 {
                     return true;
                 }

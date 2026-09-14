@@ -74,7 +74,7 @@ namespace MixERP.Net.Common
                 return null;
             }
 
-            using (SHA512CryptoServiceProvider provider = new SHA512CryptoServiceProvider())
+            using (SHA512 provider = SHA512.Create())
             {
                 return BitConverter.ToString(provider.ComputeHash(Encoding.UTF8.GetBytes(password + salt))).Replace("-", "").ToLower(CultureInfo.InvariantCulture);
             }
@@ -102,7 +102,7 @@ namespace MixERP.Net.Common
             {
                 return null;
             }
-            string physicalApplicationPath = HttpContext.Current.Request.PhysicalApplicationPath;
+            string physicalApplicationPath = System.Web.Hosting.HostingEnvironment.ApplicationPhysicalPath;
 
             if (string.IsNullOrWhiteSpace(physicalApplicationPath))
             {
@@ -114,14 +114,14 @@ namespace MixERP.Net.Common
 
         public static string ResolveUrl(string url)
         {
-            Page page = HttpContext.Current.Handler as Page;
+            Page page = HttpContext.Current?.Handler as Page;
 
             if (page == null)
             {
                 return url;
             }
 
-            return (page).ResolveUrl(url);
+            return page.ResolveUrl(url);
         }
 
         public static bool TryCastBoolean(object value)
@@ -177,7 +177,7 @@ namespace MixERP.Net.Common
 
                 if (value is DateTime)
                 {
-                    return (DateTime) value;
+                    return (DateTime)value;
                 }
 
 
@@ -249,7 +249,7 @@ namespace MixERP.Net.Common
             {
                 if (value is double)
                 {
-                    return (double) value;
+                    return (double)value;
                 }
 
                 string numberToParse = value.ToString();
@@ -279,7 +279,7 @@ namespace MixERP.Net.Common
 
                 if (value is int)
                 {
-                    return (int) value;
+                    return (int)value;
                 }
 
 
@@ -302,7 +302,7 @@ namespace MixERP.Net.Common
             {
                 if (value is long)
                 {
-                    return (long) value;
+                    return (long)value;
                 }
 
                 string numberToParse = value.ToString();
@@ -324,7 +324,7 @@ namespace MixERP.Net.Common
             {
                 if (value is short)
                 {
-                    return (short) value;
+                    return (short)value;
                 }
 
                 string numberToParse = value.ToString();
@@ -346,7 +346,7 @@ namespace MixERP.Net.Common
             {
                 if (value is float)
                 {
-                    return (float) value;
+                    return (float)value;
                 }
 
                 string numberToParse = value.ToString();
@@ -360,8 +360,6 @@ namespace MixERP.Net.Common
             return retVal;
         }
 
-        //    return number;
-        //}
         public static string TryCastString(object value)
         {
             if (value != null)
@@ -397,9 +395,8 @@ namespace MixERP.Net.Common
 
             if (value is Unit)
             {
-                return (Unit) value;
+                return (Unit)value;
             }
-
 
             return Unit.Parse(value.ToString(), CultureInfo.DefaultThreadCurrentCulture);
         }

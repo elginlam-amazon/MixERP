@@ -109,17 +109,9 @@ namespace MixERP.Net.Core.Modules.Finance.Data
 
             if (notificationReceived != null)
             {
-                if (e.Notice == null && !string.IsNullOrWhiteSpace(e.Message))
+                if (!string.IsNullOrWhiteSpace(e.Message))
                 {
-                    MixERPPGEventArgs args = new MixERPPGEventArgs(e.Message, "error", 0);
-                    notificationReceived(this, args);
-                    return;
-                }
-
-                if (e.Notice != null && e.Notice.Severity.ToUpperInvariant().Equals("INFO"))
-                {
-                    MixERPPGEventArgs args = new MixERPPGEventArgs(e.Notice.Message, e.Notice.Detail, 0);
-
+                    MixERPPGEventArgs args = new MixERPPGEventArgs(e.Message, e.Notice ?? "info", 0);
                     notificationReceived(this, args);
                 }
             }

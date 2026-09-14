@@ -33,7 +33,7 @@ namespace MixERP.Net.DbFactory
 {
     public class DbNotificationArgs : EventArgs
     {
-        public NpgsqlError Notice { get; set; }
+        public string Notice { get; set; }
         public string Message { get; set; }
     }
 
@@ -65,7 +65,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -88,9 +88,10 @@ namespace MixERP.Net.DbFactory
 
         private static string GetDBErrorResource(NpgsqlException ex)
         {
-            string message = DbErrors.Get(ex.Code);
+            string code = ex.SqlState ?? string.Empty;
+            string message = DbErrors.Get(code);
 
-            if (message == ex.Code)
+            if (message == code)
             {
                 return ex.Message;
             }
@@ -123,7 +124,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -155,7 +156,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -187,7 +188,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -227,7 +228,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -279,7 +280,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -334,7 +335,7 @@ namespace MixERP.Net.DbFactory
                             {
                                 string errorMessage = ex.Message;
 
-                                if (ex.Code.StartsWith("P"))
+                                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                                 {
                                     errorMessage = GetDBErrorResource(ex);
                                 }
@@ -362,7 +363,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -423,8 +424,8 @@ namespace MixERP.Net.DbFactory
             {
                 DbNotificationArgs args = new DbNotificationArgs
                 {
-                    Notice = e.Notice,
-                    Message = e.Notice.Message
+                    Notice = e.Notice?.MessageText ?? string.Empty,
+                    Message = e.Notice?.MessageText ?? string.Empty
                 };
 
                 listen(this, args);

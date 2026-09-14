@@ -2,7 +2,6 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Reflection;
-using System.Security.Permissions;
 using System.Web;
 using System.Web.Script.Serialization;
 using System.Web.Script.Services;
@@ -14,8 +13,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory.Handlers
     [WebService(Namespace = "http://tempuri.org/")]
     [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ScriptService]
-    [PermissionSet(SecurityAction.InheritanceDemand, Unrestricted = true)]
-    public class UploadService : WebService, IHttpHandlerFactory
+        public class UploadService : WebService, IHttpHandlerFactory
     {
         public IHttpHandler GetHandler(HttpContext context, string requestType, string url, string pathTranslated)
         {

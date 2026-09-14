@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <!-- Disable auto-generation of AssemblyInfo.cs to avoid CS0579 duplicate attribute errors.
+         Existing Properties/AssemblyInfo.cs files in each project remain authoritative. -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!-- Suppress CA1416 (Windows-specific platform warnings from System.Drawing.Common) 
+         and CLS compliance warnings from Npgsql/SystemWebAdapters stub types -->
+    <NoWarn>$(NoWarn);CA1416;CS3001;CS3002;CS3003;CS3008;CS3009</NoWarn>
+  </PropertyGroup>
+</Project>

@@ -17,18 +17,16 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using Microsoft.Owin;
-using Owin;
-
-[assembly: OwinStartup(typeof(MixERP.Net.FrontEnd.Hubs.Startup))]
+// OWIN Startup has been migrated to Program.cs (ASP.NET Core)
+// This file is kept for reference but the startup configuration
+// is now handled in Program.cs.
 
 namespace MixERP.Net.FrontEnd.Hubs
 {
-    public class Startup
+    // SignalR mapping is configured in Program.cs
+    // app.MapHub<UpdateHub>("/updateHub") should be added there.
+    internal static class SignalRStartupNote
     {
-        public void Configuration(IAppBuilder app)
-        {
-            app.MapSignalR();
-        }
+        // SignalR startup migrated to Program.cs
     }
 }
