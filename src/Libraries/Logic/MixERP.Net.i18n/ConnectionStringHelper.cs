@@ -1,4 +1,4 @@
-﻿using Npgsql;
+using Npgsql;
 using System.Configuration;
 using System.Web.Hosting;
 
@@ -29,9 +29,20 @@ namespace MixERP.Net.i18n
                 return string.Empty;
             }
 
-            string path = HostingEnvironment.MapPath(ConfigurationManager.AppSettings[configFileName]);
+            string mappedPath = ConfigurationManager.AppSettings[configFileName];
+            if (string.IsNullOrWhiteSpace(mappedPath))
+            {
+                return string.Empty;
+            }
 
-            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap {ExeConfigFilename = path};
+            string path = HostingEnvironment.MapPath(mappedPath);
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return string.Empty;
+            }
+
+            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap { ExeConfigFilename = path };
             Configuration config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap,
                 ConfigurationUserLevel.None);
             AppSettingsSection section = config.GetSection("appSettings") as AppSettingsSection;
@@ -54,12 +65,10 @@ namespace MixERP.Net.i18n
             {
                 Host = host,
                 Database = database,
-                UserName = username,
+                Username = username,
                 Password = password,
                 Port = port,
-                SyncNotification = true,
                 Pooling = true,
-                SSL = true,
                 SslMode = SslMode.Prefer,
                 MinPoolSize = 10,
                 MaxPoolSize = 100,

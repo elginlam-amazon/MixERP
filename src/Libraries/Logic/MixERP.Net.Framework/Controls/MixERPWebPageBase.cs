@@ -50,8 +50,7 @@ namespace MixERP.Net.Framework.Controls
 
             if (master != null)
             {
-                using (
-                    ContentPlaceHolder placeHolder = FindControlIterative(master, placeHolderId) as ContentPlaceHolder)
+                using (System.Web.UI.ContentPlaceHolder placeHolder = FindControlIterative(master, placeHolderId) as System.Web.UI.ContentPlaceHolder)
                 {
                     if (placeHolder != null)
                     {

@@ -1,7 +1,5 @@
-﻿using MixERP.Net.Common.Helpers;
-using System.Drawing;
-using System.Threading;
-using TheArtOfDev.HtmlRenderer.WinForms;
+// HtmlRendererImageSerializer - stubbed out for .NET 10 Linux compatibility
+// TheArtOfDev.HtmlRenderer.WinForms is Windows-only and not available in .NET 10 on Linux
 
 namespace MixERP.Net.HtmlParser.ImageSerializer
 {
@@ -9,19 +7,8 @@ namespace MixERP.Net.HtmlParser.ImageSerializer
     {
         internal override void CreateImage(string imagePath)
         {
-            Thread thread = new Thread(delegate()
-            {
-                string path = imagePath + ImageHelper.GetFileExtension(this.ImageFormat);
-
-                Image image = HtmlRender.RenderToImage(this.Html);
-
-                image.Save(path, ImageHelper.GetEncoder(this.ImageFormat), null);
-                OnImageSaved(new ImageSavedEventArgs(path));
-            });
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
-
+            // HtmlRenderer.WinForms is not available on Linux/.NET 10
+            // This implementation is a no-op stub
             base.CreateImage(imagePath);
         }
     }

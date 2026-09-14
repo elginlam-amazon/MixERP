@@ -9,8 +9,7 @@ using System.Web.UI.WebControls;
 namespace MixERP.Net.WebControls.StockAdjustmentFactory
 {
     [ToolboxData("<{0}:FormView runat=server></{0}:FormView>")]
-    [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
-    public partial class FormView : CompositeControl
+        public partial class FormView : CompositeControl
     {
         private HtmlGenericControl container;
         private DateTextBox dateTextBox;

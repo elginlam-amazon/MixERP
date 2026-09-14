@@ -33,9 +33,20 @@ namespace MixERP.Net.Common.Helpers
                 return string.Empty;
             }
 
-            string path = HostingEnvironment.MapPath(ConfigurationManager.AppSettings[configFileName]);
+            string mappedPath = ConfigurationManager.AppSettings[configFileName];
+            if (string.IsNullOrWhiteSpace(mappedPath))
+            {
+                return string.Empty;
+            }
 
-            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap {ExeConfigFilename = path};
+            string path = HostingEnvironment.MapPath(mappedPath);
+
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return string.Empty;
+            }
+
+            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap { ExeConfigFilename = path };
             Configuration config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap,
                 ConfigurationUserLevel.None);
             AppSettingsSection section = config.GetSection("appSettings") as AppSettingsSection;
@@ -90,7 +101,7 @@ namespace MixERP.Net.Common.Helpers
 
         public static string SetConfigurationValues(string configFileName, string sectionName, string value)
         {
-            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap {ExeConfigFilename = configFileName};
+            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap { ExeConfigFilename = configFileName };
             var config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap, ConfigurationUserLevel.None);
             AppSettingsSection section = config.GetSection("appSettings") as AppSettingsSection;
 
@@ -109,7 +120,7 @@ namespace MixERP.Net.Common.Helpers
         public static void SetConfigurationValues(string configFileName,
             Collection<KeyValuePair<string, string>> sections)
         {
-            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap {ExeConfigFilename = configFileName};
+            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap { ExeConfigFilename = configFileName };
             var config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap, ConfigurationUserLevel.None);
             AppSettingsSection appsetting = config.GetSection("appSettings") as AppSettingsSection;
 

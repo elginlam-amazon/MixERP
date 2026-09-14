@@ -31,7 +31,7 @@ namespace MixERP.Net.Common.Helpers
                 return;
             }
 
-            HttpSessionState session = HttpContext.Current.Session;
+            HttpSessionState session = HttpContext.Current?.Session;
 
             if (session != null && session[key] != null)
             {
@@ -46,7 +46,7 @@ namespace MixERP.Net.Common.Helpers
                 return;
             }
 
-            HttpSessionState session = HttpContext.Current.Session;
+            HttpSessionState session = HttpContext.Current?.Session;
             if (session != null)
             {
                 if (session[key] == null)
@@ -64,7 +64,7 @@ namespace MixERP.Net.Common.Helpers
         {
             if (!string.IsNullOrWhiteSpace(key))
             {
-                HttpSessionState session = HttpContext.Current.Session;
+                HttpSessionState session = HttpContext.Current?.Session;
                 if (session != null && session[key] != null)
                 {
                     return session[key];

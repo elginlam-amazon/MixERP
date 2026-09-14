@@ -9,8 +9,7 @@ using System.Web.UI.WebControls;
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
     [ToolboxData("<{0}:TransactionView runat=server></{0}:TransactionView>")]
-    [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
-    public sealed partial class TransactionView : CompositeControl
+        public sealed partial class TransactionView : CompositeControl
     {
         private HtmlGenericControl panel;
 

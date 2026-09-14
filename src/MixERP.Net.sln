@@ -1,11 +1,11 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Common", "Libraries\Logic\MixERP.net.Common\MixERP.Net.Common.csproj", "{D5A09C22-8F48-4FB2-A14D-C62C8C8FCEC0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.FrontEnd", "FrontEnd\MixERP.net.FrontEnd\MixERP.Net.FrontEnd.csproj", "{ACE1017D-71BC-4417-A906-72C4B9C55823}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.FrontEnd", "FrontEnd\MixERP.Net.FrontEnd\MixERP.Net.FrontEnd.csproj", "{ACE1017D-71BC-4417-A906-72C4B9C55823}"
 	ProjectSection(ProjectDependencies) = postProject
 		{5A14E96A-3807-4109-B0C7-4B23D151FD14} = {5A14E96A-3807-4109-B0C7-4B23D151FD14}
 	EndProjectSection
@@ -44,7 +44,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.WebControls.Stoc
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Utilities", "Utilities", "{02145AA0-9F04-4AB8-A626-2E9952EA99E6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Utility.SqlBundler", "Utilities\MixERP.Net.Utility.SqlBundler\MixERP.Net.Utility.SqlBundler.csproj", "{5A14E96A-3807-4109-B0C7-4B23D151FD14}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.Utility.SqlBundler", "Utilities\MixERP.Net.Utility.SqlBundler\MixERP.Net.Utility.SqlBundler.csproj", "{5A14E96A-3807-4109-B0C7-4B23D151FD14}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Core Modules (UI)", "Core Modules (UI)", "{817B9B9C-EFB6-42DF-A8C7-C0389B346A07}"
 EndProject
@@ -70,33 +70,33 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Frontend (UI)", "Frontend (
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Data", "Data", "{C615459A-CAF8-4802-A187-C746853A5D82}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Core.Modules.BackOffice.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\BackOffice.Data\MixERP.Net.Core.Modules.BackOffice.Data.csproj", "{19A6C0BB-7737-486C-B2BF-DF1F9290DFE9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.Core.Modules.BackOffice.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\BackOffice.Data\MixERP.Net.Core.Modules.BackOffice.Data.csproj", "{19A6C0BB-7737-486C-B2BF-DF1F9290DFE9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Core.Modules.CRM.data", "FrontEnd\MixERP.Net.FrontEnd\Modules\CRM.data\MixERP.Net.Core.Modules.CRM.data.csproj", "{CBB57F23-B95E-4328-A786-8D1248EEA525}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.Core.Modules.CRM.data", "FrontEnd\MixERP.Net.FrontEnd\Modules\CRM.data\MixERP.Net.Core.Modules.CRM.data.csproj", "{CBB57F23-B95E-4328-A786-8D1248EEA525}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Core.Modules.Sales.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\Sales.Data\MixERP.Net.Core.Modules.Sales.Data.csproj", "{DC4BD356-F8CF-4D06-8C2B-007A0E737F40}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.Core.Modules.Sales.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\Sales.Data\MixERP.Net.Core.Modules.Sales.Data.csproj", "{DC4BD356-F8CF-4D06-8C2B-007A0E737F40}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Core.Modules.Purchase.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\Purchase.Data\MixERP.Net.Core.Modules.Purchase.Data.csproj", "{AF16EA95-9B7E-44E0-8BBA-7C2A3895AFBF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.Core.Modules.Purchase.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\Purchase.Data\MixERP.Net.Core.Modules.Purchase.Data.csproj", "{AF16EA95-9B7E-44E0-8BBA-7C2A3895AFBF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Core.Modules.POS.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\POS.Data\MixERP.Net.Core.Modules.POS.Data.csproj", "{25F71631-0892-42C3-B209-6329F4AACECA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.Core.Modules.POS.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\POS.Data\MixERP.Net.Core.Modules.POS.Data.csproj", "{25F71631-0892-42C3-B209-6329F4AACECA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Core.Modules.Manufacturing.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\Manufacturing.Data\MixERP.Net.Core.Modules.Manufacturing.Data.csproj", "{71676CBA-E060-4EBA-A50B-7EB8A7BEEE1C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.Core.Modules.Manufacturing.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\Manufacturing.Data\MixERP.Net.Core.Modules.Manufacturing.Data.csproj", "{71676CBA-E060-4EBA-A50B-7EB8A7BEEE1C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Core.Modules.Inventory.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\Inventory.Data\MixERP.Net.Core.Modules.Inventory.Data.csproj", "{599DD5FD-DBF7-48B1-86FC-73B5EA70AA59}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.Core.Modules.Inventory.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\Inventory.Data\MixERP.Net.Core.Modules.Inventory.Data.csproj", "{599DD5FD-DBF7-48B1-86FC-73B5EA70AA59}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Core.Modules.Finance.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\Finance.Data\MixERP.Net.Core.Modules.Finance.Data.csproj", "{8027734A-20B1-42E5-ADDE-5F51BF5BBC08}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.Core.Modules.Finance.Data", "FrontEnd\MixERP.Net.FrontEnd\Modules\Finance.Data\MixERP.Net.Core.Modules.Finance.Data.csproj", "{8027734A-20B1-42E5-ADDE-5F51BF5BBC08}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Module Projects (UI)", "Module Projects (UI)", "{EE97E3B1-0DD0-453B-A0AA-4AF12099B0CA}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.FrontEnd.Data", "FrontEnd\MixERP.Net.FrontEnd.Data\MixERP.Net.FrontEnd.Data.csproj", "{A84ED536-8E44-4D32-A22D-26D9924A9481}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.FrontEnd.Data", "FrontEnd\MixERP.Net.FrontEnd.Data\MixERP.Net.FrontEnd.Data.csproj", "{A84ED536-8E44-4D32-A22D-26D9924A9481}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.TransactionGovernor", "Libraries\Logic\MixERP.Net.TransactionGovernor\MixERP.Net.TransactionGovernor.csproj", "{0AACF4DB-8332-4C4B-96DF-2BF6AEA68473}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.TransactionGovernor", "Libraries\Logic\MixERP.Net.TransactionGovernor\MixERP.Net.TransactionGovernor.csproj", "{0AACF4DB-8332-4C4B-96DF-2BF6AEA68473}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.TransactionGovernor.Data", "Libraries\Logic\MixERP.Net.TransactionGovernor.Data\MixERP.Net.TransactionGovernor.Data.csproj", "{4FB50AA0-EEFB-497C-A5F8-E79249EE3895}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.TransactionGovernor.Data", "Libraries\Logic\MixERP.Net.TransactionGovernor.Data\MixERP.Net.TransactionGovernor.Data.csproj", "{4FB50AA0-EEFB-497C-A5F8-E79249EE3895}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Messaging.Email", "Libraries\Logic\MixERP.Net.Messaging\MixERP.Net.Messaging.Email.csproj", "{D29B7B60-76B2-4A00-A8FA-7654519AFCD4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.Messaging.Email", "Libraries\Logic\MixERP.Net.Messaging\MixERP.Net.Messaging.Email.csproj", "{D29B7B60-76B2-4A00-A8FA-7654519AFCD4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.HtmlParser", "Libraries\Logic\MixERP.Net.HtmlParser\MixERP.Net.HtmlParser.csproj", "{0EF8A910-9603-477E-9EF7-AAE9AEA46160}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.HtmlParser", "Libraries\Logic\MixERP.Net.HtmlParser\MixERP.Net.HtmlParser.csproj", "{0EF8A910-9603-477E-9EF7-AAE9AEA46160}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Module-Specific Server Controls", "Module-Specific Server Controls", "{F6686C51-15FC-4E3A-A96B-E17C7F983B05}"
 EndProject
@@ -124,35 +124,35 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".nuget", ".nuget", "{9F33DC
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Model", "Model", "{233426C2-5C7A-499E-A7F2-FB9AE5A267EF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Entities", "Libraries\Logic\MixERP.Net.Entities\MixERP.Net.Entities.csproj", "{BDE918B1-DD9B-41C9-A41F-F3DDEC18B6D8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.Entities", "Libraries\Logic\MixERP.Net.Entities\MixERP.Net.Entities.csproj", "{BDE918B1-DD9B-41C9-A41F-F3DDEC18B6D8}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.WebControls.AttachmentFactory", "Libraries\Server Controls\Project\MixERP.Net.WebControls.AttachmentFactory\MixERP.Net.WebControls.AttachmentFactory.csproj", "{403F308D-10E7-4C70-9360-1027EE541495}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Core API", "Core API", "{79537F4D-F481-458C-98BA-71937D32E2E2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.i18n", "Libraries\Logic\MixERP.Net.i18n\MixERP.Net.i18n.csproj", "{2ECD1C2E-D7D0-4A24-896A-E625B0566DB5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.i18n", "Libraries\Logic\MixERP.Net.i18n\MixERP.Net.i18n.csproj", "{2ECD1C2E-D7D0-4A24-896A-E625B0566DB5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.ReportManager", "Libraries\Logic\MixERP.Net.ReportManager\MixERP.Net.ReportManager.csproj", "{52F97ED7-2013-4950-8725-01E5715EB285}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.ReportManager", "Libraries\Logic\MixERP.Net.ReportManager\MixERP.Net.ReportManager.csproj", "{52F97ED7-2013-4950-8725-01E5715EB285}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Updater", "Libraries\Logic\MixERP.Net.Updater\MixERP.Net.Updater.csproj", "{F5C04E5A-A4B3-40AC-8F45-318419648977}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.Updater", "Libraries\Logic\MixERP.Net.Updater\MixERP.Net.Updater.csproj", "{F5C04E5A-A4B3-40AC-8F45-318419648977}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Plugins", "Plugins", "{A22E91A0-68BF-4A62-85C0-9C998B260EC6}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Forex", "Forex", "{E892210E-9F2A-468D-BFDA-FBBE2F7D31CD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.CurrencyConversion.Currencylayer", "Libraries\CurrencyAPI\MixERP.Net.CurrencyConversion.Currencylayer\MixERP.Net.CurrencyConversion.Currencylayer.csproj", "{1B0805D4-BCAE-4159-824E-46E3A2DD820B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.CurrencyConversion.Currencylayer", "Libraries\CurrencyAPI\MixERP.Net.CurrencyConversion.Currencylayer\MixERP.Net.CurrencyConversion.Currencylayer.csproj", "{1B0805D4-BCAE-4159-824E-46E3A2DD820B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.CurrencyConversion.OpenExchangeRates", "Libraries\CurrencyAPI\MixERP.Net.CurrencyConversion.OpenExchangeRates\MixERP.Net.CurrencyConversion.OpenExchangeRates.csproj", "{3690D4C3-E5CF-4EAD-8E1C-9D7222DE8077}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.CurrencyConversion.OpenExchangeRates", "Libraries\CurrencyAPI\MixERP.Net.CurrencyConversion.OpenExchangeRates\MixERP.Net.CurrencyConversion.OpenExchangeRates.csproj", "{3690D4C3-E5CF-4EAD-8E1C-9D7222DE8077}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.ApplicationState", "Libraries\Logic\MixER.Net.StateServer\MixERP.Net.ApplicationState.csproj", "{61AB8B69-2097-4595-97B7-4A930A70163D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.ApplicationState", "Libraries\Logic\MixER.Net.StateServer\MixERP.Net.ApplicationState.csproj", "{61AB8B69-2097-4595-97B7-4A930A70163D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Framework", "Libraries\Logic\MixERP.Net.Framework\MixERP.Net.Framework.csproj", "{1509332F-AE98-44D9-9072-5BBC59A65FC4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.Framework", "Libraries\Logic\MixERP.Net.Framework\MixERP.Net.Framework.csproj", "{1509332F-AE98-44D9-9072-5BBC59A65FC4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PetaPoco", "Libraries\Logic\PetaPoco\PetaPoco.csproj", "{969D7960-52E2-40FC-91E5-1393B71E23B0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PetaPoco", "Libraries\Logic\PetaPoco\PetaPoco.csproj", "{969D7960-52E2-40FC-91E5-1393B71E23B0}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Checklists", "Checklists", "{34EB5A50-5B29-4868-BDC9-885278295286}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.FirstSteps", "Libraries\Checklists\MixERP.Net.FirstSteps\MixERP.Net.FirstSteps.csproj", "{A17952E5-9497-4013-88AA-BBEFFC2D67F7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MixERP.Net.FirstSteps", "Libraries\Checklists\MixERP.Net.FirstSteps\MixERP.Net.FirstSteps.csproj", "{A17952E5-9497-4013-88AA-BBEFFC2D67F7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

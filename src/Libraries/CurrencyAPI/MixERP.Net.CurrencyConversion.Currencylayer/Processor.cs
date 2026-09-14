@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using MixERP.Net.Framework.Contracts.Currency;
@@ -53,7 +53,10 @@ namespace MixERP.Net.CurrencyConversion.Currencylayer
             {
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(this.MediaType));
-                client.DefaultRequestHeaders.Add("User-Agent", this.UserAgent);
+                if (!string.IsNullOrWhiteSpace(this.UserAgent))
+                {
+                    client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", this.UserAgent);
+                }
 
                 HttpResponseMessage response = client.GetAsync(url).Result;
 

@@ -18,9 +18,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
+using System.IO;
 using System.IO.Compression;
-using System.Security;
-using System.Security.Permissions;
 using System.Web.Hosting;
 
 namespace MixERP.Net.Common.Helpers
@@ -34,16 +33,30 @@ namespace MixERP.Net.Common.Helpers
                 return false;
             }
 
-            FileIOPermission permission = new FileIOPermission(FileIOPermissionAccess.Write, HostingEnvironment.MapPath(directory));
-            PermissionSet permissionSet = new PermissionSet(PermissionState.None);
-            permissionSet.AddPermission(permission);
-
-            return permissionSet.IsSubsetOf(AppDomain.CurrentDomain.PermissionSet);
+            try
+            {
+                string physicalPath = HostingEnvironment.MapPath(directory);
+                if (!Directory.Exists(physicalPath))
+                {
+                    return false;
+                }
+                // Try to write a temp file to check writability
+                string testFile = Path.Combine(physicalPath, Path.GetRandomFileName());
+                using (File.Create(testFile))
+                {
+                }
+                File.Delete(testFile);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
-        public static void Unzip(string archive, string destnation)
+        public static void Unzip(string archive, string destination)
         {
-            ZipFile.ExtractToDirectory(archive, destnation);
+            ZipFile.ExtractToDirectory(archive, destination);
         }
     }
 }

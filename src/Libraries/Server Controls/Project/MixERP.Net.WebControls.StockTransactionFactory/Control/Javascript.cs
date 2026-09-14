@@ -54,8 +54,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             return "Purchase";
         }
 
-        [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
-        private void AddJavascript()
+                private void AddJavascript()
         {
             JSUtility.AddJSReference(this.Page, "MixERP.Net.WebControls.StockTransactionFactory.Includes.Script.StockTransactionForm.js", "StockTransactionForm", typeof(StockTransactionForm));
         }

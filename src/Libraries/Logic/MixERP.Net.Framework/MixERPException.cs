@@ -19,7 +19,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Runtime.Serialization;
-using System.Security.Permissions;
 using System.Web;
 using Serilog;
 
@@ -50,21 +49,26 @@ namespace MixERP.Net.Framework
             this.dbConstraintName = dbConstraintName;
         }
 
-        public MixERPException(SerializationInfo info, StreamingContext context)
+#pragma warning disable SYSLIB0051
+        protected MixERPException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
+#pragma warning restore SYSLIB0051
 
         public string DBConstraintName
         {
             get { return this.dbConstraintName; }
         }
 
-        [SecurityPermission(SecurityAction.Demand, SerializationFormatter = true)]
+#pragma warning disable SYSLIB0051
+#pragma warning disable CS0672
+        [Obsolete("Serialization is obsolete")]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
         }
+#pragma warning restore SYSLIB0051
 
         public static void Handle(MixERPException ex)
         {
@@ -73,14 +77,13 @@ namespace MixERP.Net.Framework
                 return;
             }
 
-            if (HttpContext.Current.Session != null)
+            if (HttpContext.Current?.Session != null)
             {
                 HttpContext.Current.Session["ex"] = ex;
                 Log.Information("Exception object was added to session.");
 
-                HttpContext.Current.Server.TransferRequest("~/Site/RuntimeError.aspx", true);
+                HttpContext.Current.Response.Redirect("~/Site/RuntimeError.aspx");
             }
         }
-
     }
 }

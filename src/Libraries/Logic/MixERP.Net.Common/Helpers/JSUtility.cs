@@ -31,7 +31,7 @@ namespace MixERP.Net.Common.Helpers
         {
             if (page != null)
             {
-                string script = "<script type='text/javascript' src='" + page.Request.Url.GetLeftPart(UriPartial.Authority) + page.ClientScript.GetWebResourceUrl(type, resourceName) + "'></script>";
+                string script = "<script type='text/javascript' src='" + page.Request?.Url?.GetLeftPart(UriPartial.Authority) + page.ClientScript.GetWebResourceUrl(type, resourceName) + "'></script>";
                 PageUtility.RegisterJavascript(key, script, page, false);
             }
         }
