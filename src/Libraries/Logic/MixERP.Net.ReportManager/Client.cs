@@ -26,7 +26,7 @@ namespace MixERP.Net.ReportManager
                 {
                     client.DefaultRequestHeaders.Accept.Clear();
                     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Config.MediaType));
-                    client.DefaultRequestHeaders.Add("User-Agent", Config.UserAgent);
+                    client.DefaultRequestHeaders.Add("User-Agent", Config.Headers["User-Agent"].ToString());
 
                     HttpResponseMessage response = await client.GetAsync(this.Url);
 

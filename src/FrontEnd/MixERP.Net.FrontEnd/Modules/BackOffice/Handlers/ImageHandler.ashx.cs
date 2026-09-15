@@ -19,8 +19,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
+using SkiaSharp;
 using System;
-using System.Drawing;
 using System.Globalization;
 using System.Web;
 
@@ -78,7 +78,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
                     path = context.Server.MapPath("~/Static/images/document.png");
                 }
 
-                using (Bitmap originalImage = new Bitmap(path))
+                using (SKBitmap originalImage = SKBitmap.Decode(path))
                 {
                     byte[] buffer = ImageHelper.GetResizedImage(originalImage, width, height);
 
@@ -98,9 +98,9 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
         {
             try
             {
-                using (new Bitmap(path))
+                using (SKBitmap bitmap = SKBitmap.Decode(path))
                 {
-                    return true;
+                    return bitmap != null;
                 }
             }
             catch

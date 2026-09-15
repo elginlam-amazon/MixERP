@@ -19,22 +19,19 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.i18n;
 using Serilog;
+using SkiaSharp;
 using System;
-using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Web;
-using System.Web.UI;
-using System.Web.UI.WebControls;
-using Image = System.Drawing.Image;
 
 namespace MixERP.Net.Common
 {
     public static class Conversion
     {
-        public static byte[] ConvertImageToByteArray(Image imageToConvert, ImageFormat formatOfImage)
+        public static byte[] ConvertImageToByteArray(SKBitmap imageToConvert, SKEncodedImageFormat formatOfImage)
         {
             if (imageToConvert == null)
             {
@@ -43,7 +40,11 @@ namespace MixERP.Net.Common
 
             using (MemoryStream ms = new MemoryStream())
             {
-                imageToConvert.Save(ms, formatOfImage);
+                using (var image = SKImage.FromBitmap(imageToConvert))
+                using (var data = image.Encode(formatOfImage, 90))
+                {
+                    data.SaveTo(ms);
+                }
                 return ms.ToArray();
             }
         }
@@ -114,14 +115,11 @@ namespace MixERP.Net.Common
 
         public static string ResolveUrl(string url)
         {
-            Page page = HttpContext.Current.Handler as Page;
-
-            if (page == null)
-            {
-                return url;
-            }
-
-            return (page).ResolveUrl(url);
+            // NOTE: System.Web.UI.Page has no ASP.NET Core / SystemWebAdapters equivalent
+            // (Web Forms UI classes are not supported by SystemWebAdapters). This method
+            // was unused in the codebase; callers needing URL resolution should use
+            // Microsoft.AspNetCore.Http's IUrlHelper / UriHelper instead. See KB doc 02/25.
+            return url;
         }
 
         public static bool TryCastBoolean(object value)
@@ -152,7 +150,7 @@ namespace MixERP.Net.Common
             return retVal;
         }
 
-        public static byte[] TryCastByteArray(Image image)
+        public static byte[] TryCastByteArray(SKBitmap image)
         {
             if (image == null)
             {
@@ -161,7 +159,11 @@ namespace MixERP.Net.Common
 
             using (var ms = new MemoryStream())
             {
-                image.Save(ms, ImageFormat.Jpeg);
+                using (var skImage = SKImage.FromBitmap(image))
+                using (var data = skImage.Encode(SKEncodedImageFormat.Jpeg, 90))
+                {
+                    data.SaveTo(ms);
+                }
                 return ms.ToArray();
             }
         }

@@ -34,7 +34,7 @@ namespace MixERP.Net.CurrencyConversion.Currencylayer
         {
             Processor processor = new Processor(Config.ApiUrl, Config.AccessKeyName, Config.AccessKey,
                 Config.CurrenciesKey, this.CurrencyCodes, Config.SourceKey, this.BaseCurrency, Config.MediaType,
-                Config.RemoveSourceCurrencyFromResult, Config.UserAgent, Config.ResultSubKey, Config.DecimalPlaces,
+                Config.RemoveSourceCurrencyFromResult, Config.Headers["User-Agent"].ToString(), Config.ResultSubKey, Config.DecimalPlaces,
                 Config.FormatKey, Config.DefaultFormat);
 
             return processor.Process();

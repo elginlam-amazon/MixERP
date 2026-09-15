@@ -119,12 +119,10 @@ namespace PetaPoco
             {
                 Host = ConfigurationHelper.GetDbServerParameter("Server"),
                 Database = database,
-                UserName = ConfigurationHelper.GetDbServerParameter("UserId"),
+                Username = ConfigurationHelper.GetDbServerParameter("UserId"),
                 Password = ConfigurationHelper.GetDbServerParameter("Password"),
                 Port = int.Parse(ConfigurationHelper.GetDbServerParameter("Port")),
-                SyncNotification = true,
                 Pooling = true,
-                SSL = true,
                 SslMode = SslMode.Prefer,
                 MinPoolSize = 10,
                 MaxPoolSize = 100,
