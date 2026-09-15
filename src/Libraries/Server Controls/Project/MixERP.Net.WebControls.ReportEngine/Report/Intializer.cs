@@ -21,10 +21,10 @@ using MixERP.Net.Common;
 using MixERP.Net.WebControls.Common;
 using MixERP.Net.WebControls.ReportEngine.Data;
 using MixERP.Net.WebControls.ReportEngine.Helpers;
+using SkiaSharp;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
-using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -150,15 +150,15 @@ namespace MixERP.Net.WebControls.ReportEngine
         }
 
         private string LoadPieCharts(string xml, XmlNode node, string id, int gridViewIndex, bool hideGridView,
-            string type, int width, int height, int titleColumnIndex, int valueColumnIndex, Color backgroundColor,
-            Color borderColor)
+            string type, int width, int height, int titleColumnIndex, int valueColumnIndex, SKColor backgroundColor,
+            SKColor borderColor)
         {
             string pieChart = string.Format(CultureInfo.InvariantCulture,
                 "<div style='background-color:{0};padding:24px;maring:0 auto;border:1px solid {1};'>" +
                 "<canvas id='{2}' width='{3}px' height='{4}px'></canvas>" +
                 "<br />" +
-                "<div id='{2}-legend'></div></div>", ColorTranslator.ToHtml(backgroundColor),
-                ColorTranslator.ToHtml(borderColor), id, width, height);
+                "<div id='{2}-legend'></div></div>", ToHtmlColor(backgroundColor),
+                ToHtmlColor(borderColor), id, width, height);
 
             string script = string.Format(CultureInfo.InvariantCulture, "$(document).ready(function () {{" +
                                                                         "preparePieChart('GridView{0}', '{1}', '{1}-legend', '{2}', {3}, {4}, {5});" +
@@ -317,14 +317,43 @@ namespace MixERP.Net.WebControls.ReportEngine
 
                 bool hideGridView = Conversion.TryCastBoolean(this.GetAttributeValue(node, "HideGridView"));
 
-                Color backgroundColor = ColorTranslator.FromHtml(this.GetAttributeValue(node, "BackgroundColor"));
-                Color borderColor = ColorTranslator.FromHtml(this.GetAttributeValue(node, "BorderColor"));
+                SKColor backgroundColor = ParseHtmlColor(this.GetAttributeValue(node, "BackgroundColor"));
+                SKColor borderColor = ParseHtmlColor(this.GetAttributeValue(node, "BorderColor"));
 
                 xml = this.LoadPieCharts(xml, node, id, gridViewIndex, hideGridView, pieType, width, height,
                     titleColumnIndex, valueColumnIndex, backgroundColor, borderColor);
             }
 
             return xml.Replace("<Charts>", "").Replace("</Charts>", "");
+        }
+
+        /// <summary>
+        /// Parses a CSS/HTML color string (e.g. "#RRGGBB" or a named color) into an SKColor.
+        /// Replaces System.Drawing.ColorTranslator.FromHtml (Windows-only) as part of the
+        /// .NET Framework -> .NET 10 migration (see KB doc 21).
+        /// </summary>
+        private static SKColor ParseHtmlColor(string htmlColor)
+        {
+            if (string.IsNullOrWhiteSpace(htmlColor))
+            {
+                return SKColors.Transparent;
+            }
+
+            if (SKColor.TryParse(htmlColor, out SKColor color))
+            {
+                return color;
+            }
+
+            return SKColors.Transparent;
+        }
+
+        /// <summary>
+        /// Formats an SKColor as a CSS hex color string.
+        /// Replaces System.Drawing.ColorTranslator.ToHtml (Windows-only).
+        /// </summary>
+        private static string ToHtmlColor(SKColor color)
+        {
+            return string.Format(CultureInfo.InvariantCulture, "#{0:X2}{1:X2}{2:X2}", color.Red, color.Green, color.Blue);
         }
 
         private void SetRunningTotalFields()

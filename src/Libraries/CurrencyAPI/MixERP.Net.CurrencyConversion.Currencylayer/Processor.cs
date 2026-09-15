@@ -21,7 +21,7 @@ namespace MixERP.Net.CurrencyConversion.Currencylayer
             this.Source = source;
             this.MediaType = mediaType;
             this.RemoveSourceCurrencyFromResult = removeSourceCurrencyFromResult;
-            this.UserAgent = userAgent;
+            this.Headers["User-Agent"].ToString() = userAgent;
             this.ResultSubKey = resultSubKey;
             this.DecimalPlaces = decimalPlaces;
             this.FormatKey = formatKey;
@@ -53,7 +53,7 @@ namespace MixERP.Net.CurrencyConversion.Currencylayer
             {
                 client.DefaultRequestHeaders.Accept.Clear();
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(this.MediaType));
-                client.DefaultRequestHeaders.Add("User-Agent", this.UserAgent);
+                client.DefaultRequestHeaders.Add("User-Agent", this.Headers["User-Agent"].ToString());
 
                 HttpResponseMessage response = client.GetAsync(url).Result;
 
