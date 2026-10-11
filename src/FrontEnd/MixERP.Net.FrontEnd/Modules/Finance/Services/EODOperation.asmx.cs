@@ -24,11 +24,12 @@ using Serilog;
 using System;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Web.Script.Services;
+using MixERP.Net.Web.Services;
 
 namespace MixERP.Net.Core.Modules.Finance.Services
 {
+    [global::MixERP.Net.Web.UI.VirtualPath(@"~/Modules/Finance/Services/EODOperation.asmx")]
     [WebService(Namespace = "http://tempuri.org/")]
     [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [System.ComponentModel.ToolboxItem(false)]

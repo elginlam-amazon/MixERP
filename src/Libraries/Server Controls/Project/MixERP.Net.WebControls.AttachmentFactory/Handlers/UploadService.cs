@@ -1,42 +1,21 @@
 ﻿using MixERP.Net.ApplicationState.Cache;
 using System;
 using System.Collections.ObjectModel;
-using System.Reflection;
-using System.Security.Permissions;
-using System.Web;
-using System.Web.Script.Serialization;
-using System.Web.Script.Services;
-using System.Web.Services;
-using System.Web.Services.Protocols;
+using Newtonsoft.Json;
+using MixERP.Net.Web.Script.Services;
+using MixERP.Net.Web.Services;
 
 namespace MixERP.Net.WebControls.AttachmentFactory.Handlers
 {
+    /// <summary>
+    ///     Script service mapped to FileUploadHanlder.asmx. The host's script-service endpoint dispatches its web methods
+    ///     (the former IHttpHandlerFactory/WebServiceHandlerFactory plumbing is not needed on ASP.NET Core).
+    /// </summary>
     [WebService(Namespace = "http://tempuri.org/")]
     [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ScriptService]
-    [PermissionSet(SecurityAction.InheritanceDemand, Unrestricted = true)]
-    public class UploadService : WebService, IHttpHandlerFactory
+    public class UploadService : WebService
     {
-        public IHttpHandler GetHandler(HttpContext context, string requestType, string url, string pathTranslated)
-        {
-            WebServiceHandlerFactory factory = new WebServiceHandlerFactory();
-            MethodInfo method = typeof (WebServiceHandlerFactory).GetMethod("CoreGetHandler",
-                BindingFlags.NonPublic | BindingFlags.Instance, null,
-                new Type[] {typeof (Type), typeof (HttpContext), typeof (HttpRequest), typeof (HttpResponse)}, null);
-
-            return (IHttpHandler) method.Invoke(factory, new object[]
-            {
-                this.GetType(),
-                context,
-                context.Request,
-                context.Response
-            });
-        }
-
-        public void ReleaseHandler(IHttpHandler handler)
-        {
-        }
-
         [WebMethod]
         [ScriptMethod(ResponseFormat = ResponseFormat.Xml)]
         public bool UndoUpload(string uploadedFilesJson)
@@ -62,9 +41,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory.Handlers
         public static Collection<Entities.Core.Attachment> GetAttachmentCollection(string json)
         {
             Collection<Entities.Core.Attachment> details = new Collection<Entities.Core.Attachment>();
-            var jss = new JavaScriptSerializer();
-
-            dynamic result = jss.Deserialize<dynamic>(json);
+            dynamic result = JsonConvert.DeserializeObject<dynamic>(json);
 
             if (result != null)
             {

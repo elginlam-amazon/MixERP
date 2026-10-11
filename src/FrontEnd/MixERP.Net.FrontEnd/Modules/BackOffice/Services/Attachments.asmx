@@ -1,1 +1,0 @@
-﻿<%@ WebService Language="C#" CodeBehind="Attachments.asmx.cs" Class="MixERP.Net.Core.Modules.BackOffice.Services.Attachments" %>

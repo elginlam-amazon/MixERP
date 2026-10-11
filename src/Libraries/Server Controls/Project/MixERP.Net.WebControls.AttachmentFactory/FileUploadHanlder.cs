@@ -25,6 +25,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory
             get { return true; }
         }
 
+        [System.CLSCompliant(false)]
         public void ProcessRequest(HttpContext context)
         {
             string attachmentsDirectory = Helpers.ConfigurationHelper.GetAttachmentsDirectory(AppUsers.GetCurrentUserDB());

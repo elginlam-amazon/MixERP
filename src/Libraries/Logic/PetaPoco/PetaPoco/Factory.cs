@@ -19,9 +19,9 @@ namespace PetaPoco
                     return db.Query<T>(sql, args);
                 }
             }
-            catch (NpgsqlException ex)
+            catch (PostgresException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -40,9 +40,9 @@ namespace PetaPoco
                     return db.Insert(poco);
                 }
             }
-            catch (NpgsqlException ex)
+            catch (PostgresException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -61,9 +61,9 @@ namespace PetaPoco
                     return db.ExecuteScalar<T>(sql, args);
                 }
             }
-            catch (NpgsqlException ex)
+            catch (PostgresException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -82,9 +82,9 @@ namespace PetaPoco
                     db.Execute(sql, args);
                 }
             }
-            catch (NpgsqlException ex)
+            catch (PostgresException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -94,11 +94,11 @@ namespace PetaPoco
             }
         }
 
-        private static string GetDBErrorResource(NpgsqlException ex)
+        private static string GetDBErrorResource(PostgresException ex)
         {
-            string message = DbErrors.Get(ex.Code);
+            string message = DbErrors.Get(ex.SqlState);
 
-            if (message == ex.Code)
+            if (message == ex.SqlState)
             {
                 return ex.Message;
             }
@@ -119,12 +119,10 @@ namespace PetaPoco
             {
                 Host = ConfigurationHelper.GetDbServerParameter("Server"),
                 Database = database,
-                UserName = ConfigurationHelper.GetDbServerParameter("UserId"),
+                Username = ConfigurationHelper.GetDbServerParameter("UserId"),
                 Password = ConfigurationHelper.GetDbServerParameter("Password"),
                 Port = int.Parse(ConfigurationHelper.GetDbServerParameter("Port")),
-                SyncNotification = true,
                 Pooling = true,
-                SSL = true,
                 SslMode = SslMode.Prefer,
                 MinPoolSize = 10,
                 MaxPoolSize = 100,

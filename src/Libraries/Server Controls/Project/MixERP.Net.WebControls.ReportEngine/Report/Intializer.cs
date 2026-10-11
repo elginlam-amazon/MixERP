@@ -24,11 +24,10 @@ using MixERP.Net.WebControls.ReportEngine.Helpers;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
-using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
-using System.Web.UI.WebControls;
+using MixERP.Net.Web.UI.WebControls;
 using System.Xml;
 
 namespace MixERP.Net.WebControls.ReportEngine
@@ -150,15 +149,15 @@ namespace MixERP.Net.WebControls.ReportEngine
         }
 
         private string LoadPieCharts(string xml, XmlNode node, string id, int gridViewIndex, bool hideGridView,
-            string type, int width, int height, int titleColumnIndex, int valueColumnIndex, Color backgroundColor,
-            Color borderColor)
+            string type, int width, int height, int titleColumnIndex, int valueColumnIndex, string backgroundColor,
+            string borderColor)
         {
             string pieChart = string.Format(CultureInfo.InvariantCulture,
                 "<div style='background-color:{0};padding:24px;maring:0 auto;border:1px solid {1};'>" +
                 "<canvas id='{2}' width='{3}px' height='{4}px'></canvas>" +
                 "<br />" +
-                "<div id='{2}-legend'></div></div>", ColorTranslator.ToHtml(backgroundColor),
-                ColorTranslator.ToHtml(borderColor), id, width, height);
+                "<div id='{2}-legend'></div></div>", backgroundColor,
+                borderColor, id, width, height);
 
             string script = string.Format(CultureInfo.InvariantCulture, "$(document).ready(function () {{" +
                                                                         "preparePieChart('GridView{0}', '{1}', '{1}-legend', '{2}', {3}, {4}, {5});" +
@@ -317,8 +316,9 @@ namespace MixERP.Net.WebControls.ReportEngine
 
                 bool hideGridView = Conversion.TryCastBoolean(this.GetAttributeValue(node, "HideGridView"));
 
-                Color backgroundColor = ColorTranslator.FromHtml(this.GetAttributeValue(node, "BackgroundColor"));
-                Color borderColor = ColorTranslator.FromHtml(this.GetAttributeValue(node, "BorderColor"));
+                //CSS colors are used as-is (System.Drawing.ColorTranslator is Windows-only on modern .NET).
+                string backgroundColor = this.GetAttributeValue(node, "BackgroundColor");
+                string borderColor = this.GetAttributeValue(node, "BorderColor");
 
                 xml = this.LoadPieCharts(xml, node, id, gridViewIndex, hideGridView, pieType, width, height,
                     titleColumnIndex, valueColumnIndex, backgroundColor, borderColor);

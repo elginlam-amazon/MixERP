@@ -19,8 +19,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common;
 using System.Reflection;
-using System.Web.UI;
-using System.Web.UI.WebControls;
+using MixERP.Net.Web.UI;
+using MixERP.Net.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ReportEngine
 {

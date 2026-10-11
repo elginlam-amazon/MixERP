@@ -20,9 +20,9 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.i18n.Resources;
 using System;
 using System.Web;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using MixERP.Net.Web.UI;
+using MixERP.Net.Web.UI.HtmlControls;
+using MixERP.Net.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls
 {
@@ -177,7 +177,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
 
         private static bool IsModal()
         {
-            Page page = HttpContext.Current.CurrentHandler as Page;
+            Page page = Page.GetCurrent(HttpContext.Current);
 
             if (page != null)
             {

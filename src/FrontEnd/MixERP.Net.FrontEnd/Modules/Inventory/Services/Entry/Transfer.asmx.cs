@@ -31,12 +31,13 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
-using System.Web.Script.Serialization;
-using System.Web.Script.Services;
-using System.Web.Services;
+using Newtonsoft.Json;
+using MixERP.Net.Web.Script.Services;
+using MixERP.Net.Web.Services;
 
 namespace MixERP.Net.Core.Modules.Inventory.Services.Entry
 {
+    [global::MixERP.Net.Web.UI.VirtualPath(@"~/Modules/Inventory/Services/Entry/Transfer.asmx")]
     [WebService(Namespace = "http://tempuri.org/")]
     [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]
@@ -83,9 +84,7 @@ namespace MixERP.Net.Core.Modules.Inventory.Services.Entry
         private static Collection<StockAdjustmentDetail> GetModels(string json)
         {
             Collection<StockAdjustmentDetail> models = new Collection<StockAdjustmentDetail>();
-
-            JavaScriptSerializer jss = new JavaScriptSerializer();
-            dynamic result = jss.Deserialize<dynamic>(json);
+            dynamic result = JsonConvert.DeserializeObject<dynamic>(json);
 
             foreach (var item in result)
             {

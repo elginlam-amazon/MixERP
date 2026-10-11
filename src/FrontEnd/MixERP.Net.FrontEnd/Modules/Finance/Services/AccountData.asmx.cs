@@ -29,12 +29,13 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
-using System.Web.Script.Services;
-using System.Web.Services;
-using System.Web.UI.WebControls;
+using MixERP.Net.Web.Script.Services;
+using MixERP.Net.Web.Services;
+using MixERP.Net.Web.UI.WebControls;
 
 namespace MixERP.Net.Core.Modules.Finance.Services
 {
+    [global::MixERP.Net.Web.UI.VirtualPath(@"~/Modules/Finance/Services/AccountData.asmx")]
     [WebService(Namespace = "http://tempuri.org/")]
     [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]

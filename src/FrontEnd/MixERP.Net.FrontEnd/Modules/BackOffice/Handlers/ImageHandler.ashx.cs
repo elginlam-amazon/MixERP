@@ -20,15 +20,16 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
 using System;
-using System.Drawing;
 using System.Globalization;
 using System.Web;
+using SkiaSharp;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Handlers
 {
     /// <summary>
     /// Summary description for ImageHandler
     /// </summary>
+    [global::MixERP.Net.Web.UI.VirtualPath(@"~/Modules/BackOffice/Handlers/ImageHandler.ashx")]
     public class ImageHandler : IHttpHandler
     {
         public bool IsReusable
@@ -39,6 +40,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
             }
         }
 
+        [System.CLSCompliant(false)]
         public void ProcessRequest(HttpContext context)
         {
             ProcessImage(context);
@@ -78,7 +80,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
                     path = context.Server.MapPath("~/Static/images/document.png");
                 }
 
-                using (Bitmap originalImage = new Bitmap(path))
+                using (SKBitmap originalImage = SKBitmap.Decode(path))
                 {
                     byte[] buffer = ImageHelper.GetResizedImage(originalImage, width, height);
 
@@ -98,9 +100,9 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
         {
             try
             {
-                using (new Bitmap(path))
+                using (SKBitmap bitmap = SKBitmap.Decode(path))
                 {
-                    return true;
+                    return bitmap != null;
                 }
             }
             catch

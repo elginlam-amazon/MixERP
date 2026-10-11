@@ -27,6 +27,7 @@ namespace MixERP.Net.Core.Modules.Sales.Data
 {
     public static class StockMasterDetailHelper
     {
+        [System.CLSCompliant(false)]
         public static IEnumerable<NpgsqlParameter> AddStockMasterDetailParameter(Collection<StockDetail> details)
         {
             Collection<NpgsqlParameter> collection = new Collection<NpgsqlParameter>();

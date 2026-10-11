@@ -1,1 +1,0 @@
-﻿<%@ WebService Language="C#" CodeBehind="User.asmx.cs" Class="MixERP.Net.FrontEnd.Services.User" %>

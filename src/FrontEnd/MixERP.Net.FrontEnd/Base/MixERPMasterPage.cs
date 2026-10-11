@@ -25,7 +25,7 @@ using MixERP.Net.i18n;
 using System;
 using System.Globalization;
 using System.Threading;
-using System.Web.UI;
+using MixERP.Net.Web.UI;
 
 namespace MixERP.Net.FrontEnd.Base
 {
@@ -77,7 +77,7 @@ namespace MixERP.Net.FrontEnd.Base
 
         private int Update()
         {
-            if (Conversion.TryCastBoolean(Application["UpdateAvailable"]) &&
+            if (Conversion.TryCastBoolean(Application.LegacyApplication.State.TryGetValue("UpdateAvailable", out object updateAvailable) ? updateAvailable : null) &&
                 AppUsers.GetCurrent().View.IsAdmin.ToBool())
             {
                 return 1;

@@ -27,9 +27,9 @@ using MixERP.Net.FrontEnd.Base;
 using MixERP.Net.i18n.Resources;
 using Serilog;
 using System;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using MixERP.Net.Web.UI;
+using MixERP.Net.Web.UI.HtmlControls;
+using MixERP.Net.Web.UI.WebControls;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Admin
 {

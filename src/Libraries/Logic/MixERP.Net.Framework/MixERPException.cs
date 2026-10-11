@@ -19,7 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Runtime.Serialization;
-using System.Security.Permissions;
+using MixERP.Net.Web.UI;
 using System.Web;
 using Serilog;
 
@@ -50,21 +50,24 @@ namespace MixERP.Net.Framework
             this.dbConstraintName = dbConstraintName;
         }
 
+#if !NET8_0_OR_GREATER
         public MixERPException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
+#endif
 
         public string DBConstraintName
         {
             get { return this.dbConstraintName; }
         }
 
-        [SecurityPermission(SecurityAction.Demand, SerializationFormatter = true)]
+#if !NET8_0_OR_GREATER
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
         }
+#endif
 
         public static void Handle(MixERPException ex)
         {
@@ -78,7 +81,17 @@ namespace MixERP.Net.Framework
                 HttpContext.Current.Session["ex"] = ex;
                 Log.Information("Exception object was added to session.");
 
-                HttpContext.Current.Server.TransferRequest("~/Site/RuntimeError.aspx", true);
+                //Server.TransferRequest is not available on ASP.NET Core: transfer within the executing page,
+                //or redirect when the exception is not raised by a page.
+                Page page = Page.GetCurrent(HttpContext.Current);
+
+                if (page != null)
+                {
+                    page.Transfer("~/Site/RuntimeError.aspx");
+                    return;
+                }
+
+                HttpContext.Current.Response.Redirect("~/Site/RuntimeError.aspx");
             }
         }
 

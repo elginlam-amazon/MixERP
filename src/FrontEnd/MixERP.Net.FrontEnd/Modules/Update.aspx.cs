@@ -33,7 +33,9 @@ namespace MixERP.Net.FrontEnd.Modules
 {
     public partial class Update : MixERPWebpage
     {
+        [System.CLSCompliant(false)]
         protected string _downloadUrl = string.Empty;
+        [System.CLSCompliant(false)]
         protected Release _release = new Release();
 
         protected async void Page_Init(object sender, EventArgs e)
@@ -65,7 +67,7 @@ namespace MixERP.Net.FrontEnd.Modules
                 Log.Information("Access to {Page} is denied to {User} from {IP}.", this,
                     userName, ipAddress);
 
-                this.Page.Server.Execute("~/Site/AccessIsDenied.aspx", false);
+                this.Page.Transfer("~/Site/AccessIsDenied.aspx");
                 return;
             }
 

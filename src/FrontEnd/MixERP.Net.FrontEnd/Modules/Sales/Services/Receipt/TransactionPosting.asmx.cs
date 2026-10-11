@@ -22,14 +22,15 @@ using MixERP.Net.Common.Extensions;
 using MixERP.Net.i18n.Resources;
 using Serilog;
 using System;
-using System.Web.Services;
+using MixERP.Net.Web.Services;
 
 namespace MixERP.Net.Core.Modules.Sales.Services.Receipt
 {
+    [global::MixERP.Net.Web.UI.VirtualPath(@"~/Modules/Sales/Services/Receipt/TransactionPosting.asmx")]
     [WebService(Namespace = "http://tempuri.org/")]
     [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [System.ComponentModel.ToolboxItem(false)]
-    [System.Web.Script.Services.ScriptService]
+    [MixERP.Net.Web.Script.Services.ScriptService]
     public class TransactionPosting : WebService
     {
         [WebMethod]

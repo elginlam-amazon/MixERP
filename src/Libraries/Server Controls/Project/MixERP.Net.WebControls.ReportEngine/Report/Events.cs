@@ -23,7 +23,7 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n;
 using System;
 using System.Threading;
-using System.Web.UI.WebControls;
+using MixERP.Net.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ReportEngine
 {

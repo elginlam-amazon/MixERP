@@ -18,8 +18,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System.ComponentModel;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Web.Script.Services;
+using MixERP.Net.Web.Services;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common.Extensions;
 using MixERP.Net.Core.Modules.Inventory.Data.Transactions;
@@ -28,6 +28,7 @@ using MixERP.Net.i18n.Resources;
 
 namespace MixERP.Net.Core.Modules.Inventory.Services
 {
+    [global::MixERP.Net.Web.UI.VirtualPath(@"~/Modules/Inventory/Services/TransferAcknowledgement.asmx")]
     [WebService(Namespace = "http://tempuri.org/")]
     [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]

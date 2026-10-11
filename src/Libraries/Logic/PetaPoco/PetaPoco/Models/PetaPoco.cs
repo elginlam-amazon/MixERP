@@ -190,6 +190,20 @@ namespace PetaPoco
         }
         DBType _dbType = DBType.SqlServer;
 
+        // The machine/web.config DbProviderFactories registration is not available on modern .NET;
+        // MixERP's provider (Npgsql) is resolved directly.
+        private static DbProviderFactory GetProviderFactory(string providerName)
+        {
+            if (string.Equals(providerName, "Npgsql", StringComparison.OrdinalIgnoreCase))
+                return Npgsql.NpgsqlFactory.Instance;
+
+#if NETSTANDARD2_0
+            throw new NotSupportedException("The ADO.NET provider \"" + providerName + "\" is not supported.");
+#else
+            return DbProviderFactories.GetFactory(providerName);
+#endif
+        }
+
         // Common initialization
         private void CommonConstruct()
         {
@@ -199,7 +213,7 @@ namespace PetaPoco
             ForceDateTimesToUtc = true;
 
             if (_providerName != null)
-                _factory = DbProviderFactories.GetFactory(_providerName);
+                _factory = GetProviderFactory(_providerName);
 
             string dbtype = (_factory == null ? _sharedConnection.GetType() : _factory.GetType()).Name;
 

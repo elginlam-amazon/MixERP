@@ -20,12 +20,13 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Web.Script.Services;
+using MixERP.Net.Web.Services;
 using MixERP.Net.Framework.Contracts.Checklist;
 
 namespace MixERP.Net.FrontEnd.Services
 {
+    [global::MixERP.Net.Web.UI.VirtualPath(@"~/Services/Checklists.asmx")]
     [WebService(Namespace = "http://tempuri.org/")]
     [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]
