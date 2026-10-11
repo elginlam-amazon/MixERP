@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Framework-neutral replacement for the subset of System.Web.UI (Web Forms) that MixERP's server controls,
+    modules and pages use: a server-side HTML control tree with a Web Forms compatible page lifecycle,
+    post-back data loading and post-back events. HTTP access goes through Microsoft.AspNetCore.SystemWebAdapters
+    (System.Web.HttpContext), so the same code runs on ASP.NET Core (net10.0).
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net10.0;netstandard2.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>MixERP.Net.Web.UI</RootNamespace>
+    <AssemblyName>MixERP.Net.Web.UI</AssemblyName>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>Mix Open Foundation.snk</AssemblyOriginatorKeyFile>
+    <Version>1.2.0.1</Version>
+    <Company>MixERP Inc.</Company>
+    <Product>MixERP.Net.Web.UI</Product>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SystemWebAdapters" Version="2.3.0" />
+  </ItemGroup>
+</Project>

@@ -1,15 +1,14 @@
 ﻿using System.Security.Permissions;
 using System.Web;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using MixERP.Net.Web.UI;
+using MixERP.Net.Web.UI.HtmlControls;
+using MixERP.Net.Web.UI.WebControls;
 
 [assembly: WebResource("MixERP.Net.WebControls.TransactionViewFactory.TransactionViewFactory.js", "application/x-javascript")]
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
     [ToolboxData("<{0}:TransactionView runat=server></{0}:TransactionView>")]
-    [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
     public sealed partial class TransactionView : CompositeControl
     {
         private HtmlGenericControl panel;

@@ -29,8 +29,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Web;
-using System.Web.Security;
-using System.Web.UI;
+using MixERP.Net.Web.UI;
 
 namespace MixERP.Net.FrontEnd.Base
 {
@@ -77,7 +76,7 @@ namespace MixERP.Net.FrontEnd.Base
 
             Log.Verbose("Current page is {CurrentPage}.", this.currentPage);
 
-            Page page = HttpContext.Current.Handler as Page;
+            Page page = Page.GetCurrent(HttpContext.Current);
 
             if (page == null)
             {
@@ -95,6 +94,7 @@ namespace MixERP.Net.FrontEnd.Base
             }
         }
 
+        [CLSCompliant(false)]
         public static void SetAuthenticationTicket(HttpResponse response, long signInId, bool rememberMe)
         {
             if (response == null)
@@ -102,17 +102,7 @@ namespace MixERP.Net.FrontEnd.Base
                 return;
             }
 
-            FormsAuthenticationTicket ticket = new FormsAuthenticationTicket(1,
-                signInId.ToString(CultureInfo.InvariantCulture), DateTime.Now, DateTime.Now.AddMinutes(30), rememberMe,
-                String.Empty, FormsAuthentication.FormsCookiePath);
-            string encryptedCookie = FormsAuthentication.Encrypt(ticket);
-
-            HttpCookie cookie = new HttpCookie(FormsAuthentication.FormsCookieName, encryptedCookie);
-            cookie.Domain = FormsAuthentication.CookieDomain;
-            cookie.Path = ticket.CookiePath;
-
-            response.Cookies.Add(cookie);
-            //response.Redirect(FormsAuthentication.GetRedirectUrl(signInId.ToString(CultureInfo.InvariantCulture), rememberMe));
+            FormsAuthentication.SignIn(HttpContext.Current, signInId, rememberMe);
         }
 
         protected override void InitializeCulture()
@@ -170,7 +160,7 @@ namespace MixERP.Net.FrontEnd.Base
 
             if (!policyExists)
             {
-                Server.Transfer("~/Site/AccessIsDenied.aspx");
+                this.Transfer("~/Site/AccessIsDenied.aspx");
             }
 
             return policyExists;

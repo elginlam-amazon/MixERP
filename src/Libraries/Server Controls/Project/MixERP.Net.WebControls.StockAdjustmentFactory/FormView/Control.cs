@@ -2,14 +2,13 @@
 using System;
 using System.Security.Permissions;
 using System.Web;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using MixERP.Net.Web.UI;
+using MixERP.Net.Web.UI.HtmlControls;
+using MixERP.Net.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockAdjustmentFactory
 {
     [ToolboxData("<{0}:FormView runat=server></{0}:FormView>")]
-    [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
     public partial class FormView : CompositeControl
     {
         private HtmlGenericControl container;

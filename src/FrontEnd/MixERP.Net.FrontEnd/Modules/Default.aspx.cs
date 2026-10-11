@@ -19,7 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.FrontEnd.Base;
 using System;
-using System.IO;
+using MixERP.Net.Web.UI;
 
 namespace MixERP.Net.FrontEnd.Modules
 {
@@ -76,7 +76,8 @@ namespace MixERP.Net.FrontEnd.Modules
                 {
                     string path = @"~/Modules/" + this.RouteData.Values["path"].ToString().Replace(".mix", "") + ".ascx";
 
-                    if (File.Exists(this.Server.MapPath(path)))
+                    //The .ascx markup files were compiled into their classes; resolve the control by its former virtual path.
+                    if (ControlRegistry.Exists(path))
                     {
                         this.plugin = this.Page.LoadControl(path) as MixERPUserControl;
                     }

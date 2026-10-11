@@ -28,8 +28,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Web.UI;
-using System.Web.UI.WebControls;
+using MixERP.Net.Web.UI;
+using MixERP.Net.Web.UI.WebControls;
 
 namespace MixERP.Net.FrontEnd.Reports
 {

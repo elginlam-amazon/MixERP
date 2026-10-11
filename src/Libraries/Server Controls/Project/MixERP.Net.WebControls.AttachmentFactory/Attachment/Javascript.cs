@@ -2,7 +2,7 @@
 using MixERP.Net.Common.Helpers;
 using System.Security.Permissions;
 using System.Web;
-using System.Web.UI;
+using MixERP.Net.Web.UI;
 using ConfigurationHelper = MixERP.Net.WebControls.AttachmentFactory.Helpers.ConfigurationHelper;
 
 [assembly:
@@ -16,7 +16,6 @@ namespace MixERP.Net.WebControls.AttachmentFactory
 {
     public sealed partial class Attachment
     {
-        [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
         private void AddJavascript()
         {
             JSUtility.AddJSReference(this.Page, "MixERP.Net.WebControls.AttachmentFactory.ajax-file-upload.js",

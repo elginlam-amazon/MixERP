@@ -21,7 +21,7 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
-using System.Web.UI;
+using MixERP.Net.Web.UI;
 
 namespace MixERP.Net.Common.Helpers
 {

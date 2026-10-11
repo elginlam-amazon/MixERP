@@ -26,7 +26,7 @@ using MixERP.Net.FrontEnd.Base;
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.TransactionViewFactory;
 using System;
-using System.Web.UI.HtmlControls;
+using MixERP.Net.Web.UI.HtmlControls;
 
 namespace MixERP.Net.Core.Modules.Finance
 {

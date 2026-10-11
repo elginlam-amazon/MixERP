@@ -1,8 +1,7 @@
 ﻿using System;
-using System.ComponentModel;
 using System.Globalization;
 using System.IO;
-using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 using MixERP.Net.Common;
 using MixERP.Net.Framework;
@@ -44,32 +43,64 @@ namespace MixERP.Net.Updater.Installation.Tasks
             task.Wait();
         }
 
-        private Task DownloadTask(string downloadFrom, string destination)
-        {
-            using (WebClient client = new WebClient())
-            {
-                client.DownloadProgressChanged += this.OnDownloadProgress;
-                client.DownloadFileCompleted += this.OnDownloadComplete;
-
-                return client.DownloadFileTaskAsync(new Uri(downloadFrom), destination);
-            }
-        }
-
-        private void OnDownloadComplete(object sender, AsyncCompletedEventArgs e)
+        private async Task DownloadTask(string downloadFrom, string destination)
         {
             string message = Labels.DownloadSuccessful;
 
-            if (e.Cancelled || e.Error != null)
+            try
             {
-                message = e.Error.Message;
+                using (HttpClient client = new HttpClient())
+                {
+                    using (HttpResponseMessage response = await client.GetAsync(new Uri(downloadFrom), HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false))
+                    {
+                        response.EnsureSuccessStatusCode();
+                        long? total = response.Content.Headers.ContentLength;
+
+                        using (Stream source = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+                        {
+                            using (FileStream target = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None))
+                            {
+                                byte[] buffer = new byte[81920];
+                                long received = 0;
+                                int lastPercentage = -1;
+                                int read;
+
+                                while ((read = await source.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0)
+                                {
+                                    await target.WriteAsync(buffer, 0, read).ConfigureAwait(false);
+                                    received += read;
+
+                                    if (total.HasValue && total.Value > 0)
+                                    {
+                                        int percentage = (int)(received * 100 / total.Value);
+
+                                        if (percentage != lastPercentage)
+                                        {
+                                            lastPercentage = percentage;
+                                            this.OnDownloadProgress(percentage);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                message = ex.Message;
+            }
+            catch (IOException ex)
+            {
+                message = ex.Message;
             }
 
             this.OnProgress(new ProgressInfo(this.Description, message));
         }
 
-        private void OnDownloadProgress(object sender, DownloadProgressChangedEventArgs e)
+        private void OnDownloadProgress(int progressPercentage)
         {
-            string message = string.Format(CultureInfo.DefaultThreadCurrentCulture, Labels.PercentCompleted, e.ProgressPercentage);
+            string message = string.Format(CultureInfo.DefaultThreadCurrentCulture, Labels.PercentCompleted, progressPercentage);
 
             this.OnProgress(new ProgressInfo(this.Description, message));
         }

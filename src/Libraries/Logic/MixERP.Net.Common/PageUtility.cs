@@ -24,11 +24,12 @@ using System.Configuration;
 using System.Globalization;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Web;
 using System.Web.Hosting;
 using System.Web.SessionState;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
+using MixERP.Net.Web.UI;
+using MixERP.Net.Web.UI.HtmlControls;
 using MixERP.Net.Common.Helpers;
 
 namespace MixERP.Net.Common
@@ -60,17 +61,14 @@ namespace MixERP.Net.Common
             return host;
         }
 
-        private static HttpBrowserCapabilities GetBrowser()
+        private static string GetBrowser()
         {
             if (HttpContext.Current != null)
             {
-                if (HttpContext.Current.Request.UserHostAddress != null)
-                {
-                    return HttpContext.Current.Request.Browser;
-                }
+                return HttpContext.Current.Request.UserAgent ?? string.Empty;
             }
 
-            return new HttpBrowserCapabilities();
+            return string.Empty;
         }
 
         public static void CheckInvalidAttempts(Page page)
@@ -82,12 +80,12 @@ namespace MixERP.Net.Common
 
                 if (triedAttempts > 0)
                 {
-                    Log.Warning("{Count} of {Allowed} allowed invalid sign-in attempts from {Host}/{IP} using {Browser}.", triedAttempts, allowedAttemps, GetUserHostAddress(), GetUserIpAddress(), GetBrowser().Browsers);
+                    Log.Warning("{Count} of {Allowed} allowed invalid sign-in attempts from {Host}/{IP} using {Browser}.", triedAttempts, allowedAttemps, GetUserHostAddress(), GetUserIpAddress(), GetBrowser());
                 }
 
                 if (triedAttempts >= allowedAttemps)
                 {
-                    Log.Error("Disallowed access to {Host}/{IP} using {Browser}.", GetUserHostAddress(), GetUserIpAddress(), GetBrowser().Browsers);
+                    Log.Error("Disallowed access to {Host}/{IP} using {Browser}.", GetUserHostAddress(), GetUserIpAddress(), GetBrowser());
                     page.Response.Redirect("~/Static/AccessIsDenied.html");
                 }
             }
@@ -125,20 +123,30 @@ namespace MixERP.Net.Common
                 url = prefix + "://" + url;
             }
 
-            using (MyClient client = new MyClient())
+            try
             {
-                client.HeadOnly = true;
-                try
+                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Head, url))
                 {
-                    client.DownloadString(url);
+                    using (HttpResponseMessage response = UrlClient.SendAsync(request).GetAwaiter().GetResult())
+                    {
+                        response.EnsureSuccessStatusCode();
+                    }
                 }
-                catch (WebException)
-                {
-                    url = string.Empty;
-                }
-
-                return url;
             }
+            catch (HttpRequestException)
+            {
+                url = string.Empty;
+            }
+            catch (InvalidOperationException)
+            {
+                url = string.Empty;
+            }
+            catch (UriFormatException)
+            {
+                url = string.Empty;
+            }
+
+            return url;
         }
 
         public static Control FindControlIterative(Control root, string id)
@@ -192,7 +200,7 @@ namespace MixERP.Net.Common
 
         public static string GetUserIpAddress()
         {
-            Page page = HttpContext.Current.Handler as Page;
+            Page page = Page.GetCurrent(HttpContext.Current);
 
             if (page != null)
             {
@@ -212,6 +220,7 @@ namespace MixERP.Net.Common
             return string.Empty;
         }
 
+        [CLSCompliant(false)]
         public static int InvalidPasswordAttempts(HttpSessionState session, int increment = 0)
         {
             if (session == null)
@@ -235,7 +244,7 @@ namespace MixERP.Net.Common
 
             if (increment > 0)
             {
-                Log.Warning("{Count} Invalid attempt to sign in from {Host}/{IP} using {Browser}.", retVal, GetUserHostAddress(), GetUserIpAddress(), GetBrowser().Browsers);
+                Log.Warning("{Count} Invalid attempt to sign in from {Host}/{IP} using {Browser}.", retVal, GetUserHostAddress(), GetUserIpAddress(), GetBrowser());
             }
 
             return retVal;
@@ -287,7 +296,7 @@ namespace MixERP.Net.Common
         {
             if (page == null)
             {
-                page = HttpContext.Current.Handler as Page;
+                page = Page.GetCurrent(HttpContext.Current);
             }
 
             if (page == null)
@@ -316,7 +325,7 @@ namespace MixERP.Net.Common
 
             if (HttpContext.Current != null)
             {
-                Page p = HttpContext.Current.Handler as Page;
+                Page p = Page.GetCurrent(HttpContext.Current);
                 if (p != null)
                 {
                     return p.ResolveUrl(relativeUrl);
@@ -325,20 +334,6 @@ namespace MixERP.Net.Common
             return relativeUrl;
         }
 
-        private class MyClient : WebClient
-        {
-            public bool HeadOnly { private get; set; }
-
-            protected override WebRequest GetWebRequest(Uri address)
-            {
-                WebRequest req = base.GetWebRequest(address);
-
-                if (req != null && (this.HeadOnly && req.Method == "GET"))
-                {
-                    req.Method = "HEAD";
-                }
-                return req;
-            }
-        }
+        private static readonly HttpClient UrlClient = new HttpClient();
     }
 }

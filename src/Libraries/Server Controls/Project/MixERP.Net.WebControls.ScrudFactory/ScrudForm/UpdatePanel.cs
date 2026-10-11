@@ -21,8 +21,8 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.WebControls.ScrudFactory.Controls;
 using System;
 using System.Globalization;
-using System.Web.UI;
-using System.Web.UI.WebControls;
+using MixERP.Net.Web.UI;
+using MixERP.Net.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {

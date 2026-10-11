@@ -23,7 +23,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Web;
-using System.Web.UI;
+using MixERP.Net.Web.UI;
 
 namespace MixERP.Net.Common.jQueryHelper
 {
@@ -48,7 +48,7 @@ namespace MixERP.Net.Common.jQueryHelper
 
             if (p == null)
             {
-                p = HttpContext.Current.Handler as Page;
+                p = Page.GetCurrent(HttpContext.Current);
             }
 
             string script = GetDatePickerScript(controlId, minDate, maxDate);

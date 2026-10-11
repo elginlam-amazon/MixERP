@@ -26,12 +26,13 @@ using Serilog;
 using System.ComponentModel;
 using System.Threading;
 using System.Web;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Web.Script.Services;
+using MixERP.Net.Web.Services;
 using MixERP.Net.FrontEnd.Application;
 
 namespace MixERP.Net.FrontEnd.Services
 {
+    [global::MixERP.Net.Web.UI.VirtualPath(@"~/Services/User.asmx")]
     [WebService(Namespace = "http://tempuri.org/")]
     [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]
@@ -82,7 +83,7 @@ namespace MixERP.Net.FrontEnd.Services
                     AppUsers.SetCurrentLogin(globalLoginId);
                     MixERPWebpage.SetAuthenticationTicket(this.Context.Response, globalLoginId, rememberMe);
 
-                    this.Context.Session["FirstStepsPending"] = FirstSteps.CheckIfPending(globalLoginId);
+                    this.Context.Session["FirstStepsPending"] = MixERP.Net.FrontEnd.Application.FirstSteps.CheckIfPending(globalLoginId);
 
 
                     return "OK";

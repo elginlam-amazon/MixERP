@@ -20,7 +20,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.Common.Helpers;
 using System.Security.Permissions;
 using System.Web;
-using System.Web.UI;
+using MixERP.Net.Web.UI;
 
 [assembly: WebResource("MixERP.Net.WebControls.StockTransactionViewFactory.StockTransactionView.js", "application/x-javascript", PerformSubstitution = true)]
 
@@ -28,7 +28,6 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
     public partial class StockTransactionView
     {
-        [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
         private void AddJavascript()
         {
             JSUtility.AddJSReference(this.Page, "MixERP.Net.WebControls.StockTransactionViewFactory.StockTransactionView.js", "StockTransactionView", typeof(StockTransactionView));

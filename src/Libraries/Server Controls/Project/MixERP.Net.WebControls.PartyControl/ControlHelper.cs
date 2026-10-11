@@ -19,7 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.ComponentModel;
 using System.Globalization;
-using System.Web.UI.HtmlControls;
+using MixERP.Net.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.PartyControl
 {

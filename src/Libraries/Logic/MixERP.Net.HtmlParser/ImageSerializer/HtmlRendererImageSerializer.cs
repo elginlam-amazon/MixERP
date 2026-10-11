@@ -1,27 +1,27 @@
-﻿using MixERP.Net.Common.Helpers;
-using System.Drawing;
-using System.Threading;
-using TheArtOfDev.HtmlRenderer.WinForms;
+﻿using System.IO;
+using System.Text;
 
 namespace MixERP.Net.HtmlParser.ImageSerializer
 {
+    /// <summary>
+    ///     Saves the HTML as a standalone HTML document which is attached to e-mails.
+    ///     The former implementation rasterized the HTML with HtmlRenderer.WinForms (System.Drawing/GDI+),
+    ///     which is Windows-only and not available on modern .NET; the HTML document preserves the full layout.
+    /// </summary>
     public sealed class HtmlRendererImageSerializer : HtmlImageSerializer
     {
         internal override void CreateImage(string imagePath)
         {
-            Thread thread = new Thread(delegate()
+            string path = imagePath + ".html";
+            string directory = Path.GetDirectoryName(path);
+
+            if (!string.IsNullOrWhiteSpace(directory))
             {
-                string path = imagePath + ImageHelper.GetFileExtension(this.ImageFormat);
+                Directory.CreateDirectory(directory);
+            }
 
-                Image image = HtmlRender.RenderToImage(this.Html);
-
-                image.Save(path, ImageHelper.GetEncoder(this.ImageFormat), null);
-                OnImageSaved(new ImageSavedEventArgs(path));
-            });
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
-
+            File.WriteAllText(path, this.Html ?? string.Empty, Encoding.UTF8);
+            this.OnImageSaved(new ImageSavedEventArgs(path));
             base.CreateImage(imagePath);
         }
     }

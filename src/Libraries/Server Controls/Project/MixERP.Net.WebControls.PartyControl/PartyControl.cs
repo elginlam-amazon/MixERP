@@ -20,15 +20,14 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.Common.Helpers;
 using System.Security.Permissions;
 using System.Web;
-using System.Web.UI;
-using System.Web.UI.WebControls;
+using MixERP.Net.Web.UI;
+using MixERP.Net.Web.UI.WebControls;
 
 [assembly: WebResource("MixERP.Net.WebControls.PartyControl.PartyControl.js", "application/x-javascript")]
 
 namespace MixERP.Net.WebControls.PartyControl
 {
     [ToolboxData("<{0}:PartyControl runat=server></{0}:PartyControl>")]
-    [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
     public sealed partial class PartyControl : CompositeControl
     {
         public Panel container;

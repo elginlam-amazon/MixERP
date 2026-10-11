@@ -22,11 +22,12 @@ using MixERP.Net.Common.Extensions;
 using MixERP.Net.FrontEnd.Models;
 using Newtonsoft.Json;
 using System.ComponentModel;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Web.Script.Services;
+using MixERP.Net.Web.Services;
 
 namespace MixERP.Net.FrontEnd.Services
 {
+    [global::MixERP.Net.Web.UI.VirtualPath(@"~/Services/Menu.asmx")]
     [WebService(Namespace = "http://tempuri.org/")]
     [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]
