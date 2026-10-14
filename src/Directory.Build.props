@@ -1,0 +1,11 @@
+<Project>
+  <!-- Shared settings for all MixERP projects (SDK-style, .NET 10 migration). -->
+  <PropertyGroup>
+    <!-- Every project keeps its hand-written Properties/AssemblyInfo.cs (versions, CLSCompliant, NeutralResourcesLanguage). -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!-- Allows the Windows-only projects (installer, HtmlParser windows leg) to be built on Linux build agents. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- WebFormsForCore provides the System.Web (Web Forms) runtime for .NET 10. Keep all projects on the same version. -->
+    <WebFormsForCoreVersion>1.6.8</WebFormsForCoreVersion>
+  </PropertyGroup>
+</Project>
