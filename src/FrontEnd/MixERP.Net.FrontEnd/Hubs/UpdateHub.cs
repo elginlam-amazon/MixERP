@@ -20,7 +20,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNet.SignalR;
+using Microsoft.AspNetCore.SignalR;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Extensions;
@@ -35,10 +35,12 @@ using Serilog;
 namespace MixERP.Net.FrontEnd.Hubs
 {
     [CLSCompliant(false)]
-    public class UpdateHub : Hub
+    public class UpdateHub : MixERPHub
     {
         public void InstallUpdates()
         {
+            this.CaptureClients();
+
             if (!this.IsValidRequest())
             {
                 this.Notify("Cannot Update", Warnings.AccessIsDenied);
@@ -91,7 +93,7 @@ namespace MixERP.Net.FrontEnd.Hubs
 
             if (this.Context == null)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                this.callerClients.SendAsync("getNotification", Warnings.AccessIsDenied);
                 return false;
             }
 
@@ -99,7 +101,7 @@ namespace MixERP.Net.FrontEnd.Hubs
 
             if (globalLoginId <= 0)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                this.callerClients.SendAsync("getNotification", Warnings.AccessIsDenied);
                 return false;
             }
 
@@ -136,12 +138,12 @@ namespace MixERP.Net.FrontEnd.Hubs
 
         private void Notify(string description, string message)
         {
-            this.Clients.All.updateInstallationNotification(DateTime.UtcNow, description, message);
+            this.allClients.SendAsync("updateInstallationNotification", DateTime.UtcNow, description, message);
         }
 
         private void installer_Progress(ProgressInfo progressInfo)
         {
-            this.Clients.All.updateInstallationNotification(progressInfo.Timestamp, progressInfo.Description,
+            this.allClients.SendAsync("updateInstallationNotification", progressInfo.Timestamp, progressInfo.Description,
                 progressInfo.Message);
         }
     }

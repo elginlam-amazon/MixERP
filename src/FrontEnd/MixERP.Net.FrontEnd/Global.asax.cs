@@ -19,15 +19,42 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Web;
-using System.Web.Routing;
+using System.Web.UI;
 using MixERP.Net.Entities.Office;
 using MixERP.Net.FrontEnd.Application;
 using MixERP.Net.ReportManager;
 
 namespace MixERP.Net.FrontEnd
 {
+    /// <summary>
+    ///     Application events, raised by the System.Web adapters (registered with AddHttpApplication&lt;Global&gt;()).
+    ///     Routes are registered in Program.cs.
+    /// </summary>
     public class Global : HttpApplication
     {
+        public Global()
+        {
+            this.PreRequestHandlerExecute += ApplyPageDefaults;
+        }
+
+        /// <summary>
+        ///     Applies the former Web.config &lt;pages clientIDMode="Static" enableViewState="false"
+        ///     enableEventValidation="false" /&gt; defaults; page directives still override them.
+        /// </summary>
+        private static void ApplyPageDefaults(object sender, EventArgs e)
+        {
+            Page page = HttpContext.Current == null ? null : HttpContext.Current.Handler as Page;
+
+            if (page == null)
+            {
+                return;
+            }
+
+            page.ClientIDMode = ClientIDMode.Static;
+            page.EnableViewState = false;
+            page.EnableEventValidation = false;
+        }
+
         private void Application_Error(object sender, EventArgs e)
         {
             ApplicationError.Handle(this.Server.GetLastError());
@@ -37,7 +64,6 @@ namespace MixERP.Net.FrontEnd
         {
             LogManager.IntializeLogger();
             UpdateManager.CheckForUpdates(this.Application);
-            Routes.RegisterRoutes(RouteTable.Routes);
 
             GlobalLogin.CreateTable();
             Repository.DownloadAndInstallReports();

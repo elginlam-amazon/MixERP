@@ -1,0 +1,20 @@
+<Project>
+  <!-- Shared settings for all MixERP projects (SDK-style, .NET 10 migration). -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <!-- Every project keeps its own Properties\AssemblyInfo.cs. -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!-- Only Debug and Release configurations are used. -->
+    <Configurations>Debug;Release</Configurations>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!--
+      CLS compliance (CS3001/CS3002/CS3003/CS3008/CS3009): MixERP assemblies keep [assembly: CLSCompliant(true)],
+      but the .NET dependencies they expose in public APIs (CoreWebForms System.Web.UI types, Npgsql, PetaPoco)
+      do not declare CLS compliance, so every such member is reported. This is advisory only.
+    -->
+    <NoWarn>$(NoWarn);CS3001;CS3002;CS3003;CS3008;CS3009</NoWarn>
+  </PropertyGroup>
+</Project>

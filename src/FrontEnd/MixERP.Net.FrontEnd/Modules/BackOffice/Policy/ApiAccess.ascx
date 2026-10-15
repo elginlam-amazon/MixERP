@@ -47,9 +47,11 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
         });
     };
 
-    Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () {
-        //Fired on each ASP.net AJAX request.
-        addPocoSelect();
-    });
+    if (typeof Sys !== "undefined") {
+        Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () {
+            //Fired on each ASP.net AJAX request.
+            addPocoSelect();
+        });
+    }
 
 </script>

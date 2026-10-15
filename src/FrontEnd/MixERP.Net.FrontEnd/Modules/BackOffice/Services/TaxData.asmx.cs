@@ -23,16 +23,12 @@ using MixERP.Net.Core.Modules.BackOffice.Data.Tax;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Framework.WebServices;
 using System.Web.UI.WebControls;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Services
 {
-    [WebService(Namespace = "http://tempuri.org/")]
-    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]
-    [ScriptService]
     public class TaxData : WebService
     {
         /// <summary>Gets sales tax rate.</summary>

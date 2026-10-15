@@ -42,11 +42,10 @@ namespace MixERP.Net.Updater.Api
 
         private static string ParseMarkdown(string markdown)
         {
-            var md = new MarkdownDeep.Markdown();
-            md.ExtraMode = true;
-            md.SafeMode = false;
+            // Markdown "Extra" features (tables, footnotes, etc.); raw HTML is allowed as before.
+            var pipeline = Markdig.MarkdownExtensions.UseAdvancedExtensions(new Markdig.MarkdownPipelineBuilder()).Build();
 
-            return md.Transform(markdown);
+            return Markdig.Markdown.ToHtml(markdown ?? string.Empty, pipeline);
         }
     }
 }

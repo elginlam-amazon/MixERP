@@ -18,7 +18,10 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Data;
+using System.IO;
+using System.Linq;
 
 namespace MixERP.Net.Common.Helpers
 {
@@ -27,6 +30,51 @@ namespace MixERP.Net.Common.Helpers
         public static DataTable JsonToDataTable(string json)
         {
             return JsonConvert.DeserializeObject<DataTable>(json);
+        }
+
+        /// <summary>
+        ///     Replacement for System.Web.Script.Serialization.JavaScriptSerializer.Deserialize&lt;dynamic&gt;,
+        ///     which is not available on .NET. Produces the same untyped object graph:
+        ///     objects become Dictionary&lt;string, object&gt;, arrays become object[], integers become
+        ///     int (or long when they do not fit), and fractional numbers become decimal.
+        /// </summary>
+        public static object DeserializeDynamic(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return null;
+            }
+
+            using (JsonTextReader reader = new JsonTextReader(new StringReader(json)))
+            {
+                reader.FloatParseHandling = FloatParseHandling.Decimal;
+                reader.DateParseHandling = DateParseHandling.None;
+                return ToObject(JToken.ReadFrom(reader));
+            }
+        }
+
+        private static object ToObject(JToken token)
+        {
+            switch (token.Type)
+            {
+                case JTokenType.Object:
+                    return ((JObject) token).Properties().ToDictionary(p => p.Name, p => ToObject(p.Value));
+                case JTokenType.Array:
+                    return token.Select(ToObject).ToArray();
+                case JTokenType.Integer:
+                    long value = token.Value<long>();
+                    if (value >= int.MinValue && value <= int.MaxValue)
+                    {
+                        return (int) value;
+                    }
+
+                    return value;
+                case JTokenType.Null:
+                case JTokenType.Undefined:
+                    return null;
+                default:
+                    return ((JValue) token).Value;
+            }
         }
     }
 }

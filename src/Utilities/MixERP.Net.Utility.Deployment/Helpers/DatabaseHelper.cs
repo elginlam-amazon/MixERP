@@ -29,7 +29,7 @@ namespace MixERP.Net.Utility.Installer.Helpers
             {
                 Host = "localhost",
                 Database = this.DatabaseName,
-                UserName = this.UserName,
+                Username = this.UserName,
                 Password = this.Password,
                 ApplicationName = "MixERP Installer"
             };

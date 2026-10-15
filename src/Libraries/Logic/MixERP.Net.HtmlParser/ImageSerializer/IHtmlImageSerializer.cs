@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Drawing.Imaging;
+using SkiaSharp;
 
 namespace MixERP.Net.HtmlParser.ImageSerializer
 {
@@ -9,7 +9,7 @@ namespace MixERP.Net.HtmlParser.ImageSerializer
 
         string Html { get; set; }
 
-        ImageFormat ImageFormat { get; set; }
+        SKEncodedImageFormat ImageFormat { get; set; }
 
         event EventHandler<ImageSavedEventArgs> ImageSaved;
 

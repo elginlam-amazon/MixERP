@@ -45,7 +45,6 @@
         <script src="/Resources.js?Culture=<%= CultureInfo.CurrentCulture.TwoLetterISOLanguageName %>"></script>
         <script src="/bundles/scripts/master-page.js"></script>
         <asp:Button runat="server" ID="SwallowSubmit" OnClientClick=" return false; " Style="display: none;" />
-        <asp:ScriptManager runat="server" ID="ScriptManager1" />
         <div id="wrapper">
             <div class="brand theme">
                 <div class="logo">
@@ -176,7 +175,9 @@
             </div>
         </div>
 
-        <script src="/signalr/hubs"></script>
+    <script src="/Scripts/microsoft-signalr/signalr.min.js"></script>
+    <script src="/signalr/hubs"></script>
+    <script src="/Scripts/mixerp/signalr-hubs.js"></script>
         <script type="text/javascript">
             $(function () {
                 var started = false;

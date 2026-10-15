@@ -1,7 +1,7 @@
 ﻿using MixERP.Net.Framework;
 using MixERP.Net.i18n.Resources;
 using System;
-using System.Drawing.Imaging;
+using SkiaSharp;
 using System.Web.Hosting;
 
 namespace MixERP.Net.HtmlParser.ImageSerializer
@@ -10,7 +10,7 @@ namespace MixERP.Net.HtmlParser.ImageSerializer
     {
         public string TempDirectory { get; set; }
         public string Html { get; set; }
-        public ImageFormat ImageFormat { get; set; }
+        public SKEncodedImageFormat ImageFormat { get; set; }
         public event EventHandler<ImageSavedEventArgs> ImageSaved;
 
         public void Serialize()
