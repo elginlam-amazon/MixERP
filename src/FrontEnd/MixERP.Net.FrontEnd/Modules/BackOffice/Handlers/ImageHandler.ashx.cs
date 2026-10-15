@@ -22,6 +22,7 @@ using MixERP.Net.Common.Helpers;
 using System;
 using System.Drawing;
 using System.Globalization;
+using System.Runtime.Versioning;
 using System.Web;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Handlers
@@ -29,6 +30,9 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
     /// <summary>
     /// Summary description for ImageHandler
     /// </summary>
+#if NET
+    [SupportedOSPlatform("windows")]
+#endif
     public class ImageHandler : IHttpHandler
     {
         public bool IsReusable

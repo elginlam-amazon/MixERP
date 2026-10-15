@@ -31,7 +31,6 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
     {
         private const string resource = "MixERP.Net.WebControls.StockTransactionFactory.Includes.Style.StockTransactionFactory.css";
 
-        [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
         private void AddStylesheet()
         {
             string href = this.Page.Request.Url.GetLeftPart(UriPartial.Authority) + this.Page.ClientScript.GetWebResourceUrl(typeof(StockTransactionForm), resource);

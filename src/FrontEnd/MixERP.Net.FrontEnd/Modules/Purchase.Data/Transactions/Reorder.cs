@@ -30,6 +30,7 @@ namespace MixERP.Net.Core.Modules.Purchase.Data.Transactions
 {
     public static class Reorder
     {
+        [System.CLSCompliant(false)]
         public static IEnumerable<NpgsqlParameter> AddPurchaseReorderTypeParameter(Collection<Models.Reorder> details)
         {
             Collection<NpgsqlParameter> collection = new Collection<NpgsqlParameter>();

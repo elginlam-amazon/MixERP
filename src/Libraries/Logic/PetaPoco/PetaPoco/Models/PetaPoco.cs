@@ -1,4 +1,4 @@
-/* PetaPoco v4.0.3 - A Tiny ORMish thing for your POCO's.
+﻿/* PetaPoco v4.0.3 - A Tiny ORMish thing for your POCO's.
  * Copyright © 2011 Topten Software.  All Rights Reserved.
  * 
  * Apache License 2.0 - http://www.toptensoftware.com/petapoco/license
@@ -179,6 +179,19 @@ namespace PetaPoco
             CommonConstruct();
         }
 
+        static DbProviderFactory GetProviderFactory(string providerName)
+        {
+#if NETSTANDARD2_0
+            // DbProviderFactories is not part of netstandard2.0; it is in-box on the .NET Framework hosts
+            // that consume this build, so resolve it at runtime.
+            var factories = Type.GetType("System.Data.Common.DbProviderFactories, System.Data, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", true);
+            var getFactory = factories.GetMethod("GetFactory", new[] { typeof(string) });
+            return (DbProviderFactory)getFactory.Invoke(null, new object[] { providerName });
+#else
+            return DbProviderFactories.GetFactory(providerName);
+#endif
+        }
+
         enum DBType
         {
             SqlServer,
@@ -199,7 +212,7 @@ namespace PetaPoco
             ForceDateTimesToUtc = true;
 
             if (_providerName != null)
-                _factory = DbProviderFactories.GetFactory(_providerName);
+                _factory = GetProviderFactory(_providerName);
 
             string dbtype = (_factory == null ? _sharedConnection.GetType() : _factory.GetType()).Name;
 

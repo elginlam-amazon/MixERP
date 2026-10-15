@@ -1,0 +1,67 @@
+<Project>
+  <!--
+    System.Web (ASP.NET Web Forms) API surface for projects that opt in with <UseSystemWeb>true</UseSystemWeb>.
+
+    - net10.0:         WebFormsForCore (a port of the .NET Framework System.Web stack to ASP.NET Core).
+    - netstandard2.0:  the .NET Framework 4.8 reference assemblies, so .NET Framework callers that consume the
+                       netstandard2.0 build keep binding to the in-box System.Web of the host process.
+
+    Optional flags (only meaningful together with UseSystemWeb):
+      UseSystemWebExtensions  -> System.Web.Extensions (JavaScriptSerializer, ScriptService, ...)
+      UseSystemWebServices    -> System.Web.Services (ASMX WebService / WebMethod)
+  -->
+  <PropertyGroup>
+    <WebFormsForCoreVersion>1.6.8</WebFormsForCoreVersion>
+    <NetFx48ReferenceAssemblyDir>$(PkgMicrosoft_NETFramework_ReferenceAssemblies_net48)/build/.NETFramework/v4.8/</NetFx48ReferenceAssemblyDir>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(UseSystemWeb)' == 'true' And '$(TargetFrameworkIdentifier)' == '.NETCoreApp'">
+    <!--
+      The assemblies are [CLSCompliant(true)], but WebFormsForCore's System.Web port is not marked CLS-compliant, so
+      every public member exposing a System.Web type would raise CS3001/CS3002/CS3003/CS3009 on the net10.0 build only.
+      CLS compliance is still verified against the .NET Framework System.Web on the netstandard2.0 build.
+    -->
+    <NoWarn>$(NoWarn);CS3001;CS3002;CS3003;CS3009</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(UseSystemWeb)' == 'true' And '$(TargetFrameworkIdentifier)' == '.NETCoreApp'">
+    <PackageReference Include="WebFormsForCore.Web" Version="$(WebFormsForCoreVersion)" />
+    <PackageReference Include="WebFormsForCore.Web.Extensions" Version="$(WebFormsForCoreVersion)" Condition="'$(UseSystemWebExtensions)' == 'true'" />
+    <PackageReference Include="WebFormsForCore.Web.Services" Version="$(WebFormsForCoreVersion)" Condition="'$(UseSystemWebServices)' == 'true'" />
+    <!-- WebFormsForCore pulls 10.0.10 of these transitively, which carry known vulnerabilities (NU1902/NU1903). -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <!-- Web SDK projects reference Microsoft.AspNetCore.App directly, which already supplies (and prunes) this one. -->
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.13" Condition="'$(UsingMicrosoftNETSdkWeb)' != 'true'" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(UseSystemWeb)' == 'true' And '$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" IncludeAssets="none" PrivateAssets="all" GeneratePathProperty="true" />
+    <Reference Include="System.Web" HintPath="$(NetFx48ReferenceAssemblyDir)System.Web.dll" Private="false" />
+    <Reference Include="System.Web.Extensions" HintPath="$(NetFx48ReferenceAssemblyDir)System.Web.Extensions.dll" Private="false" Condition="'$(UseSystemWebExtensions)' == 'true'" />
+    <Reference Include="System.Web.Services" HintPath="$(NetFx48ReferenceAssemblyDir)System.Web.Services.dll" Private="false" Condition="'$(UseSystemWebServices)' == 'true'" />
+  </ItemGroup>
+
+  <!--
+    WebFormsForCore.Web.Extensions depends on CoreWCF, which brings System.Web.Services.Description.dll; its types
+    (e.g. WsiProfiles) duplicate those of WebFormsForCore's System.Web.Services.dll (CS0433). ASMX code binds to the
+    System.Web.Services port, so keep the CoreWCF copy out of compilation (it is still deployed for CoreWCF).
+  -->
+  <Target Name="RemoveDuplicateWebServicesDescription" AfterTargets="ResolveAssemblyReferences" Condition="'$(UseSystemWebServices)' == 'true' And '$(TargetFrameworkIdentifier)' == '.NETCoreApp'">
+    <ItemGroup>
+      <ReferencePath Remove="@(ReferencePath)" Condition="'%(Filename)' == 'System.Web.Services.Description'" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    netstandard.dll (2.0) and the .NET Framework System.Web.dll both define System.Web.HttpUtility (CS0433).
+    Expose netstandard.dll under an extra "netstandard" alias so code can bind explicitly with
+    "extern alias netstandard;" on the netstandard2.0 leg.
+  -->
+  <Target Name="AliasNetStandardForSystemWeb" AfterTargets="ResolveAssemblyReferences" Condition="'$(UseSystemWeb)' == 'true' And '$(TargetFramework)' == 'netstandard2.0'">
+    <ItemGroup>
+      <ReferencePath Condition="'%(Filename)' == 'netstandard'">
+        <Aliases>global,netstandard</Aliases>
+      </ReferencePath>
+    </ItemGroup>
+  </Target>
+</Project>

@@ -144,12 +144,26 @@ Inherits="MixERP.Net.FrontEnd.MixERPMaster" %>
     </div>
     <asp:ContentPlaceHolder ID="BottomScriptContentPlaceholder" runat="server">
     </asp:ContentPlaceHolder>
-    <script src="/signalr/hubs"></script>
+    <script src="/Scripts/signalr/signalr.min.js"></script>
     <script type="text/javascript">
+        // ASP.NET Core SignalR keeps one connection per hub; hubs are mapped below /signalr (see Program.cs).
+        var hubConnections = {};
+
+        function getHub(name) {
+            if (!hubConnections[name]) {
+                hubConnections[name] = new signalR.HubConnectionBuilder()
+                    .withUrl("/signalr/" + name)
+                    .withAutomaticReconnect()
+                    .build();
+            };
+
+            return hubConnections[name];
+        };
+
         $(function() {
             var started = false;
 
-            $.connection.baseHub.client.terminate = function(c, cat) {
+            getHub("baseHub").on("terminate", function (c, cat) {
                 if (top.catalog !== cat) {
                     return;
                 };
@@ -170,9 +184,11 @@ Inherits="MixERP.Net.FrontEnd.MixERPMaster" %>
                 if (c === 100) {
                     window.location = "/Site/Account/SignOut.aspx";
                 };
-            };
+            });
 
-            $.connection.hub.start().done(function() {
+            var connections = $.map(hubConnections, function (connection) { return connection.start(); });
+
+            Promise.all(connections).then(function () {
                 if (typeof connectionListener === "function") {
                     connectionListener();
                 };

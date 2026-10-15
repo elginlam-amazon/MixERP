@@ -1,8 +1,7 @@
 ﻿using System;
-using System.ComponentModel;
 using System.Globalization;
 using System.IO;
-using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 using MixERP.Net.Common;
 using MixERP.Net.Framework;
@@ -12,6 +11,9 @@ namespace MixERP.Net.Updater.Installation.Tasks
 {
     internal class DownloadUpdate : UpdateTask
     {
+        private const int BufferSize = 81920;
+        private static readonly HttpClient Client = new HttpClient();
+
         public DownloadUpdate(UpdaterConfig config)
             : base(config)
         {
@@ -44,32 +46,68 @@ namespace MixERP.Net.Updater.Installation.Tasks
             task.Wait();
         }
 
-        private Task DownloadTask(string downloadFrom, string destination)
+        private async Task DownloadTask(string downloadFrom, string destination)
         {
-            using (WebClient client = new WebClient())
+            // WebClient (SYSLIB0014) replaced by HttpClient; progress and completion are reported as before.
+            try
             {
-                client.DownloadProgressChanged += this.OnDownloadProgress;
-                client.DownloadFileCompleted += this.OnDownloadComplete;
+                using (HttpResponseMessage response = await Client.GetAsync(new Uri(downloadFrom), HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false))
+                {
+                    response.EnsureSuccessStatusCode();
 
-                return client.DownloadFileTaskAsync(new Uri(downloadFrom), destination);
+                    long? total = response.Content.Headers.ContentLength;
+
+                    using (Stream source = await response.Content.ReadAsStreamAsync().ConfigureAwait(false))
+                    using (FileStream target = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None, BufferSize, true))
+                    {
+                        byte[] buffer = new byte[BufferSize];
+                        long received = 0;
+                        int lastPercentage = -1;
+                        int read;
+
+                        while ((read = await source.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0)
+                        {
+                            await target.WriteAsync(buffer, 0, read).ConfigureAwait(false);
+                            received += read;
+
+                            if (total > 0)
+                            {
+                                int percentage = (int)(received * 100 / total.Value);
+
+                                if (percentage != lastPercentage)
+                                {
+                                    lastPercentage = percentage;
+                                    this.OnDownloadProgress(percentage);
+                                }
+                            }
+                        }
+                    }
+                }
             }
+            catch (Exception ex) when (ex is HttpRequestException || ex is IOException || ex is TaskCanceledException)
+            {
+                this.OnDownloadComplete(ex);
+                throw;
+            }
+
+            this.OnDownloadComplete(null);
         }
 
-        private void OnDownloadComplete(object sender, AsyncCompletedEventArgs e)
+        private void OnDownloadComplete(Exception error)
         {
             string message = Labels.DownloadSuccessful;
 
-            if (e.Cancelled || e.Error != null)
+            if (error != null)
             {
-                message = e.Error.Message;
+                message = error.Message;
             }
 
             this.OnProgress(new ProgressInfo(this.Description, message));
         }
 
-        private void OnDownloadProgress(object sender, DownloadProgressChangedEventArgs e)
+        private void OnDownloadProgress(int progressPercentage)
         {
-            string message = string.Format(CultureInfo.DefaultThreadCurrentCulture, Labels.PercentCompleted, e.ProgressPercentage);
+            string message = string.Format(CultureInfo.DefaultThreadCurrentCulture, Labels.PercentCompleted, progressPercentage);
 
             this.OnProgress(new ProgressInfo(this.Description, message));
         }

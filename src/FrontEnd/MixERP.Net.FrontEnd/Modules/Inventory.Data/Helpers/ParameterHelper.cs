@@ -28,6 +28,7 @@ namespace MixERP.Net.Core.Modules.Inventory.Data.Helpers
 {
     public static class ParameterHelper
     {
+        [System.CLSCompliant(false)]
         public static IEnumerable<NpgsqlParameter> AddStockTransferModelParameter(Collection<StockAdjustmentDetail> details)
         {
             Collection<NpgsqlParameter> collection = new Collection<NpgsqlParameter>();

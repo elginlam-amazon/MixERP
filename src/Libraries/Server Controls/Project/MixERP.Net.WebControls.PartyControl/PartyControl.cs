@@ -28,7 +28,6 @@ using System.Web.UI.WebControls;
 namespace MixERP.Net.WebControls.PartyControl
 {
     [ToolboxData("<{0}:PartyControl runat=server></{0}:PartyControl>")]
-    [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
     public sealed partial class PartyControl : CompositeControl
     {
         public Panel container;

@@ -45,7 +45,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses />.
 
     $(function () {
         //EOD Notices from PostgreSQL Server
-        $.connection.dayOperationHub.client.getNotification = function (msg, condition) {
+        getHub("dayOperationHub").on("getNotification", function (msg, condition) {
             AddItem(msg);
 
             if (condition.toLowerCase() === "error") {
@@ -62,7 +62,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses />.
                 $(".loading").removeClass("loading");
                 notifyServer();
             };
-        };
+        });
     });
 
     //Termination Signal
@@ -108,7 +108,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses />.
             triggers.popup('hide');
             $(".ui.blue.header").removeClass("initially hidden");
             ShowProgress(0);
-            $.connection.dayOperationHub.server.performEOD();
+            getHub("dayOperationHub").invoke("PerformEOD");
         });
     };
 
@@ -191,6 +191,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses />.
             return;
         };
 
-        $.connection.baseHub.server.terminate(progress);
+        getHub("baseHub").invoke("Terminate", progress);
     };
 </script>

@@ -18,14 +18,11 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
-using System.Runtime.Serialization;
-using System.Security.Permissions;
 using System.Web;
 using Serilog;
 
 namespace MixERP.Net.Framework
 {
-    [Serializable]
     public class MixERPException : Exception
     {
         private readonly string dbConstraintName;
@@ -50,20 +47,9 @@ namespace MixERP.Net.Framework
             this.dbConstraintName = dbConstraintName;
         }
 
-        public MixERPException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
-
         public string DBConstraintName
         {
             get { return this.dbConstraintName; }
-        }
-
-        [SecurityPermission(SecurityAction.Demand, SerializationFormatter = true)]
-        public override void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            base.GetObjectData(info, context);
         }
 
         public static void Handle(MixERPException ex)
