@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using System;
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.HtmlParser.ImageSerializer;
 using MixERP.Net.i18n.Resources;
@@ -50,7 +51,13 @@ namespace MixERP.Net.WebControls.TransactionChecklist.Helpers
             string extension = ConfigurationHelper.GetTransactionChecklistParameter("EmailImageExtension") ?? ".png";
 
             serializer.Html = this.Html;
-            serializer.ImageFormat = ImageHelper.GetImageFormat(extension);
+#if NET
+            // System.Drawing image formats are Windows-only on .NET; the HtmlRenderer serializer does not use them.
+            if (OperatingSystem.IsWindows())
+#endif
+            {
+                serializer.ImageFormat = ImageHelper.GetImageFormat(extension);
+            }
             serializer.ImageSaved += this.Serializer_ImageSaved;
             serializer.TempDirectory = "~/Resource/Temp/Images/";
             serializer.Serialize();

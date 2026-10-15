@@ -99,10 +99,10 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
         $(function () {
             //EOD Notices from PostgreSQL Server
-            $.connection.updateHub.client.updateInstallationNotification = function (timestamp, label, message) {
+            getHub("updateHub").on("updateInstallationNotification", function (timestamp, label, message) {
                 disableUpdateButton();
                 addToConsole(timestamp, label, message);
-            };
+            });
         });
 
         function connectionListener() {
@@ -114,7 +114,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
                 };
 
                 disableUpdateButton();
-                $.connection.updateHub.server.installUpdates();
+                getHub("updateHub").invoke("InstallUpdates");
             });
         };
 

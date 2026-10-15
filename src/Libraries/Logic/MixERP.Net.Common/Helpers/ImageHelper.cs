@@ -23,6 +23,7 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using System.Runtime.Versioning;
 
 namespace MixERP.Net.Common.Helpers
 {
@@ -41,6 +42,9 @@ namespace MixERP.Net.Common.Helpers
             }
         }
 
+#if NET
+        [SupportedOSPlatform("windows")]
+#endif
         public static ImageCodecInfo GetEncoder(ImageFormat format)
         {
             if (format == null)
@@ -60,6 +64,9 @@ namespace MixERP.Net.Common.Helpers
             return null;
         }
 
+#if NET
+        [SupportedOSPlatform("windows")]
+#endif
         public static string GetFileExtension(ImageFormat format)
         {
             return ImageCodecInfo.GetImageEncoders()
@@ -71,6 +78,9 @@ namespace MixERP.Net.Common.Helpers
                 .ToUpperInvariant();
         }
 
+#if NET
+        [SupportedOSPlatform("windows")]
+#endif
         public static ImageFormat GetImageFormat(String path)
         {
             switch (Path.GetExtension(path))
@@ -83,6 +93,9 @@ namespace MixERP.Net.Common.Helpers
             return ImageFormat.Jpeg;
         }
 
+#if NET
+        [SupportedOSPlatform("windows")]
+#endif
         public static byte[] GetResizedImage(Image image, int width, int height)
         {
             Size thumbnailSize = new Size(width, height);

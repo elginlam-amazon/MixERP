@@ -1,8 +1,15 @@
-﻿using System;
+﻿#if NETSTANDARD2_0
+// netstandard.dll and the .NET Framework System.Web.dll both define System.Web.HttpUtility; bind to netstandard's.
+extern alias netstandard;
+#endif
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Web;
+#if NETSTANDARD2_0
+using HttpUtility = netstandard::System.Web.HttpUtility;
+#endif
 
 namespace MixERP.Net.i18n
 {

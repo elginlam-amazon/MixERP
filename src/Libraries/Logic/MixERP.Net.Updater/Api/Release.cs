@@ -1,3 +1,4 @@
+﻿using Markdig;
 using MixERP.Net.Common;
 using System;
 using System.Collections.Generic;
@@ -6,6 +7,8 @@ namespace MixERP.Net.Updater.Api
 {
     public class Release
     {
+        private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+
         public string Id { get; set; }
         public string Name { get; set; }
         public string TagName { get; set; }
@@ -42,11 +45,9 @@ namespace MixERP.Net.Updater.Api
 
         private static string ParseMarkdown(string markdown)
         {
-            var md = new MarkdownDeep.Markdown();
-            md.ExtraMode = true;
-            md.SafeMode = false;
-
-            return md.Transform(markdown);
+            // MarkdownDeep (ExtraMode, SafeMode off) replaced by Markdig: advanced extensions cover the
+            // Markdown Extra features (tables, footnotes, definition lists, ...); raw HTML is kept as before.
+            return Markdown.ToHtml(markdown ?? string.Empty, Pipeline);
         }
     }
 }

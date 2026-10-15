@@ -33,7 +33,8 @@ namespace MixERP.Net.DbFactory
 {
     public class DbNotificationArgs : EventArgs
     {
-        public NpgsqlError Notice { get; set; }
+        [CLSCompliant(false)]
+        public PostgresNotice Notice { get; set; }
         public string Message { get; set; }
     }
 
@@ -65,9 +66,9 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex is PostgresException postgresException && postgresException.SqlState.StartsWith("P"))
                 {
-                    string errorMessage = GetDBErrorResource(ex);
+                    string errorMessage = GetDBErrorResource(postgresException);
                     throw new MixERPException(errorMessage, ex);
                 }
 
@@ -86,11 +87,11 @@ namespace MixERP.Net.DbFactory
             return ExecuteNonQuery(catalog, new NpgsqlCommand(sql));
         }
 
-        private static string GetDBErrorResource(NpgsqlException ex)
+        private static string GetDBErrorResource(PostgresException ex)
         {
-            string message = DbErrors.Get(ex.Code);
+            string message = DbErrors.Get(ex.SqlState);
 
-            if (message == ex.Code)
+            if (message == ex.SqlState)
             {
                 return ex.Message;
             }
@@ -123,9 +124,9 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex is PostgresException postgresException && postgresException.SqlState.StartsWith("P"))
                 {
-                    string errorMessage = GetDBErrorResource(ex);
+                    string errorMessage = GetDBErrorResource(postgresException);
                     throw new MixERPException(errorMessage, ex);
                 }
 
@@ -155,9 +156,9 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex is PostgresException postgresException && postgresException.SqlState.StartsWith("P"))
                 {
-                    string errorMessage = GetDBErrorResource(ex);
+                    string errorMessage = GetDBErrorResource(postgresException);
                     throw new MixERPException(errorMessage, ex);
                 }
 
@@ -187,9 +188,9 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex is PostgresException postgresException && postgresException.SqlState.StartsWith("P"))
                 {
-                    string errorMessage = GetDBErrorResource(ex);
+                    string errorMessage = GetDBErrorResource(postgresException);
                     throw new MixERPException(errorMessage, ex);
                 }
 
@@ -227,9 +228,9 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex is PostgresException postgresException && postgresException.SqlState.StartsWith("P"))
                 {
-                    string errorMessage = GetDBErrorResource(ex);
+                    string errorMessage = GetDBErrorResource(postgresException);
                     throw new MixERPException(errorMessage, ex);
                 }
 
@@ -279,9 +280,9 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex is PostgresException postgresException && postgresException.SqlState.StartsWith("P"))
                 {
-                    string errorMessage = GetDBErrorResource(ex);
+                    string errorMessage = GetDBErrorResource(postgresException);
                     throw new MixERPException(errorMessage, ex);
                 }
 
@@ -308,6 +309,7 @@ namespace MixERP.Net.DbFactory
             return false;
         }
 
+        [CLSCompliant(false)]
         public void ListenNonQuery(string catalog, NpgsqlCommand command)
         {
             try
@@ -334,9 +336,9 @@ namespace MixERP.Net.DbFactory
                             {
                                 string errorMessage = ex.Message;
 
-                                if (ex.Code.StartsWith("P"))
+                                if (ex is PostgresException postgresException && postgresException.SqlState.StartsWith("P"))
                                 {
-                                    errorMessage = GetDBErrorResource(ex);
+                                    errorMessage = GetDBErrorResource(postgresException);
                                 }
 
                                 EventHandler<DbNotificationArgs> listen = this.Listen;
@@ -362,9 +364,9 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex is PostgresException postgresException && postgresException.SqlState.StartsWith("P"))
                 {
-                    string errorMessage = GetDBErrorResource(ex);
+                    string errorMessage = GetDBErrorResource(postgresException);
                     throw new MixERPException(errorMessage, ex);
                 }
 
@@ -424,7 +426,7 @@ namespace MixERP.Net.DbFactory
                 DbNotificationArgs args = new DbNotificationArgs
                 {
                     Notice = e.Notice,
-                    Message = e.Notice.Message
+                    Message = e.Notice.MessageText
                 };
 
                 listen(this, args);

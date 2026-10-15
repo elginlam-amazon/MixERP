@@ -28,6 +28,7 @@ namespace MixERP.Net.Core.Modules.Sales.Data.Data
 {
     public static class AttachmentHelper
     {
+        [System.CLSCompliant(false)]
         public static IEnumerable<NpgsqlParameter> AddAttachmentParameter(Collection<Attachment> attachments)
         {
             Collection<NpgsqlParameter> collection = new Collection<NpgsqlParameter>();

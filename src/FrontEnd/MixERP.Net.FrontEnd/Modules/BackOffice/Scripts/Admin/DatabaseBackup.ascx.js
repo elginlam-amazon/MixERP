@@ -46,7 +46,7 @@ function connectionListener() {
         $(this).addClass("disabled loading");
         header.removeClass("initially hidden");
         InitializeMessage();
-        $.connection.dbHub.server.backupDatabase(backupName);
+        getHub("dbHub").invoke("BackupDatabase", backupName);
 
     });
 };
@@ -60,18 +60,18 @@ function isValidFileName(fileName) {
 };
 
 $(function () {
-    $.connection.dbHub.client.getNotification = function (msg) {
+    getHub("dbHub").on("getNotification", function (msg) {
         AddItem(msg);
-    };
+    });
 
-    $.connection.dbHub.client.backupCompleted = function (msg) {
+    getHub("dbHub").on("backupCompleted", function (msg) {
         backupButton.removeClass("disabled loading");
         AddItem(msg);
-    };
+    });
 
-    $.connection.dbHub.client.backupFailed = function (msg) {
+    getHub("dbHub").on("backupFailed", function (msg) {
         backupButton.removeClass("disabled loading");
         AddItem(msg, "red");
-    };
+    });
 });
 

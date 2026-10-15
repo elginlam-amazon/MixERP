@@ -23,6 +23,7 @@ using System;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
+using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
 using System.Web;
@@ -34,6 +35,9 @@ namespace MixERP.Net.Common
 {
     public static class Conversion
     {
+#if NET
+        [SupportedOSPlatform("windows")]
+#endif
         public static byte[] ConvertImageToByteArray(Image imageToConvert, ImageFormat formatOfImage)
         {
             if (imageToConvert == null)
@@ -74,7 +78,7 @@ namespace MixERP.Net.Common
                 return null;
             }
 
-            using (SHA512CryptoServiceProvider provider = new SHA512CryptoServiceProvider())
+            using (SHA512 provider = SHA512.Create())
             {
                 return BitConverter.ToString(provider.ComputeHash(Encoding.UTF8.GetBytes(password + salt))).Replace("-", "").ToLower(CultureInfo.InvariantCulture);
             }
@@ -152,6 +156,9 @@ namespace MixERP.Net.Common
             return retVal;
         }
 
+#if NET
+        [SupportedOSPlatform("windows")]
+#endif
         public static byte[] TryCastByteArray(Image image)
         {
             if (image == null)

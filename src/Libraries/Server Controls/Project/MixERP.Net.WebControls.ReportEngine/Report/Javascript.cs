@@ -36,7 +36,6 @@ namespace MixERP.Net.WebControls.ReportEngine
 {
     public partial class Report
     {
-        [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
         private void AddJavascript()
         {
             JSUtility.AddJSReference(this.Page, "MixERP.Net.WebControls.ReportEngine.Scripts.JsBarcode.CODE128.js", "code128", typeof(Report));

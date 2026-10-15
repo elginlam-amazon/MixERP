@@ -23,7 +23,8 @@ using System;
 using System.Configuration;
 using System.Globalization;
 using System.IO;
-using System.Net;
+using System.Net.Http;
+using System.Threading.Tasks;
 using System.Web;
 using System.Web.Hosting;
 using System.Web.SessionState;
@@ -35,6 +36,8 @@ namespace MixERP.Net.Common
 {
     public static class PageUtility
     {
+        private static readonly HttpClient UrlValidationClient = new HttpClient();
+
         public static void AddMeta(Page page, string name, string content)
         {
             using (HtmlMeta meta = new HtmlMeta())
@@ -125,20 +128,25 @@ namespace MixERP.Net.Common
                 url = prefix + "://" + url;
             }
 
-            using (MyClient client = new MyClient())
+            // WebClient (SYSLIB0014) replaced by HttpClient: a HEAD request validates the url, as before.
+            try
             {
-                client.HeadOnly = true;
-                try
+                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Head, url))
+                using (HttpResponseMessage response = UrlValidationClient.SendAsync(request).ConfigureAwait(false).GetAwaiter().GetResult())
                 {
-                    client.DownloadString(url);
+                    response.EnsureSuccessStatusCode();
                 }
-                catch (WebException)
-                {
-                    url = string.Empty;
-                }
-
-                return url;
             }
+            catch (HttpRequestException)
+            {
+                url = string.Empty;
+            }
+            catch (TaskCanceledException)
+            {
+                url = string.Empty;
+            }
+
+            return url;
         }
 
         public static Control FindControlIterative(Control root, string id)
@@ -323,22 +331,6 @@ namespace MixERP.Net.Common
                 }
             }
             return relativeUrl;
-        }
-
-        private class MyClient : WebClient
-        {
-            public bool HeadOnly { private get; set; }
-
-            protected override WebRequest GetWebRequest(Uri address)
-            {
-                WebRequest req = base.GetWebRequest(address);
-
-                if (req != null && (this.HeadOnly && req.Method == "GET"))
-                {
-                    req.Method = "HEAD";
-                }
-                return req;
-            }
         }
     }
 }

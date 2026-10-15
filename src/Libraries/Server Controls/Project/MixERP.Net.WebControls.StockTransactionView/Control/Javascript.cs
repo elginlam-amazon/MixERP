@@ -28,7 +28,6 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
     public partial class StockTransactionView
     {
-        [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
         private void AddJavascript()
         {
             JSUtility.AddJSReference(this.Page, "MixERP.Net.WebControls.StockTransactionViewFactory.StockTransactionView.js", "StockTransactionView", typeof(StockTransactionView));
