@@ -24,7 +24,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses />.
     <asp:Literal runat="server" ID="TitleLiteral" />
 </h2>
 
-<asp:ScriptManagerProxy runat="server"></asp:ScriptManagerProxy>
 
 <asp:PlaceHolder runat="server" ID="Placeholder1"></asp:PlaceHolder>
 

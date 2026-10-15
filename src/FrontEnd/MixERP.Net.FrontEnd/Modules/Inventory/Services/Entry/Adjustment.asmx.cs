@@ -18,6 +18,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.ApplicationState.Cache;
+using MixERP.Net.Common.Helpers;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Extensions;
 using MixERP.Net.Core.Modules.Inventory.Data.Helpers;
@@ -31,16 +32,11 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
-using System.Web.Script.Serialization;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Framework.WebServices;
 
 namespace MixERP.Net.Core.Modules.Inventory.Services.Entry
 {
-    [WebService(Namespace = "http://tempuri.org/")]
-    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]
-    [ScriptService]
     public class Adjustment : WebService
     {
         [WebMethod]
@@ -79,8 +75,7 @@ namespace MixERP.Net.Core.Modules.Inventory.Services.Entry
         {
             Collection<StockAdjustmentDetail> models = new Collection<StockAdjustmentDetail>();
 
-            JavaScriptSerializer jss = new JavaScriptSerializer();
-            dynamic result = jss.Deserialize<dynamic>(json);
+            dynamic result = JSONHelper.DeserializeDynamic(json);
 
             foreach (var item in result)
             {

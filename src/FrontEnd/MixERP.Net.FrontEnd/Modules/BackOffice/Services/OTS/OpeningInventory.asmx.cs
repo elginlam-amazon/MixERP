@@ -18,6 +18,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.ApplicationState.Cache;
+using MixERP.Net.Common.Helpers;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Extensions;
 using MixERP.Net.Entities.Transactions;
@@ -25,16 +26,11 @@ using Serilog;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Web.Script.Serialization;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Framework.WebServices;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Services.OTS
 {
-    [WebService(Namespace = "http://tempuri.org/")]
-    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]
-    [ScriptService]
     public class OpeningInventory : WebService
     {
         [WebMethod]
@@ -65,9 +61,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Services.OTS
         private Collection<OpeningStockType> GetStockDetails(string json)
         {
             Collection<OpeningStockType> details = new Collection<OpeningStockType>();
-            JavaScriptSerializer jss = new JavaScriptSerializer();
-
-            dynamic result = jss.Deserialize<dynamic>(json);
+            dynamic result = JSONHelper.DeserializeDynamic(json);
 
             if (result != null)
             {

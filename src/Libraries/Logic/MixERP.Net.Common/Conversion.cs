@@ -20,32 +20,30 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.i18n;
 using Serilog;
 using System;
-using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Web;
+#if !NETSTANDARD2_0
 using System.Web.UI;
 using System.Web.UI.WebControls;
-using Image = System.Drawing.Image;
+#endif
+using SkiaSharp;
 
 namespace MixERP.Net.Common
 {
     public static class Conversion
     {
-        public static byte[] ConvertImageToByteArray(Image imageToConvert, ImageFormat formatOfImage)
+        public static byte[] ConvertImageToByteArray(SKBitmap imageToConvert, SKEncodedImageFormat formatOfImage)
         {
             if (imageToConvert == null)
             {
                 return null;
             }
 
-            using (MemoryStream ms = new MemoryStream())
-            {
-                imageToConvert.Save(ms, formatOfImage);
-                return ms.ToArray();
-            }
+            // Quality 75 matches the GDI+ default encoder quality used previously.
+            return ConvertImageToByteArray(imageToConvert, formatOfImage, 75);
         }
 
         public static DateTime GetLocalDateTime(string timeZone, DateTime utc)
@@ -74,7 +72,7 @@ namespace MixERP.Net.Common
                 return null;
             }
 
-            using (SHA512CryptoServiceProvider provider = new SHA512CryptoServiceProvider())
+            using (SHA512 provider = SHA512.Create())
             {
                 return BitConverter.ToString(provider.ComputeHash(Encoding.UTF8.GetBytes(password + salt))).Replace("-", "").ToLower(CultureInfo.InvariantCulture);
             }
@@ -102,7 +100,7 @@ namespace MixERP.Net.Common
             {
                 return null;
             }
-            string physicalApplicationPath = HttpContext.Current.Request.PhysicalApplicationPath;
+            string physicalApplicationPath = HttpRuntime.AppDomainAppPath;
 
             if (string.IsNullOrWhiteSpace(physicalApplicationPath))
             {
@@ -114,6 +112,9 @@ namespace MixERP.Net.Common
 
         public static string ResolveUrl(string url)
         {
+#if NETSTANDARD2_0
+            return VirtualPathUtility.IsAppRelative(url) ? VirtualPathUtility.ToAbsolute(url) : url;
+#else
             Page page = HttpContext.Current.Handler as Page;
 
             if (page == null)
@@ -122,6 +123,7 @@ namespace MixERP.Net.Common
             }
 
             return (page).ResolveUrl(url);
+#endif
         }
 
         public static bool TryCastBoolean(object value)
@@ -152,17 +154,21 @@ namespace MixERP.Net.Common
             return retVal;
         }
 
-        public static byte[] TryCastByteArray(Image image)
+        public static byte[] TryCastByteArray(SKBitmap image)
         {
             if (image == null)
             {
                 return null;
             }
 
-            using (var ms = new MemoryStream())
+            return ConvertImageToByteArray(image, SKEncodedImageFormat.Jpeg);
+        }
+
+        private static byte[] ConvertImageToByteArray(SKBitmap image, SKEncodedImageFormat format, int quality)
+        {
+            using (SKData data = image.Encode(format, quality))
             {
-                image.Save(ms, ImageFormat.Jpeg);
-                return ms.ToArray();
+                return data == null ? null : data.ToArray();
             }
         }
 
@@ -388,6 +394,7 @@ namespace MixERP.Net.Common
             return string.Empty;
         }
 
+#if !NETSTANDARD2_0
         public static Unit TryCastUnit(object value)
         {
             if (value == null)
@@ -403,6 +410,7 @@ namespace MixERP.Net.Common
 
             return Unit.Parse(value.ToString(), CultureInfo.DefaultThreadCurrentCulture);
         }
+#endif
 
         public static DateTime? TryCastNullableDate(object value)
         {

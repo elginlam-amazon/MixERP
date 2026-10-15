@@ -22,6 +22,7 @@ using MixERP.Net.ApplicationState;
 using MixERP.Net.Common.Extensions;
 using MixERP.Net.Entities.Core;
 using MixERP.Net.Framework.Controls;
+using MixERP.Net.FrontEnd.Application;
 using Serilog;
 using System;
 using System.Collections.ObjectModel;
@@ -29,7 +30,6 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Web;
-using System.Web.Security;
 using System.Web.UI;
 
 namespace MixERP.Net.FrontEnd.Base
@@ -64,7 +64,7 @@ namespace MixERP.Net.FrontEnd.Base
 
         public void RequestLoginPage()
         {
-            FormsAuthentication.SignOut();
+            Authentication.SignOut();
             Log.Information("User {UserName} was signed off.", AppUsers.GetCurrent().View.UserName);
 
             Log.Debug("Clearing Http Cookies.");
@@ -84,12 +84,11 @@ namespace MixERP.Net.FrontEnd.Base
                 return;
             }
 
-            string loginUrl = (page).ResolveUrl(FormsAuthentication.LoginUrl);
+            string loginUrl = (page).ResolveUrl(Authentication.LoginUrl);
 
             this.currentPage = HttpContext.Current.Request.Url.AbsolutePath;
             if (this.currentPage != loginUrl)
             {
-                FormsAuthentication.RedirectToLoginPage(this.currentPage);
                 HttpContext.Current.Response.Redirect("/SignIn.aspx?ReturnUrl=" + this.currentPage);
                 Log.Information("Redirected to login page.");
             }
@@ -102,17 +101,8 @@ namespace MixERP.Net.FrontEnd.Base
                 return;
             }
 
-            FormsAuthenticationTicket ticket = new FormsAuthenticationTicket(1,
-                signInId.ToString(CultureInfo.InvariantCulture), DateTime.Now, DateTime.Now.AddMinutes(30), rememberMe,
-                String.Empty, FormsAuthentication.FormsCookiePath);
-            string encryptedCookie = FormsAuthentication.Encrypt(ticket);
-
-            HttpCookie cookie = new HttpCookie(FormsAuthentication.FormsCookieName, encryptedCookie);
-            cookie.Domain = FormsAuthentication.CookieDomain;
-            cookie.Path = ticket.CookiePath;
-
-            response.Cookies.Add(cookie);
-            //response.Redirect(FormsAuthentication.GetRedirectUrl(signInId.ToString(CultureInfo.InvariantCulture), rememberMe));
+            // Issues the ASP.NET Core authentication cookie (replaces the encrypted FormsAuthenticationTicket cookie).
+            Authentication.SignIn(signInId, rememberMe);
         }
 
         protected override void InitializeCulture()
@@ -170,7 +160,8 @@ namespace MixERP.Net.FrontEnd.Base
 
             if (!policyExists)
             {
-                Server.Transfer("~/Site/AccessIsDenied.aspx");
+                // Server.Transfer is not supported on ASP.NET Core; redirect instead.
+                this.Response.Redirect("~/Site/AccessIsDenied.aspx");
             }
 
             return policyExists;

@@ -17,19 +17,21 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using Microsoft.AspNet.SignalR;
+using Microsoft.AspNetCore.SignalR;
 using MixERP.Net.ApplicationState.Cache;
 using System;
 
 namespace MixERP.Net.FrontEnd.Hubs
 {
     [CLSCompliant(false)]
-    public class BaseHub : Hub
+    public class BaseHub : MixERPHub
     {
         public void Terminate(int counter)
         {
+            this.CaptureClients();
+
             string catalog = AppUsers.GetCurrentUserDB();
-            this.Clients.All.terminate(counter, catalog);
+            this.allClients.SendAsync("terminate", counter, catalog);
         }
     }
 }

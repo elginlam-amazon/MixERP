@@ -39,7 +39,6 @@ Inherits="MixERP.Net.FrontEnd.MixERPMaster" %>
 <script src="/bundles/scripts/master-page.min.js"></script>
 <form id="form1" runat="server" enctype="multipart/form-data" method="post" submitdisabledcontrols="true" defaultbutton="SwallowSubmit">
     <asp:Button runat="server" ID="SwallowSubmit" OnClientClick=" return false; " Style="display: none;"/>
-    <asp:ScriptManager runat="server" ID="ScriptManager1"/>
     <div class="ui celled grid" id="container">
         <div class="row" id="ContentRow">
             <div class="three wide column sidebar" id="MenuContainer">
@@ -144,7 +143,9 @@ Inherits="MixERP.Net.FrontEnd.MixERPMaster" %>
     </div>
     <asp:ContentPlaceHolder ID="BottomScriptContentPlaceholder" runat="server">
     </asp:ContentPlaceHolder>
+    <script src="/Scripts/microsoft-signalr/signalr.min.js"></script>
     <script src="/signalr/hubs"></script>
+    <script src="/Scripts/mixerp/signalr-hubs.js"></script>
     <script type="text/javascript">
         $(function() {
             var started = false;

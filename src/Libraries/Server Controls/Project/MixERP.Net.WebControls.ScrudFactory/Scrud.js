@@ -73,10 +73,13 @@ var scrudPrintGridView = function () {
     printGridView(reportTemplatePath, reportHeaderPath, title, formGridViewId, date, user, office, 'ScrudReport', 1, 0);
 };
 
-Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () {
-    //Fired on each ASP.net AJAX request.
-    scrudInitialize();
-});
+// ASP.NET AJAX (Sys) is only present when a ScriptManager renders it.
+if (typeof Sys !== "undefined") {
+    Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () {
+        //Fired on each ASP.net AJAX request.
+        scrudInitialize();
+    });
+}
 
 $(document).ready(function () {
     scrudInitialize();
