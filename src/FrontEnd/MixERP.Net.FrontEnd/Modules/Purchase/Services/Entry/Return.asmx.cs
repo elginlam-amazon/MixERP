@@ -28,13 +28,11 @@ using Serilog;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Framework.WebServices;
 
 namespace MixERP.Net.Core.Modules.Purchase.Services.Entry
 {
     [WebService(Namespace = "http://tempuri.org/")]
-    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]
     [ScriptService]
     public class Return : WebService

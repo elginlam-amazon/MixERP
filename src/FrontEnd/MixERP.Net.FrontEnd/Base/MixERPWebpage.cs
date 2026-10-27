@@ -28,9 +28,12 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
+using System.Security.Claims;
 using System.Web;
-using System.Web.Security;
 using System.Web.UI;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.SystemWebAdapters;
 
 namespace MixERP.Net.FrontEnd.Base
 {
@@ -62,9 +65,20 @@ namespace MixERP.Net.FrontEnd.Base
             HttpContext.Current.Response.Redirect("~/");
         }
 
+        /// <summary>
+        ///     Signs the current user out (replaces FormsAuthentication.SignOut).
+        /// </summary>
+        public static void SignOut()
+        {
+            HttpContext.Current.AsAspNetCore()
+                .SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme)
+                .GetAwaiter()
+                .GetResult();
+        }
+
         public void RequestLoginPage()
         {
-            FormsAuthentication.SignOut();
+            SignOut();
             Log.Information("User {UserName} was signed off.", AppUsers.GetCurrent().View.UserName);
 
             Log.Debug("Clearing Http Cookies.");
@@ -84,13 +98,12 @@ namespace MixERP.Net.FrontEnd.Base
                 return;
             }
 
-            string loginUrl = (page).ResolveUrl(FormsAuthentication.LoginUrl);
+            string loginUrl = (page).ResolveUrl(Program.LoginUrl);
 
             this.currentPage = HttpContext.Current.Request.Url.AbsolutePath;
             if (this.currentPage != loginUrl)
             {
-                FormsAuthentication.RedirectToLoginPage(this.currentPage);
-                HttpContext.Current.Response.Redirect("/SignIn.aspx?ReturnUrl=" + this.currentPage);
+                HttpContext.Current.Response.Redirect(loginUrl + "?ReturnUrl=" + this.currentPage);
                 Log.Information("Redirected to login page.");
             }
         }
@@ -102,16 +115,23 @@ namespace MixERP.Net.FrontEnd.Base
                 return;
             }
 
-            FormsAuthenticationTicket ticket = new FormsAuthenticationTicket(1,
-                signInId.ToString(CultureInfo.InvariantCulture), DateTime.Now, DateTime.Now.AddMinutes(30), rememberMe,
-                String.Empty, FormsAuthentication.FormsCookiePath);
-            string encryptedCookie = FormsAuthentication.Encrypt(ticket);
+            // Cookie authentication replaces the encrypted FormsAuthenticationTicket; the user name is the sign-in id.
+            ClaimsIdentity identity = new ClaimsIdentity(new[]
+            {
+                new Claim(ClaimTypes.Name, signInId.ToString(CultureInfo.InvariantCulture))
+            }, CookieAuthenticationDefaults.AuthenticationScheme);
 
-            HttpCookie cookie = new HttpCookie(FormsAuthentication.FormsCookieName, encryptedCookie);
-            cookie.Domain = FormsAuthentication.CookieDomain;
-            cookie.Path = ticket.CookiePath;
+            AuthenticationProperties properties = new AuthenticationProperties
+            {
+                IsPersistent = rememberMe,
+                IssuedUtc = DateTimeOffset.UtcNow,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(30)
+            };
 
-            response.Cookies.Add(cookie);
+            HttpContext.Current.AsAspNetCore()
+                .SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), properties)
+                .GetAwaiter()
+                .GetResult();
             //response.Redirect(FormsAuthentication.GetRedirectUrl(signInId.ToString(CultureInfo.InvariantCulture), rememberMe));
         }
 
@@ -170,7 +190,8 @@ namespace MixERP.Net.FrontEnd.Base
 
             if (!policyExists)
             {
-                Server.Transfer("~/Site/AccessIsDenied.aspx");
+                // Server.Transfer is not supported on ASP.NET Core.
+                this.Response.Redirect("~/Site/AccessIsDenied.aspx");
             }
 
             return policyExists;

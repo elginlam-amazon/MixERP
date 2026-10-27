@@ -19,6 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace MixERP.Net.Framework.Controls
 {
+    [System.CLSCompliant(false)]
     public abstract class MixERPWidget: MixERPUserControlBase, IWidget
     {
         public override AccessLevel AccessLevel

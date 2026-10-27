@@ -13,6 +13,9 @@ namespace MixERP.Net.Utility.Installer
         [STAThread]
         private static void Main()
         {
+            // Npgsql 6+ maps timestamptz to UTC-only DateTime values; keep the Npgsql 2.x semantics the installer was written for.
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 

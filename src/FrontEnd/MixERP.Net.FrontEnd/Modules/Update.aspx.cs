@@ -65,7 +65,7 @@ namespace MixERP.Net.FrontEnd.Modules
                 Log.Information("Access to {Page} is denied to {User} from {IP}.", this,
                     userName, ipAddress);
 
-                this.Page.Server.Execute("~/Site/AccessIsDenied.aspx", false);
+                this.Page.Response.Redirect("~/Site/AccessIsDenied.aspx"); // Server.Execute is not supported on ASP.NET Core.
                 return;
             }
 

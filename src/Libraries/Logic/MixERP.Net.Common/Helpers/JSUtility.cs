@@ -25,6 +25,7 @@ using System.Web.UI;
 
 namespace MixERP.Net.Common.Helpers
 {
+    [CLSCompliant(false)]
     public static class JSUtility
     {
         public static void AddJSReference(Page page, string resourceName, string key, Type type)

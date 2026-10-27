@@ -1,4 +1,4 @@
-/* PetaPoco v4.0.3 - A Tiny ORMish thing for your POCO's.
+﻿/* PetaPoco v4.0.3 - A Tiny ORMish thing for your POCO's.
  * Copyright © 2011 Topten Software.  All Rights Reserved.
  * 
  * Apache License 2.0 - http://www.toptensoftware.com/petapoco/license
@@ -190,6 +190,20 @@ namespace PetaPoco
         }
         DBType _dbType = DBType.SqlServer;
 
+        // Resolves the ADO.NET provider factory. Modern .NET has no machine.config/Web.config
+        // <DbProviderFactories> registry, so the Npgsql provider used by MixERP is resolved directly.
+        private static DbProviderFactory GetProviderFactory(string providerName)
+        {
+            if (string.Equals(providerName, "Npgsql", StringComparison.OrdinalIgnoreCase))
+                return Npgsql.NpgsqlFactory.Instance;
+
+#if NETSTANDARD2_0
+            throw new NotSupportedException(string.Format("The ADO.NET provider \"{0}\" is not supported.", providerName));
+#else
+            return DbProviderFactories.GetFactory(providerName);
+#endif
+        }
+
         // Common initialization
         private void CommonConstruct()
         {
@@ -199,7 +213,7 @@ namespace PetaPoco
             ForceDateTimesToUtc = true;
 
             if (_providerName != null)
-                _factory = DbProviderFactories.GetFactory(_providerName);
+                _factory = GetProviderFactory(_providerName);
 
             string dbtype = (_factory == null ? _sharedConnection.GetType() : _factory.GetType()).Name;
 

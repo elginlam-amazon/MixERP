@@ -1,0 +1,15 @@
+<Project>
+  <!--
+    MixERP modules are plug-ins of MixERP.Net.FrontEnd: the front end does not reference them, it loads every
+    MixERP.Net.Core.Modules.*.dll found in its output folder at startup (legacy layout: modules built into ..\..\bin).
+    After a module is built, its MixERP assemblies are copied into the front end output folder.
+  -->
+  <Target Name="CopyModuleToFrontEnd" AfterTargets="Build" Condition="'$(IsMixERPModule)' == 'true'">
+    <ItemGroup>
+      <MixERPModuleOutput Include="$(TargetDir)MixERP.Net.*.dll;$(TargetDir)MixERP.Net.*.pdb" Exclude="$(TargetDir)MixERP.Net.FrontEnd.dll;$(TargetDir)MixERP.Net.FrontEnd.pdb" />
+    </ItemGroup>
+    <Copy SourceFiles="@(MixERPModuleOutput)"
+          DestinationFolder="$(MSBuildThisFileDirectory)..\bin\$(Configuration)\$(TargetFramework)\"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

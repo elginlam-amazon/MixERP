@@ -22,6 +22,7 @@ using System.Web.UI;
 
 namespace MixERP.Net.Framework.Controls
 {
+    [CLSCompliant(false)]
     public abstract class MixERPUserControlBase : UserControl, IControl
     {
         private ValidateRequestMode validDateRequest = ValidateRequestMode.Inherit;

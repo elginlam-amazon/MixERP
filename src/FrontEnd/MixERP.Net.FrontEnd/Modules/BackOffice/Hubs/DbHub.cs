@@ -17,8 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using Microsoft.AspNet.SignalR;
-using Microsoft.VisualBasic.FileIO;
+using Microsoft.AspNetCore.SignalR;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
@@ -47,13 +46,13 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
         {
             if (!this.IsValidRequest())
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied, Warnings.AccessIsDenied);
+                this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied, Warnings.AccessIsDenied).Wait();
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(fileName))
             {
-                this.Clients.Caller.backupFailed(Warnings.NoFileSpecified);
+                this.Clients.Caller.SendAsync("backupFailed", Warnings.NoFileSpecified).Wait();
                 return;
             }
 
@@ -77,7 +76,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
                 return;
             }
 
-            this.Clients.Caller.backupFailed(Warnings.ConfigurationError);
+            this.Clients.Caller.SendAsync("backupFailed", Warnings.ConfigurationError).Wait();
         }
 
         private void Backup(PostgreSQLServer server, string fileName)
@@ -108,11 +107,11 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
                     message.Append(Labels.ClickHereToDownload);
                     message.Append("</a>");
 
-                    this.Clients.Caller.backupCompleted(message.ToString());
+                    this.Clients.Caller.SendAsync("backupCompleted", message.ToString()).Wait();
                     return;
                 }
 
-                this.Clients.Caller.backupFailed(Warnings.CannotCreateABackup);
+                this.Clients.Caller.SendAsync("backupFailed", Warnings.CannotCreateABackup).Wait();
             }
         }
 
@@ -162,7 +161,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
             this.RemoveFile(batchFile);
             this.CopyResource();
             this.CompressBackupDirectory(true);
-            this.Clients.Caller.backupCompleted(string.Empty);
+            this.Clients.Caller.SendAsync("backupCompleted", string.Empty).Wait();
         }
 
         private void CopyResource()
@@ -170,7 +169,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
             string source = ConfigurationHelper.GetResourceDirectory();
             string destination = Path.Combine(backupDirectory, new DirectoryInfo(source).Name);
 
-            FileSystem.CopyDirectory(source, destination);
+            DirectoryHelper.CopyDirectory(source, destination);
         }
 
         private void CreateBatchFile(PostgreSQLServer server, string pgDumpPath, string fileName)
@@ -194,7 +193,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
         {
             if (!string.IsNullOrWhiteSpace(e.Data))
             {
-                this.Clients.Caller.getNotification(e.Data);
+                this.Clients.Caller.SendAsync("getNotification", e.Data).Wait();
             }
         }
 
@@ -219,7 +218,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
 
             if (this.Context == null)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied).Wait();
                 return false;
             }
 
@@ -227,7 +226,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
 
             if (globalLoginId <= 0)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied).Wait();
                 return false;
             }
 

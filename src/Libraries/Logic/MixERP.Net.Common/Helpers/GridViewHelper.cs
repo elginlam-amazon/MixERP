@@ -17,12 +17,14 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using System;
 using System.Web.UI;
 using System.Web.UI.HtmlControls;
 using System.Web.UI.WebControls;
 
 namespace MixERP.Net.Common.Helpers
 {
+    [CLSCompliant(false)]
     public static class GridViewHelper
     {
         public static void AddDataBoundControl(GridView grid, string dataField, string headerText, string dataFormatString = "", bool alignRight = false)

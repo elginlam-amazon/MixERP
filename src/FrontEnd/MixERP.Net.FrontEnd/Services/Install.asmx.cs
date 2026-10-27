@@ -19,8 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.ComponentModel;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Framework.WebServices;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Framework;
 using MixERP.Net.i18n.Resources;
@@ -29,7 +28,6 @@ using Serilog;
 namespace MixERP.Net.FrontEnd.Services
 {
     [WebService(Namespace = "http://tempuri.org/")]
-    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]
     [ScriptService]
     public class Install : WebService

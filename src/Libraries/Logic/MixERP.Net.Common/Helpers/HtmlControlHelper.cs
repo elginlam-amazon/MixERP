@@ -24,6 +24,7 @@ using System.Web.UI.WebControls;
 
 namespace MixERP.Net.Common.Helpers
 {
+    [CLSCompliant(false)]
     public static class HtmlControlHelper
     {
         public static HtmlGenericControl GetDivider()

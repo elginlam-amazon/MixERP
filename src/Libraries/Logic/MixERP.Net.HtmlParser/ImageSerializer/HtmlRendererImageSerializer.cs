@@ -1,26 +1,26 @@
-﻿using MixERP.Net.Common.Helpers;
-using System.Drawing;
-using System.Threading;
-using TheArtOfDev.HtmlRenderer.WinForms;
+﻿using PdfSharp;
+using PdfSharp.Pdf;
+using TheArtOfDev.HtmlRenderer.PdfSharp;
 
 namespace MixERP.Net.HtmlParser.ImageSerializer
 {
+    /// <summary>
+    ///     Renders the HTML snapshot with HtmlRenderer. The GDI/WinForms renderer (HtmlRenderer.WinForms,
+    ///     HTML to bitmap on an STA thread) is not available on .NET 10, so the snapshot is rendered as a PDF document
+    ///     with the cross-platform HtmlRenderer.PdfSharp renderer.
+    /// </summary>
     public sealed class HtmlRendererImageSerializer : HtmlImageSerializer
     {
         internal override void CreateImage(string imagePath)
         {
-            Thread thread = new Thread(delegate()
+            string path = imagePath + ".pdf";
+
+            using (PdfDocument document = PdfGenerator.GeneratePdf(this.Html, PageSize.A4))
             {
-                string path = imagePath + ImageHelper.GetFileExtension(this.ImageFormat);
+                document.Save(path);
+            }
 
-                Image image = HtmlRender.RenderToImage(this.Html);
-
-                image.Save(path, ImageHelper.GetEncoder(this.ImageFormat), null);
-                OnImageSaved(new ImageSavedEventArgs(path));
-            });
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
+            this.OnImageSaved(new ImageSavedEventArgs(path));
 
             base.CreateImage(imagePath);
         }
