@@ -22,8 +22,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Web.Script.Serialization;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Framework.WebServices;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Extensions;
@@ -38,7 +37,6 @@ using Serilog;
 namespace MixERP.Net.Core.Modules.Inventory.Services.Entry
 {
     [WebService(Namespace = "http://tempuri.org/")]
-    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]
     [ScriptService]
     public class TransferDelivery : WebService

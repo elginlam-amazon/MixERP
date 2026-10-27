@@ -26,14 +26,12 @@ using Serilog;
 using System.ComponentModel;
 using System.Threading;
 using System.Web;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Framework.WebServices;
 using MixERP.Net.FrontEnd.Application;
 
 namespace MixERP.Net.FrontEnd.Services
 {
     [WebService(Namespace = "http://tempuri.org/")]
-    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]
     [ScriptService]
     public class User : WebService

@@ -51,4 +51,5 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyFileVersion("1.2.0.1")]
 [assembly: AssemblyInformationalVersion("1.2.0.1 RC")]
 
-[assembly: CLSCompliant(true)]
+// Web Forms types now come from CoreWebForms, which is not marked CLS-compliant.
+[assembly: CLSCompliant(false)]

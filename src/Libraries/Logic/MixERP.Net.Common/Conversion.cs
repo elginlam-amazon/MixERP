@@ -26,8 +26,10 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Web;
+#if NET
 using System.Web.UI;
 using System.Web.UI.WebControls;
+#endif
 using Image = System.Drawing.Image;
 
 namespace MixERP.Net.Common
@@ -74,7 +76,7 @@ namespace MixERP.Net.Common
                 return null;
             }
 
-            using (SHA512CryptoServiceProvider provider = new SHA512CryptoServiceProvider())
+            using (SHA512 provider = SHA512.Create())
             {
                 return BitConverter.ToString(provider.ComputeHash(Encoding.UTF8.GetBytes(password + salt))).Replace("-", "").ToLower(CultureInfo.InvariantCulture);
             }
@@ -102,7 +104,7 @@ namespace MixERP.Net.Common
             {
                 return null;
             }
-            string physicalApplicationPath = HttpContext.Current.Request.PhysicalApplicationPath;
+            string physicalApplicationPath = HttpRuntime.AppDomainAppPath;
 
             if (string.IsNullOrWhiteSpace(physicalApplicationPath))
             {
@@ -112,6 +114,7 @@ namespace MixERP.Net.Common
             return @"~/" + fullServerPath.Replace(physicalApplicationPath, String.Empty).Replace(@"\", "/");
         }
 
+#if NET
         public static string ResolveUrl(string url)
         {
             Page page = HttpContext.Current.Handler as Page;
@@ -123,6 +126,7 @@ namespace MixERP.Net.Common
 
             return (page).ResolveUrl(url);
         }
+#endif
 
         public static bool TryCastBoolean(object value)
         {
@@ -388,6 +392,8 @@ namespace MixERP.Net.Common
             return string.Empty;
         }
 
+#if NET
+        [CLSCompliant(false)]
         public static Unit TryCastUnit(object value)
         {
             if (value == null)
@@ -403,6 +409,7 @@ namespace MixERP.Net.Common
 
             return Unit.Parse(value.ToString(), CultureInfo.DefaultThreadCurrentCulture);
         }
+#endif
 
         public static DateTime? TryCastNullableDate(object value)
         {

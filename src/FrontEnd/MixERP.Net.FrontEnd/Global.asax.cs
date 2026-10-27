@@ -20,6 +20,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Web;
 using System.Web.Routing;
+using System.Web.UI;
 using MixERP.Net.Entities.Office;
 using MixERP.Net.FrontEnd.Application;
 using MixERP.Net.ReportManager;
@@ -28,12 +29,12 @@ namespace MixERP.Net.FrontEnd
 {
     public class Global : HttpApplication
     {
-        private void Application_Error(object sender, EventArgs e)
+        protected void Application_Error(object sender, EventArgs e)
         {
             ApplicationError.Handle(this.Server.GetLastError());
         }
 
-        private void Application_Start(object sender, EventArgs e)
+        protected void Application_Start(object sender, EventArgs e)
         {
             LogManager.IntializeLogger();
             UpdateManager.CheckForUpdates(this.Application);
@@ -41,6 +42,24 @@ namespace MixERP.Net.FrontEnd
 
             GlobalLogin.CreateTable();
             Repository.DownloadAndInstallReports();
+        }
+
+        /// <summary>
+        ///     Applies the former Web.config &lt;pages enableViewState="false" enableEventValidation="false" clientIDMode="Static" /&gt;
+        ///     defaults before the page is processed, so values in the @Page directive still take precedence.
+        /// </summary>
+        protected void Application_PreRequestHandlerExecute(object sender, EventArgs e)
+        {
+            Page page = this.Context.Handler as Page;
+
+            if (page == null)
+            {
+                return;
+            }
+
+            page.ClientIDMode = ClientIDMode.Static;
+            page.EnableViewState = false;
+            page.EnableEventValidation = false;
         }
     }
 }

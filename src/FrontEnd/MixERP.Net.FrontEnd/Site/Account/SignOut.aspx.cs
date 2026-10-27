@@ -19,7 +19,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.FrontEnd.Base;
 using System;
-using System.Web.Security;
 
 namespace MixERP.Net.FrontEnd.Site.Account
 {
@@ -30,7 +29,7 @@ namespace MixERP.Net.FrontEnd.Site.Account
             this.IsLandingPage = true;
 
             this.Session.Remove("UserName");
-            FormsAuthentication.SignOut();
+            SignOut();
             this.Response.Redirect("~/SignIn.aspx");
         }
     }

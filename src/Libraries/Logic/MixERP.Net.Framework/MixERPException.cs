@@ -50,21 +50,26 @@ namespace MixERP.Net.Framework
             this.dbConstraintName = dbConstraintName;
         }
 
+#if !NET
         public MixERPException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
+#endif
 
         public string DBConstraintName
         {
             get { return this.dbConstraintName; }
         }
 
+#if !NET
+        // Formatter-based (BinaryFormatter) exception serialization is obsolete on .NET; it is kept for netstandard2.0 consumers.
         [SecurityPermission(SecurityAction.Demand, SerializationFormatter = true)]
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
         }
+#endif
 
         public static void Handle(MixERPException ex)
         {
@@ -78,7 +83,8 @@ namespace MixERP.Net.Framework
                 HttpContext.Current.Session["ex"] = ex;
                 Log.Information("Exception object was added to session.");
 
-                HttpContext.Current.Server.TransferRequest("~/Site/RuntimeError.aspx", true);
+                // Server.TransferRequest is not supported on ASP.NET Core; the error page reads the exception from session.
+                HttpContext.Current.Response.Redirect("~/Site/RuntimeError.aspx");
             }
         }
 

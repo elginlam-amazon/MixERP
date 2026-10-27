@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using System;
 using Npgsql;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -26,6 +27,7 @@ namespace MixERP.Net.Common.PostgresHelper
 {
     public static class ParameterHelper
     {
+        [CLSCompliant(false)]
         public static IEnumerable<NpgsqlParameter> AddBigintArrayParameter(Collection<long> items, string parameterPrefix)
         {
             Collection<NpgsqlParameter> collection = new Collection<NpgsqlParameter>();

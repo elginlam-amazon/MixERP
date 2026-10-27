@@ -1,42 +1,17 @@
 ﻿using MixERP.Net.ApplicationState.Cache;
-using System;
+using MixERP.Net.Framework.WebServices;
 using System.Collections.ObjectModel;
-using System.Reflection;
-using System.Security.Permissions;
-using System.Web;
 using System.Web.Script.Serialization;
-using System.Web.Script.Services;
-using System.Web.Services;
-using System.Web.Services.Protocols;
 
 namespace MixERP.Net.WebControls.AttachmentFactory.Handlers
 {
+    /// <summary>
+    ///     Attachment upload service, exposed by the host application at "~/FileUploadHanlder.asmx/{method}".
+    /// </summary>
     [WebService(Namespace = "http://tempuri.org/")]
-    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ScriptService]
-    [PermissionSet(SecurityAction.InheritanceDemand, Unrestricted = true)]
-    public class UploadService : WebService, IHttpHandlerFactory
+    public class UploadService : WebService
     {
-        public IHttpHandler GetHandler(HttpContext context, string requestType, string url, string pathTranslated)
-        {
-            WebServiceHandlerFactory factory = new WebServiceHandlerFactory();
-            MethodInfo method = typeof (WebServiceHandlerFactory).GetMethod("CoreGetHandler",
-                BindingFlags.NonPublic | BindingFlags.Instance, null,
-                new Type[] {typeof (Type), typeof (HttpContext), typeof (HttpRequest), typeof (HttpResponse)}, null);
-
-            return (IHttpHandler) method.Invoke(factory, new object[]
-            {
-                this.GetType(),
-                context,
-                context.Request,
-                context.Response
-            });
-        }
-
-        public void ReleaseHandler(IHttpHandler handler)
-        {
-        }
-
         [WebMethod]
         [ScriptMethod(ResponseFormat = ResponseFormat.Xml)]
         public bool UndoUpload(string uploadedFilesJson)
@@ -62,7 +37,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory.Handlers
         public static Collection<Entities.Core.Attachment> GetAttachmentCollection(string json)
         {
             Collection<Entities.Core.Attachment> details = new Collection<Entities.Core.Attachment>();
-            var jss = new JavaScriptSerializer();
+                        var jss = new JavaScriptSerializer();
 
             dynamic result = jss.Deserialize<dynamic>(json);
 

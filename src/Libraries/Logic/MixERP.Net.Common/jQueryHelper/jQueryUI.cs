@@ -28,6 +28,7 @@ using System.Web.UI;
 namespace MixERP.Net.Common.jQueryHelper
 {
 
+    [CLSCompliant(false)]
     public static class jQueryUI
     {
         ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -1,0 +1,7 @@
+<Project>
+  <!-- Shared build settings for all SDK-style MixERP projects. -->
+  <PropertyGroup>
+    <!-- Projects that keep a hand-written Properties\AssemblyInfo.cs must not get a second, SDK-generated one (CS0579). -->
+    <GenerateAssemblyInfo Condition="Exists('$(MSBuildProjectDirectory)\Properties\AssemblyInfo.cs')">false</GenerateAssemblyInfo>
+  </PropertyGroup>
+</Project>

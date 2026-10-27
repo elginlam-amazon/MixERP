@@ -18,7 +18,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.Common.Helpers;
-using System.Security.Permissions;
 using System.Web;
 using System.Web.UI;
 
@@ -27,7 +26,6 @@ namespace MixERP.Net.WebControls.TransactionChecklist
 {
     public partial class TransactionChecklistForm
     {
-        [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
         private void AddScript()
         {
             JSUtility.AddJSReference(this.Page, "MixERP.Net.WebControls.TransactionChecklist.Scripts.TransactionChecklist.js", "TransactionChecklistForm", typeof(TransactionChecklistForm));

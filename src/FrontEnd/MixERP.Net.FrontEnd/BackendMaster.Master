@@ -176,7 +176,8 @@
             </div>
         </div>
 
-        <script src="/signalr/hubs"></script>
+        <script src="/Scripts/microsoft-signalr/signalr.min.js"></script>
+        <script src="/Scripts/mixerp/core/mixerp-signalr.js"></script>
         <script type="text/javascript">
             $(function () {
                 var started = false;
