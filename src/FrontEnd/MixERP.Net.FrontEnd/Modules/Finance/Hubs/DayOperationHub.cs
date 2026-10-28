@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNet.SignalR;
+﻿using Microsoft.AspNetCore.SignalR;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Events;
@@ -15,7 +15,7 @@ namespace MixERP.Net.Core.Modules.Finance.Hubs
         {
             if (!this.IsValidRequest())
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied, Warnings.AccessIsDenied);
+                this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied, Warnings.AccessIsDenied);
                 return;
             }
 
@@ -29,7 +29,7 @@ namespace MixERP.Net.Core.Modules.Finance.Hubs
 
         private void EOD_NotificationReceived(object sender, MixERPPGEventArgs e)
         {
-            this.Clients.Caller.getNotification(e.AdditionalInformation, e.Condition);
+            this.Clients.Caller.SendAsync("getNotification", e.AdditionalInformation, e.Condition);
         }
 
 
@@ -39,7 +39,7 @@ namespace MixERP.Net.Core.Modules.Finance.Hubs
 
             if (this.Context == null)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied);
                 return false;
             }
 
@@ -47,7 +47,7 @@ namespace MixERP.Net.Core.Modules.Finance.Hubs
 
             if (globalLoginId <= 0)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied);
                 return false;
             }
 

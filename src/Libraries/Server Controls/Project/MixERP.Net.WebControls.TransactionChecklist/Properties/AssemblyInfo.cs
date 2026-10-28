@@ -56,4 +56,5 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyFileVersion("1.2.0.1")]
 [assembly: AssemblyInformationalVersion("1.2.0.1 RC")]
 
-[assembly: CLSCompliant(true)]
+// The Web Forms surface (CoreWebForms / System.Web adapters) is not CLS-compliant.
+[assembly: CLSCompliant(false)]

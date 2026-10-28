@@ -17,8 +17,11 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using System;
+
 namespace MixERP.Net.Framework.Controls
 {
+    [CLSCompliant(false)]
     public abstract class MixERPWidget: MixERPUserControlBase, IWidget
     {
         public override AccessLevel AccessLevel

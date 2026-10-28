@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using System;
 using MixERP.Net.Entities.Core;
 using Npgsql;
 using System.Collections.Generic;
@@ -28,6 +29,7 @@ namespace MixERP.Net.Core.Modules.Purchase.Data
 {
     public static class AttachmentHelper
     {
+        [CLSCompliant(false)]
         public static IEnumerable<NpgsqlParameter> AddAttachmentParameter(Collection<Attachment> attachments)
         {
             Collection<NpgsqlParameter> collection = new Collection<NpgsqlParameter>();

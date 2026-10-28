@@ -1,4 +1,4 @@
-/* PetaPoco v4.0.3 - A Tiny ORMish thing for your POCO's.
+﻿/* PetaPoco v4.0.3 - A Tiny ORMish thing for your POCO's.
  * Copyright © 2011 Topten Software.  All Rights Reserved.
  * 
  * Apache License 2.0 - http://www.toptensoftware.com/petapoco/license
@@ -199,7 +199,11 @@ namespace PetaPoco
             ForceDateTimesToUtc = true;
 
             if (_providerName != null)
+#if NETSTANDARD2_0
+                throw new NotSupportedException("DbProviderFactories is not available on netstandard2.0; pass a DbProviderFactory instance instead of a provider name.");
+#else
                 _factory = DbProviderFactories.GetFactory(_providerName);
+#endif
 
             string dbtype = (_factory == null ? _sharedConnection.GetType() : _factory.GetType()).Name;
 

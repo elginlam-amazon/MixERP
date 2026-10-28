@@ -22,7 +22,7 @@ using MixERP.Net.Entities.Models.Transactions;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Web.Script.Serialization;
+using Newtonsoft.Json;
 using System.Web.UI;
 using System.Web.UI.HtmlControls;
 using System.Web.UI.WebControls;
@@ -82,8 +82,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
                     rowData.Add(colData);
                 }
 
-                JavaScriptSerializer serializer = new JavaScriptSerializer();
-                string data = serializer.Serialize(rowData);
+                string data = JsonConvert.SerializeObject(rowData);
 
                 this.productGridViewDataHidden.Value = data;
             }

@@ -9,7 +9,6 @@ using System.Web.UI.WebControls;
 namespace MixERP.Net.WebControls.Flag
 {
     [ToolboxData("<{0}:Flag runat=server />")]
-    [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
     public sealed partial class FlagControl : CompositeControl
     {
         private Panel container;

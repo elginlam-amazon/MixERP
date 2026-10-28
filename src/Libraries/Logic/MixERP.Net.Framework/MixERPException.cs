@@ -19,7 +19,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Runtime.Serialization;
-using System.Security.Permissions;
 using System.Web;
 using Serilog;
 
@@ -50,20 +49,18 @@ namespace MixERP.Net.Framework
             this.dbConstraintName = dbConstraintName;
         }
 
+#if NETSTANDARD2_0
+        // Formatter-based (BinaryFormatter) serialization is obsolete on .NET 10; the constructor is only kept for
+        // .NET Framework consumers of the netstandard2.0 build.
         public MixERPException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
+#endif
 
         public string DBConstraintName
         {
             get { return this.dbConstraintName; }
-        }
-
-        [SecurityPermission(SecurityAction.Demand, SerializationFormatter = true)]
-        public override void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            base.GetObjectData(info, context);
         }
 
         public static void Handle(MixERPException ex)
@@ -78,7 +75,15 @@ namespace MixERP.Net.Framework
                 HttpContext.Current.Session["ex"] = ex;
                 Log.Information("Exception object was added to session.");
 
+#if NETSTANDARD2_0
+                // .NET Framework consumers of the netstandard2.0 build run on System.Web, where TransferRequest is supported.
+#pragma warning disable SYSWEB0001
                 HttpContext.Current.Server.TransferRequest("~/Site/RuntimeError.aspx", true);
+#pragma warning restore SYSWEB0001
+#else
+                // Server.TransferRequest is not supported on ASP.NET Core; redirect to the error page instead.
+                HttpContext.Current.Response.Redirect("~/Site/RuntimeError.aspx");
+#endif
             }
         }
 

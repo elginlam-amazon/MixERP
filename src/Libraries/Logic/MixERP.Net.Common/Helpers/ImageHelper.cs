@@ -18,16 +18,18 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
-using System.IO;
-using System.Linq;
+using SkiaSharp;
 
 namespace MixERP.Net.Common.Helpers
 {
+    /// <summary>
+    /// Image helpers. System.Drawing (GDI+) is Windows-only on .NET 10, so images are processed with SkiaSharp.
+    /// </summary>
     public static class ImageHelper
     {
+        // Image.Save(stream, ImageFormat.Jpeg) used the GDI+ default JPEG quality of 75.
+        private const int JpegQuality = 75;
+
         public static string GetContentType(string extension)
         {
             switch (extension)
@@ -41,99 +43,87 @@ namespace MixERP.Net.Common.Helpers
             }
         }
 
-        public static ImageCodecInfo GetEncoder(ImageFormat format)
+        /// <summary>
+        /// Returns true when the data can be decoded as an image.
+        /// </summary>
+        public static bool IsValidImage(byte[] imageData)
         {
-            if (format == null)
+            if (imageData == null || imageData.Length == 0)
+            {
+                return false;
+            }
+
+            using (SKCodec codec = SKCodec.Create(new SKMemoryStream(imageData)))
+            {
+                return codec != null;
+            }
+        }
+
+        /// <summary>
+        /// Scales the image to fit a width x height thumbnail (0 keeps the original dimension), centered on a transparent
+        /// canvas, and returns it as JPEG.
+        /// </summary>
+        public static byte[] GetResizedImage(byte[] imageData, int width, int height)
+        {
+            if (imageData == null)
             {
                 return null;
             }
 
-            ImageCodecInfo[] codecs = ImageCodecInfo.GetImageDecoders();
-
-            foreach (ImageCodecInfo codec in codecs)
+            using (SKBitmap image = SKBitmap.Decode(imageData))
             {
-                if (codec.FormatID == format.Guid)
+                if (image == null)
                 {
-                    return codec;
-                }
-            }
-            return null;
-        }
-
-        public static string GetFileExtension(ImageFormat format)
-        {
-            return ImageCodecInfo.GetImageEncoders()
-                .First(x => x.FormatID == format.Guid)
-                .FilenameExtension
-                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .First()
-                .Trim('*')
-                .ToUpperInvariant();
-        }
-
-        public static ImageFormat GetImageFormat(String path)
-        {
-            switch (Path.GetExtension(path))
-            {
-                case ".bmp": return ImageFormat.Bmp;
-                case ".gif": return ImageFormat.Gif;
-                case ".jpg": return ImageFormat.Jpeg;
-                case ".png": return ImageFormat.Png;
-            }
-            return ImageFormat.Jpeg;
-        }
-
-        public static byte[] GetResizedImage(Image image, int width, int height)
-        {
-            Size thumbnailSize = new Size(width, height);
-
-            if (image == null)
-            {
-                return null;
-            }
-
-            if (thumbnailSize.Width.Equals(0))
-            {
-                thumbnailSize.Width = image.Size.Width;
-            }
-
-            if (thumbnailSize.Height.Equals(0))
-            {
-                thumbnailSize.Height = image.Size.Height;
-            }
-
-            float scalingRatio = CalculateScalingRatio(image.Size, thumbnailSize);
-
-            int scaledWidth = (int)Math.Round(image.Size.Width * scalingRatio);
-            int scaledHeight = (int)Math.Round(image.Size.Height * scalingRatio);
-            int scaledLeft = (thumbnailSize.Width - scaledWidth) / 2;
-            int scaledTop = (thumbnailSize.Height - scaledHeight) / 2;
-
-            // For portrait mode, adjust the vertical top of the crop area so that we get more of
-            // the top area
-            if (scaledWidth < scaledHeight && scaledHeight > thumbnailSize.Height)
-            {
-                scaledTop = (thumbnailSize.Height - scaledHeight) / 4;
-            }
-
-            Rectangle cropArea = new Rectangle(scaledLeft, scaledTop, scaledWidth, scaledHeight);
-
-            using (Bitmap thumbnail = new Bitmap(thumbnailSize.Width, thumbnailSize.Height, PixelFormat.Format32bppPArgb))
-            {
-                using (Graphics thumbnailGraphics = Graphics.FromImage(thumbnail))
-                {
-                    thumbnailGraphics.CompositingQuality = CompositingQuality.HighQuality;
-                    thumbnailGraphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                    thumbnailGraphics.SmoothingMode = SmoothingMode.HighQuality;
-                    thumbnailGraphics.Clear(Color.Transparent);
-                    thumbnailGraphics.DrawImage(image, cropArea);
+                    return null;
                 }
 
-                return Conversion.TryCastByteArray(thumbnail);
+                SKSizeI imageSize = new SKSizeI(image.Width, image.Height);
+                SKSizeI thumbnailSize = new SKSizeI(width, height);
+
+                if (thumbnailSize.Width.Equals(0))
+                {
+                    thumbnailSize.Width = imageSize.Width;
+                }
+
+                if (thumbnailSize.Height.Equals(0))
+                {
+                    thumbnailSize.Height = imageSize.Height;
+                }
+
+                float scalingRatio = CalculateScalingRatio(imageSize, thumbnailSize);
+
+                int scaledWidth = (int)Math.Round(imageSize.Width * scalingRatio);
+                int scaledHeight = (int)Math.Round(imageSize.Height * scalingRatio);
+                int scaledLeft = (thumbnailSize.Width - scaledWidth) / 2;
+                int scaledTop = (thumbnailSize.Height - scaledHeight) / 2;
+
+                // For portrait mode, adjust the vertical top of the crop area so that we get more of
+                // the top area
+                if (scaledWidth < scaledHeight && scaledHeight > thumbnailSize.Height)
+                {
+                    scaledTop = (thumbnailSize.Height - scaledHeight) / 4;
+                }
+
+                SKRect cropArea = SKRect.Create(scaledLeft, scaledTop, scaledWidth, scaledHeight);
+
+                using (SKBitmap thumbnail = new SKBitmap(new SKImageInfo(thumbnailSize.Width, thumbnailSize.Height, SKColorType.Rgba8888, SKAlphaType.Premul)))
+                using (SKCanvas canvas = new SKCanvas(thumbnail))
+                using (SKImage source = SKImage.FromBitmap(image))
+                {
+                    canvas.Clear(SKColors.Transparent);
+                    canvas.DrawImage(source, cropArea, new SKSamplingOptions(SKCubicResampler.Mitchell));
+                    canvas.Flush();
+
+                    using (SKImage result = SKImage.FromBitmap(thumbnail))
+                    using (SKData data = result.Encode(SKEncodedImageFormat.Jpeg, JpegQuality))
+                    {
+                        return data.ToArray();
+                    }
+                }
             }
         }
 
-        private static float CalculateScalingRatio(Size originalSize, Size targetSize)
+        private static float CalculateScalingRatio(SKSizeI originalSize, SKSizeI targetSize)
         {
             float originalAspectRatio = (float)originalSize.Width / originalSize.Height;
             float targetAspectRatio = (float)targetSize.Width / targetSize.Height;
