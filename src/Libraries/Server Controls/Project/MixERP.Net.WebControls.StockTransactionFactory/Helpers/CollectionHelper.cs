@@ -21,7 +21,7 @@ using MixERP.Net.Common;
 using MixERP.Net.Entities.Core;
 using MixERP.Net.Entities.Models.Transactions;
 using System.Collections.ObjectModel;
-using System.Web.Script.Serialization;
+using MixERP.Net.Common.Helpers;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory.Helpers
 {
@@ -30,9 +30,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory.Helpers
         public static Collection<Attachment> GetAttachmentCollection(string json)
         {
             Collection<Attachment> details = new Collection<Attachment>();
-            var jss = new JavaScriptSerializer();
-
-            dynamic result = jss.Deserialize<dynamic>(json);
+            dynamic result = JSONHelper.DeserializeDynamic(json);
 
             if (result != null)
             {
@@ -53,9 +51,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory.Helpers
         public static Collection<StockDetail> GetStockMasterDetailCollection(string json, int storeId)
         {
             Collection<StockDetail> details = new Collection<StockDetail>();
-            var jss = new JavaScriptSerializer();
-
-            dynamic result = jss.Deserialize<dynamic>(json);
+            dynamic result = JSONHelper.DeserializeDynamic(json);
 
             foreach (dynamic item in result)
             {

@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -30,6 +31,7 @@ namespace MixERP.Net.Core.Modules.Purchase.Data.Transactions
 {
     public static class Reorder
     {
+        [CLSCompliant(false)]
         public static IEnumerable<NpgsqlParameter> AddPurchaseReorderTypeParameter(Collection<Models.Reorder> details)
         {
             Collection<NpgsqlParameter> collection = new Collection<NpgsqlParameter>();

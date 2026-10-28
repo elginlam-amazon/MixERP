@@ -1,4 +1,5 @@
-﻿using MixERP.Net.Entities;
+﻿using System;
+using MixERP.Net.Entities;
 using MixERP.Net.Entities.Models.Transactions;
 using Npgsql;
 using System.Collections.Generic;
@@ -28,6 +29,7 @@ namespace MixERP.Net.Core.Modules.Inventory.Data.Helpers
 {
     public static class ParameterHelper
     {
+        [CLSCompliant(false)]
         public static IEnumerable<NpgsqlParameter> AddStockTransferModelParameter(Collection<StockAdjustmentDetail> details)
         {
             Collection<NpgsqlParameter> collection = new Collection<NpgsqlParameter>();

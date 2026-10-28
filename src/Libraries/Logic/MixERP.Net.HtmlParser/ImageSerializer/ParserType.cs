@@ -2,7 +2,6 @@
 {
     public enum ParserType
     {
-        IEWebBrowser,
-        HtmlRenderer
+        HtmlRenderer = 1
     }
 }

@@ -32,43 +32,23 @@ namespace MixERP.Net.WebControls.ScrudFactory
         private Label messageLabel;
         private HiddenField officeCodeHidden;
         private CommandPanel topCommandPanel;
-        private UpdatePanel updatePanel;
+        // ASP.NET AJAX (UpdatePanel/ScriptManager) is not available on .NET 10; a plain Panel keeps the same
+        // container markup (id="ScrudUpdatePanel") and the commands perform regular postbacks.
+        private Panel updatePanel;
         private HiddenField userIdHidden;
-
-        protected override void OnPreRender(EventArgs e)
-        {
-            this.AddScriptManager();
-            base.OnPreRender(e);
-        }
-
-        private void AddScriptManager()
-        {
-            ScriptManager scriptManager = ScriptManager.GetCurrent(this.Page);
-            if (scriptManager != null)
-            {
-                scriptManager.RegisterAsyncPostBackControl(this.saveButton);
-                scriptManager.RegisterAsyncPostBackControl(this.saveButton);
-                scriptManager.RegisterAsyncPostBackControl(this.topCommandPanel.EditButton);
-                scriptManager.RegisterAsyncPostBackControl(this.bottomCommandPanel.EditButton);
-                scriptManager.RegisterAsyncPostBackControl(this.topCommandPanel.DeleteButton);
-                scriptManager.RegisterAsyncPostBackControl(this.bottomCommandPanel.DeleteButton);
-            }
-        }
 
         private void AddUpdatePanel(Panel p)
         {
             this.messageLabel = new Label();
 
-            this.updatePanel = new UpdatePanel();
+            this.updatePanel = new Panel();
             this.updatePanel.ID = "ScrudUpdatePanel";
-            this.updatePanel.ChildrenAsTriggers = true;
-            this.updatePanel.UpdateMode = UpdatePanelUpdateMode.Conditional;
 
-            this.updatePanel.ContentTemplateContainer.Controls.Add(this.topCommandPanel.GetCommandPanel("top"));
-            this.updatePanel.ContentTemplateContainer.Controls.Add(this.messageLabel);
-            this.updatePanel.ContentTemplateContainer.Controls.Add(this.gridPanel);
-            this.updatePanel.ContentTemplateContainer.Controls.Add(this.formPanel);
-            this.updatePanel.ContentTemplateContainer.Controls.Add(this.bottomCommandPanel.GetCommandPanel("bottom"));
+            this.updatePanel.Controls.Add(this.topCommandPanel.GetCommandPanel("top"));
+            this.updatePanel.Controls.Add(this.messageLabel);
+            this.updatePanel.Controls.Add(this.gridPanel);
+            this.updatePanel.Controls.Add(this.formPanel);
+            this.updatePanel.Controls.Add(this.bottomCommandPanel.GetCommandPanel("bottom"));
 
             //Bottom command panel.
             this.userIdHidden = new HiddenField();
@@ -79,8 +59,8 @@ namespace MixERP.Net.WebControls.ScrudFactory
             this.officeCodeHidden.ID = "OfficeCodeHidden";
             this.officeCodeHidden.Value = this.OfficeCode;
 
-            this.updatePanel.ContentTemplateContainer.Controls.Add(this.userIdHidden);
-            this.updatePanel.ContentTemplateContainer.Controls.Add(this.officeCodeHidden);
+            this.updatePanel.Controls.Add(this.userIdHidden);
+            this.updatePanel.Controls.Add(this.officeCodeHidden);
             p.Controls.Add(this.updatePanel);
         }
 

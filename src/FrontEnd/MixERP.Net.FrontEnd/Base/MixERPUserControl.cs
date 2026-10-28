@@ -57,7 +57,8 @@ namespace MixERP.Net.FrontEnd.Base
             {
                 if (!AppUsers.GetCurrent().View.AllowTransactionPosting.ToBool())
                 {
-                    this.Server.Transfer("~/Site/Exceptions/RestrictedTransactionMode.aspx");
+                    // Server.Transfer is not supported on ASP.NET Core; redirect to the same page instead.
+                    this.Response.Redirect("~/Site/Exceptions/RestrictedTransactionMode.aspx");
                 }
             }
         }
@@ -106,7 +107,8 @@ namespace MixERP.Net.FrontEnd.Base
                 Log.Information("Access to {Control} is denied to {User} from {IP}.", this,
                     userName, ipAddress);
 
-                this.Page.Server.Transfer("~/Site/AccessIsDenied.aspx");
+                // Server.Transfer is not supported on ASP.NET Core; redirect to the same page instead.
+                this.Page.Response.Redirect("~/Site/AccessIsDenied.aspx");
             }
         }
     }

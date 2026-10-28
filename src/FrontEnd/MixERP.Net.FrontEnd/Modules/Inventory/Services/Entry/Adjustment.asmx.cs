@@ -31,14 +31,11 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
-using System.Web.Script.Serialization;
-using System.Web.Script.Services;
-using System.Web.Services;
+using MixERP.Net.Common.Helpers;
+using MixERP.Net.Framework.Services;
 
 namespace MixERP.Net.Core.Modules.Inventory.Services.Entry
 {
-    [WebService(Namespace = "http://tempuri.org/")]
-    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]
     [ScriptService]
     public class Adjustment : WebService
@@ -79,8 +76,7 @@ namespace MixERP.Net.Core.Modules.Inventory.Services.Entry
         {
             Collection<StockAdjustmentDetail> models = new Collection<StockAdjustmentDetail>();
 
-            JavaScriptSerializer jss = new JavaScriptSerializer();
-            dynamic result = jss.Deserialize<dynamic>(json);
+            dynamic result = JSONHelper.DeserializeDynamic(json);
 
             foreach (var item in result)
             {

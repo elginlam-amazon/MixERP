@@ -35,7 +35,6 @@
 </head>
 <body>
     <form id="form1" runat="server">
-        <asp:ScriptManager runat="server" ID="ScriptManager1" />
 
         <div class="row">
             <div class="col-md-12">

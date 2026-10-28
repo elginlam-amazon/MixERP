@@ -20,7 +20,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
 using System;
-using System.Drawing;
 using System.Globalization;
 using System.Web;
 
@@ -73,39 +72,23 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
 
                 path = context.Server.MapPath(path);
 
-                if(!IsValidBitmap(path))
+                byte[] originalImage = System.IO.File.ReadAllBytes(path);
+
+                if (!ImageHelper.IsValidImage(originalImage))
                 {
-                    path = context.Server.MapPath("~/Static/images/document.png");
+                    originalImage = System.IO.File.ReadAllBytes(context.Server.MapPath("~/Static/images/document.png"));
                 }
 
-                using (Bitmap originalImage = new Bitmap(path))
-                {
-                    byte[] buffer = ImageHelper.GetResizedImage(originalImage, width, height);
+                byte[] buffer = ImageHelper.GetResizedImage(originalImage, width, height);
 
-                    context.Response.ContentType = ImageHelper.GetContentType(file.Extension);
-                    context.Response.Cache.SetCacheability(HttpCacheability.Public);
-                    context.Response.Cache.SetExpires(DateTime.Now.AddMonths(1));
-                    context.Response.Cache.SetMaxAge(new TimeSpan(30, 0, 0, 0, 0));
-                    context.Response.AddHeader("Last-Modified", DateTime.Now.ToShortDateString());
+                context.Response.ContentType = ImageHelper.GetContentType(file.Extension);
+                context.Response.Cache.SetCacheability(HttpCacheability.Public);
+                context.Response.Cache.SetExpires(DateTime.Now.AddMonths(1));
+                context.Response.Cache.SetMaxAge(new TimeSpan(30, 0, 0, 0, 0));
+                context.Response.AddHeader("Last-Modified", DateTime.Now.ToShortDateString());
 
-                    context.Response.OutputStream.Write(buffer, 0, buffer.Length);
-                    context.Response.End();
-                }
-            }
-        }
-
-        private static bool IsValidBitmap(string path)
-        {
-            try
-            {
-                using (new Bitmap(path))
-                {
-                    return true;
-                }
-            }
-            catch
-            {
-                return false;
+                context.Response.OutputStream.Write(buffer, 0, buffer.Length);
+                context.Response.End();
             }
         }
     }
