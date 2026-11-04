@@ -1,6 +1,13 @@
 ﻿using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+
+// The SDK normally derives this from the net10.0-windows target framework, but only while it is
+// generating the assembly info; this solution keeps the hand written AssemblyInfo files, so the
+// attribute is declared here. Without it the platform compatibility analyzer treats every
+// Windows Forms, registry and ACL call in this Windows only installer as cross platform (CA1416).
+[assembly: SupportedOSPlatform("windows7.0")]
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information

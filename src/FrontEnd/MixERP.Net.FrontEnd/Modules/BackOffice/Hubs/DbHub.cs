@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,8 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using Microsoft.AspNet.SignalR;
-using Microsoft.VisualBasic.FileIO;
+using Microsoft.AspNetCore.SignalR;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
@@ -32,28 +31,42 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using System.Threading.Tasks;
 using System.Web.Hosting;
 using MixERP.Net.Common.Extensions;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Hubs
 {
+    /// <remarks>
+    ///     <para>
+    ///         Migrated from ASP.NET SignalR 2. ASP.NET Core SignalR dropped the dynamic client
+    ///         proxy, so client methods are invoked by name with <c>SendAsync</c>, and hub methods
+    ///         are asynchronous. See knowledge base doc 32.
+    ///     </para>
+    ///     <para>
+    ///         The backup itself still drives <c>pg_dump.exe</c> through a generated <c>.bat</c>
+    ///         file, which only works on Windows. That was already true of the .NET Framework
+    ///         version; making the pipeline cross platform is tracked in summary.md.
+    ///     </para>
+    /// </remarks>
     [CLSCompliant(false)]
     public class DbHub : Hub
     {
         private string backupDirectory;
         private string batchFile;
 
-        public void BackupDatabase(string fileName)
+        public async Task BackupDatabase(string fileName)
         {
-            if (!this.IsValidRequest())
+            if (!await this.IsValidRequest())
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied, Warnings.AccessIsDenied);
+                await this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied,
+                    Warnings.AccessIsDenied);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(fileName))
             {
-                this.Clients.Caller.backupFailed(Warnings.NoFileSpecified);
+                await this.Clients.Caller.SendAsync("backupFailed", Warnings.NoFileSpecified);
                 return;
             }
 
@@ -73,24 +86,24 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
             if (server.IsValid && !string.IsNullOrWhiteSpace(server.BinDirectory) &&
                 !string.IsNullOrWhiteSpace(server.DatabaseBackupDirectory))
             {
-                this.Backup(server, fileName);
+                await this.Backup(server, fileName);
                 return;
             }
 
-            this.Clients.Caller.backupFailed(Warnings.ConfigurationError);
+            await this.Clients.Caller.SendAsync("backupFailed", Warnings.ConfigurationError);
         }
 
-        private void Backup(PostgreSQLServer server, string fileName)
+        private async Task Backup(PostgreSQLServer server, string fileName)
         {
             string pgdumpPath = Path.Combine(server.BinDirectory, "pg_dump.exe");
-            backupDirectory = HostingEnvironment.MapPath(server.DatabaseBackupDirectory);
+            this.backupDirectory = HostingEnvironment.MapPath(server.DatabaseBackupDirectory);
 
-            if (backupDirectory != null)
+            if (this.backupDirectory != null)
             {
-                backupDirectory = Path.Combine(backupDirectory, fileName);
-                Directory.CreateDirectory(backupDirectory);
+                this.backupDirectory = Path.Combine(this.backupDirectory, fileName);
+                Directory.CreateDirectory(this.backupDirectory);
 
-                string path = Path.Combine(backupDirectory, "db.backup");
+                string path = Path.Combine(this.backupDirectory, "db.backup");
 
                 bool result = this.BackupDatabase(pgdumpPath, server, path);
 
@@ -108,21 +121,21 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
                     message.Append(Labels.ClickHereToDownload);
                     message.Append("</a>");
 
-                    this.Clients.Caller.backupCompleted(message.ToString());
+                    await this.Clients.Caller.SendAsync("backupCompleted", message.ToString());
                     return;
                 }
 
-                this.Clients.Caller.backupFailed(Warnings.CannotCreateABackup);
+                await this.Clients.Caller.SendAsync("backupFailed", Warnings.CannotCreateABackup);
             }
         }
 
         private void CompressBackupDirectory(bool removeSource)
         {
-            ZipFile.CreateFromDirectory(backupDirectory, backupDirectory + ".zip");
+            ZipFile.CreateFromDirectory(this.backupDirectory, this.backupDirectory + ".zip");
 
             if (removeSource)
             {
-                Directory.Delete(backupDirectory, true);
+                Directory.Delete(this.backupDirectory, true);
             }
         }
 
@@ -132,7 +145,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
 
             using (Process process = new Process())
             {
-                process.StartInfo.FileName = batchFile;
+                process.StartInfo.FileName = this.batchFile;
 
                 process.StartInfo.CreateNoWindow = true;
                 process.StartInfo.ErrorDialog = false;
@@ -157,20 +170,30 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
             }
         }
 
+        /// <remarks>
+        ///     <see cref="Process.Disposed" /> is a void returning event, so this handler cannot
+        ///     become asynchronous. Blocking is safe here: ASP.NET Core has no synchronization
+        ///     context, so there is no deadlock risk the way there was under System.Web.
+        /// </remarks>
         private void Completed(object sender, EventArgs e)
         {
-            this.RemoveFile(batchFile);
+            this.RemoveFile(this.batchFile);
             this.CopyResource();
             this.CompressBackupDirectory(true);
-            this.Clients.Caller.backupCompleted(string.Empty);
+            this.Clients.Caller.SendAsync("backupCompleted", string.Empty).GetAwaiter().GetResult();
         }
 
+        /// <remarks>
+        ///     <c>Microsoft.VisualBasic.FileIO.FileSystem.CopyDirectory</c> is Windows only on
+        ///     modern .NET; MixERP already ships an equivalent recursive copy in
+        ///     <see cref="DirectoryHelper.CopyDirectory" />.
+        /// </remarks>
         private void CopyResource()
         {
             string source = ConfigurationHelper.GetResourceDirectory();
-            string destination = Path.Combine(backupDirectory, new DirectoryInfo(source).Name);
+            string destination = Path.Combine(this.backupDirectory, new DirectoryInfo(source).Name);
 
-            FileSystem.CopyDirectory(source, destination);
+            DirectoryHelper.CopyDirectory(source, destination);
         }
 
         private void CreateBatchFile(PostgreSQLServer server, string pgDumpPath, string fileName)
@@ -185,16 +208,20 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
             commands.Add(command);
             commands.Add("exit");
 
-            batchFile = fileName + ".bat";
+            this.batchFile = fileName + ".bat";
 
-            File.WriteAllText(batchFile, string.Join(Environment.NewLine, commands));
+            File.WriteAllText(this.batchFile, string.Join(Environment.NewLine, commands));
         }
 
+        /// <remarks>
+        ///     <see cref="Process.OutputDataReceived" /> is a void returning event; see
+        ///     <see cref="Completed" /> for why blocking on the send is safe.
+        /// </remarks>
         private void Data_Received(object sender, DataReceivedEventArgs e)
         {
             if (!string.IsNullOrWhiteSpace(e.Data))
             {
-                this.Clients.Caller.getNotification(e.Data);
+                this.Clients.Caller.SendAsync("getNotification", e.Data).GetAwaiter().GetResult();
             }
         }
 
@@ -213,21 +240,21 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
             }
         }
 
-        private bool IsValidRequest()
+        private async Task<bool> IsValidRequest()
         {
-            System.Threading.Thread.Sleep(2000);
+            await Task.Delay(2000);
 
             if (this.Context == null)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                await this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied);
                 return false;
             }
 
-            long globalLoginId = Conversion.TryCastLong(this.Context.User.Identity.Name);
+            long globalLoginId = Conversion.TryCastLong(this.Context.User?.Identity?.Name);
 
             if (globalLoginId <= 0)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                await this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied);
                 return false;
             }
 

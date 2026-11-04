@@ -17,6 +17,15 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+/*
+    OWIN SIGNALR 2 STARTUP - EXCLUDED FROM THE net10.0 COMPILE.
+
+    ASP.NET SignalR 2 was hosted through OWIN (Microsoft.Owin / Owin) and System.Web, neither of
+    which exists on modern .NET. ASP.NET Core SignalR replaces both the host and the wire protocol:
+    hubs are registered per route with MapHub<T>() in Program.cs instead of the single app.MapSignalR()
+    endpoint. This file is kept for reference; see knowledge base doc 32.
+*/
+
 using Microsoft.Owin;
 using Owin;
 

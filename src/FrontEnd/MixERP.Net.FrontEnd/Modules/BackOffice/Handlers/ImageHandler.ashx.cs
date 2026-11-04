@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,8 +19,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
+using SkiaSharp;
 using System;
-using System.Drawing;
 using System.Globalization;
 using System.Web;
 
@@ -39,6 +39,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
             }
         }
 
+        [CLSCompliant(false)]
         public void ProcessRequest(HttpContext context)
         {
             ProcessImage(context);
@@ -78,7 +79,9 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
                     path = context.Server.MapPath("~/Static/images/document.png");
                 }
 
-                using (Bitmap originalImage = new Bitmap(path))
+                // System.Drawing.Common is Windows only on modern .NET, so the decode moved to
+                // SkiaSharp. See knowledge base doc 21.
+                using (SKBitmap originalImage = SKBitmap.Decode(path))
                 {
                     byte[] buffer = ImageHelper.GetResizedImage(originalImage, width, height);
 
@@ -98,9 +101,11 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
         {
             try
             {
-                using (new Bitmap(path))
+                // SKBitmap.Decode returns null for anything it cannot decode rather than throwing,
+                // which is what System.Drawing's Bitmap constructor used to do.
+                using (SKBitmap bitmap = SKBitmap.Decode(path))
                 {
-                    return true;
+                    return bitmap != null;
                 }
             }
             catch

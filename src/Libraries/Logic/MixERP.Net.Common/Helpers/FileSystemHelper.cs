@@ -18,15 +18,23 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
+using System.IO;
 using System.IO.Compression;
-using System.Security;
-using System.Security.Permissions;
 using System.Web.Hosting;
 
 namespace MixERP.Net.Common.Helpers
 {
     public static class FileSystemHelper
     {
+        /// <summary>
+        ///     Determines whether the application can write into the supplied directory.
+        /// </summary>
+        /// <remarks>
+        ///     Code Access Security (<c>FileIOPermission</c> / <c>PermissionSet</c>) was removed in
+        ///     modern .NET, so permissions can no longer be asserted declaratively. The directory is
+        ///     probed instead by creating and deleting a scratch file, which is what the CAS demand
+        ///     was standing in for.
+        /// </remarks>
         public static bool IsDirectoryWritable(string directory)
         {
             if (string.IsNullOrWhiteSpace(directory))
@@ -34,11 +42,35 @@ namespace MixERP.Net.Common.Helpers
                 return false;
             }
 
-            FileIOPermission permission = new FileIOPermission(FileIOPermissionAccess.Write, HostingEnvironment.MapPath(directory));
-            PermissionSet permissionSet = new PermissionSet(PermissionState.None);
-            permissionSet.AddPermission(permission);
+            string path = HostingEnvironment.MapPath(directory);
 
-            return permissionSet.IsSubsetOf(AppDomain.CurrentDomain.PermissionSet);
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+            {
+                return false;
+            }
+
+            string probe = Path.Combine(path, Path.GetRandomFileName());
+
+            try
+            {
+                using (new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1,
+                    FileOptions.DeleteOnClose))
+                {
+                    return true;
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (NotSupportedException)
+            {
+                return false;
+            }
         }
 
         public static void Unzip(string archive, string destnation)

@@ -1,6 +1,6 @@
-﻿using System;
+using MixERP.Net.Framework;
+using System;
 using System.Collections.Generic;
-using System.Configuration;
 using System.Globalization;
 using System.Resources;
 using System.Runtime.Caching;
@@ -10,7 +10,7 @@ namespace MixERP.Net.i18n
 {
     public class ResourceManager
     {
-        private static readonly bool supressException = ConfigurationManager.AppSettings["SupressMissingResourceException"].ToUpperInvariant().Equals("TRUE");
+        private static readonly bool supressException = AppSettings.Get("SupressMissingResourceException", string.Empty).ToUpperInvariant().Equals("TRUE");
 
         public static string GetString(string resourceClass, string resourceKey, string cultureCode = null)
         {
