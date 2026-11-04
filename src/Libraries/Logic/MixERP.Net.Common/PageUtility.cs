@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -23,18 +23,21 @@ using System;
 using System.Configuration;
 using System.Globalization;
 using System.IO;
-using System.Net;
+using System.Net.Http;
 using System.Web;
 using System.Web.Hosting;
+#if NET
 using System.Web.SessionState;
 using System.Web.UI;
 using System.Web.UI.HtmlControls;
+#endif
 using MixERP.Net.Common.Helpers;
 
 namespace MixERP.Net.Common
 {
     public static class PageUtility
     {
+#if NET
         public static void AddMeta(Page page, string name, string content)
         {
             using (HtmlMeta meta = new HtmlMeta())
@@ -44,7 +47,9 @@ namespace MixERP.Net.Common
                 page.Header.Controls.Add(meta);
             }
         }
+#endif
 
+#if NET
         private static string GetUserHostAddress()
         {
             string host = string.Empty;
@@ -59,20 +64,24 @@ namespace MixERP.Net.Common
 
             return host;
         }
+#endif
 
-        private static HttpBrowserCapabilities GetBrowser()
+#if NET
+        private static string GetBrowser()
         {
             if (HttpContext.Current != null)
             {
-                if (HttpContext.Current.Request.UserHostAddress != null)
+                if (HttpContext.Current.Request.UserAgent != null)
                 {
-                    return HttpContext.Current.Request.Browser;
+                    return HttpContext.Current.Request.UserAgent;
                 }
             }
 
-            return new HttpBrowserCapabilities();
+            return string.Empty;
         }
+#endif
 
+#if NET
         public static void CheckInvalidAttempts(Page page)
         {
             if (page != null)
@@ -82,16 +91,17 @@ namespace MixERP.Net.Common
 
                 if (triedAttempts > 0)
                 {
-                    Log.Warning("{Count} of {Allowed} allowed invalid sign-in attempts from {Host}/{IP} using {Browser}.", triedAttempts, allowedAttemps, GetUserHostAddress(), GetUserIpAddress(), GetBrowser().Browsers);
+                    Log.Warning("{Count} of {Allowed} allowed invalid sign-in attempts from {Host}/{IP} using {Browser}.", triedAttempts, allowedAttemps, GetUserHostAddress(), GetUserIpAddress(), GetBrowser());
                 }
 
                 if (triedAttempts >= allowedAttemps)
                 {
-                    Log.Error("Disallowed access to {Host}/{IP} using {Browser}.", GetUserHostAddress(), GetUserIpAddress(), GetBrowser().Browsers);
+                    Log.Error("Disallowed access to {Host}/{IP} using {Browser}.", GetUserHostAddress(), GetUserIpAddress(), GetBrowser());
                     page.Response.Redirect("~/Static/AccessIsDenied.html");
                 }
             }
         }
+#endif
 
         public static string MapPath(string path)
         {
@@ -125,14 +135,26 @@ namespace MixERP.Net.Common
                 url = prefix + "://" + url;
             }
 
-            using (MyClient client = new MyClient())
+            // WebClient is obsolete on modern .NET; a HEAD request with HttpClient performs the same check.
+            using (HttpClient client = new HttpClient())
+            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Head, url))
             {
-                client.HeadOnly = true;
                 try
                 {
-                    client.DownloadString(url);
+                    using (HttpResponseMessage response = client.SendAsync(request).GetAwaiter().GetResult())
+                    {
+                        response.EnsureSuccessStatusCode();
+                    }
                 }
-                catch (WebException)
+                catch (HttpRequestException)
+                {
+                    url = string.Empty;
+                }
+                catch (UriFormatException)
+                {
+                    url = string.Empty;
+                }
+                catch (InvalidOperationException)
                 {
                     url = string.Empty;
                 }
@@ -141,6 +163,7 @@ namespace MixERP.Net.Common
             }
         }
 
+#if NET
         public static Control FindControlIterative(Control root, string id)
         {
             if (root == null)
@@ -162,6 +185,7 @@ namespace MixERP.Net.Common
             }
             return null;
         }
+#endif
 
         public static string GetCurrentDomainName()
         {
@@ -180,6 +204,7 @@ namespace MixERP.Net.Common
             return url;
         }
 
+#if NET
         public static string GetCurrentPageUrl(Page p)
         {
             if (p == null)
@@ -189,7 +214,9 @@ namespace MixERP.Net.Common
 
             return p.Request.Url.AbsolutePath;
         }
+#endif
 
+#if NET
         public static string GetUserIpAddress()
         {
             Page page = HttpContext.Current.Handler as Page;
@@ -211,7 +238,9 @@ namespace MixERP.Net.Common
 
             return string.Empty;
         }
+#endif
 
+#if NET
         public static int InvalidPasswordAttempts(HttpSessionState session, int increment = 0)
         {
             if (session == null)
@@ -235,12 +264,14 @@ namespace MixERP.Net.Common
 
             if (increment > 0)
             {
-                Log.Warning("{Count} Invalid attempt to sign in from {Host}/{IP} using {Browser}.", retVal, GetUserHostAddress(), GetUserIpAddress(), GetBrowser().Browsers);
+                Log.Warning("{Count} Invalid attempt to sign in from {Host}/{IP} using {Browser}.", retVal, GetUserHostAddress(), GetUserIpAddress(), GetBrowser());
             }
 
             return retVal;
         }
+#endif
 
+#if NET
         public static bool IsLocalUrl(Uri url, Page page)
         {
             if (page == null)
@@ -264,7 +295,9 @@ namespace MixERP.Net.Common
 
             return false;
         }
+#endif
 
+#if NET
         public static bool IsLocalhost(Page page)
         {
             if (page == null)
@@ -274,7 +307,9 @@ namespace MixERP.Net.Common
 
             return page.Request.IsLocal;
         }
+#endif
 
+#if NET
         public static void RefreshPage(Page page)
         {
             if (page != null)
@@ -282,7 +317,9 @@ namespace MixERP.Net.Common
                 page.Response.Redirect(page.Request.Url.AbsolutePath);
             }
         }
+#endif
 
+#if NET
         public static void RegisterJavascript(string key, string javaScript, Page page, bool addScriptTags)
         {
             if (page == null)
@@ -295,9 +332,11 @@ namespace MixERP.Net.Common
                 throw new InvalidOperationException(Warnings.CouldNotRegisterJavascript);
             }
 
-            ScriptManager.RegisterStartupScript(page, typeof (Page), key, javaScript, addScriptTags);
+            page.ClientScript.RegisterStartupScript(typeof (Page), key, javaScript, addScriptTags);
         }
+#endif
 
+#if NET
         public static string ResolveAbsoluteUrl(Page page, string relativeUrl)
         {
             if (page != null)
@@ -306,7 +345,9 @@ namespace MixERP.Net.Common
             }
             return relativeUrl;
         }
+#endif
 
+#if NET
         public static string ResolveUrl(string relativeUrl)
         {
             if (string.IsNullOrWhiteSpace(relativeUrl))
@@ -324,21 +365,6 @@ namespace MixERP.Net.Common
             }
             return relativeUrl;
         }
-
-        private class MyClient : WebClient
-        {
-            public bool HeadOnly { private get; set; }
-
-            protected override WebRequest GetWebRequest(Uri address)
-            {
-                WebRequest req = base.GetWebRequest(address);
-
-                if (req != null && (this.HeadOnly && req.Method == "GET"))
-                {
-                    req.Method = "HEAD";
-                }
-                return req;
-            }
-        }
+#endif
     }
 }

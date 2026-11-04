@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -22,7 +22,6 @@ using MixERP.Net.Entities.Models.Transactions;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Web.Script.Serialization;
 using System.Web.UI;
 using System.Web.UI.HtmlControls;
 using System.Web.UI.WebControls;
@@ -82,8 +81,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
                     rowData.Add(colData);
                 }
 
-                JavaScriptSerializer serializer = new JavaScriptSerializer();
-                string data = serializer.Serialize(rowData);
+                string data = JSONHelper.Serialize(rowData);
 
                 this.productGridViewDataHidden.Value = data;
             }

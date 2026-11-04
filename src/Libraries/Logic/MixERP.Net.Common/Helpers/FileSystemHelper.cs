@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,9 +18,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
+using System.IO;
 using System.IO.Compression;
-using System.Security;
-using System.Security.Permissions;
 using System.Web.Hosting;
 
 namespace MixERP.Net.Common.Helpers
@@ -34,11 +33,33 @@ namespace MixERP.Net.Common.Helpers
                 return false;
             }
 
-            FileIOPermission permission = new FileIOPermission(FileIOPermissionAccess.Write, HostingEnvironment.MapPath(directory));
-            PermissionSet permissionSet = new PermissionSet(PermissionState.None);
-            permissionSet.AddPermission(permission);
+            // Code Access Security (FileIOPermission) is not honored on modern .NET,
+            // so verify write access by creating and deleting a probe file.
+            string path = HostingEnvironment.MapPath(directory);
 
-            return permissionSet.IsSubsetOf(AppDomain.CurrentDomain.PermissionSet);
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+            {
+                return false;
+            }
+
+            string probe = Path.Combine(path, Path.GetRandomFileName());
+
+            try
+            {
+                using (File.Create(probe, 1, FileOptions.DeleteOnClose))
+                {
+                }
+
+                return true;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
         }
 
         public static void Unzip(string archive, string destnation)

@@ -20,7 +20,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.Entities;
-using System.Security.Permissions;
 using System.Web;
 using System.Web.UI;
 
@@ -54,7 +53,6 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             return "Purchase";
         }
 
-        [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
         private void AddJavascript()
         {
             JSUtility.AddJSReference(this.Page, "MixERP.Net.WebControls.StockTransactionFactory.Includes.Script.StockTransactionForm.js", "StockTransactionForm", typeof(StockTransactionForm));

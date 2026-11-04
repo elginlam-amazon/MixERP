@@ -1,4 +1,6 @@
-﻿/********************************************************************************
+#if NET
+// Web Forms base types are provided by CoreWebForms, which is available on the net10.0 target only.
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -27,3 +29,4 @@ namespace MixERP.Net.Framework.Controls
         }
     }
 }
+#endif

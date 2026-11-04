@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -74,18 +74,18 @@ namespace MixERP.Net.FrontEnd.Site
 
         private void DisplayError()
         {
-            Exception ex = (Exception)this.Page.Session["ex"];
+            string message = this.Page.Session["ex"] as string;
             StringBuilder s = new StringBuilder();
 
-            if (ex != null)
+            if (message != null)
             {
                 Log.Verbose("Getting the innermost exception.");
 
                 Log.Verbose("Exception displayed to user.");
 
-                s.Append(string.Format(Thread.CurrentThread.CurrentCulture, "<h2>{0}</h2>", ex.Message));
+                s.Append(string.Format(Thread.CurrentThread.CurrentCulture, "<h2>{0}</h2>", message));
 
-                Log.Warning("{Exception}.", ex);
+                Log.Warning("{Exception}.", message);
 
                 this.ExceptionLiteral.Text = s.ToString();
             }

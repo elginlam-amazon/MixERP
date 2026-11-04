@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -68,7 +68,7 @@ namespace MixERP.Net.FrontEnd.Application
 
             return
                 new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
-                    .WriteTo.RollingFile(GetLogFileName());
+                    .WriteTo.File(GetLogFileName(), rollingInterval: RollingInterval.Day);
         }
 
         internal static void IntializeLogger()

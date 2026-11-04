@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -37,7 +37,7 @@ using System.Web.UI.WebControls;
 
 namespace MixERP.Net.FrontEnd
 {
-    public partial class SignIn : Page
+    public partial class SignIn : MixERP.Net.Framework.Controls.MixERPWebPageBase
     {
         protected void Page_Init(object sender, EventArgs e)
         {
