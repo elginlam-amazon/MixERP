@@ -1,4 +1,4 @@
-﻿<%--
+<%--
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -23,8 +23,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses />.
 <h2>
     <asp:Literal runat="server" ID="TitleLiteral" />
 </h2>
-
-<asp:ScriptManagerProxy runat="server"></asp:ScriptManagerProxy>
 
 <asp:PlaceHolder runat="server" ID="Placeholder1"></asp:PlaceHolder>
 

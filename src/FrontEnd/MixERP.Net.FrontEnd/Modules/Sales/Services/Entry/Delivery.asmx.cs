@@ -1,4 +1,4 @@
-﻿using MixERP.Net.ApplicationState.Cache;
+using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common.Extensions;
 using MixERP.Net.Entities.Core;
 using MixERP.Net.Entities.Models.Transactions;
@@ -27,13 +27,9 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
-using System.Web.Script.Services;
-using System.Web.Services;
-
+using MixERP.Net.Framework.WebServices;
 namespace MixERP.Net.Core.Modules.Sales.Services.Entry
 {
-    [WebService(Namespace = "http://tempuri.org/")]
-    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [ToolboxItem(false)]
     [ScriptService]
     public class Delivery : WebService

@@ -1,4 +1,4 @@
-﻿<%--
+<%--
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -50,7 +50,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses />.
 </head>
 <body>
     <form id="form1" runat="server">
-        <asp:ScriptManager runat="server" ID="ScriptManager1" />
         <asp:PlaceHolder runat="server" ID="SelectorPlaceholder"></asp:PlaceHolder>
     </form>
 </body>

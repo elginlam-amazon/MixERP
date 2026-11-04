@@ -1,4 +1,5 @@
 using MixERP.Net.Common;
+using Markdig;
 using System;
 using System.Collections.Generic;
 
@@ -42,11 +43,11 @@ namespace MixERP.Net.Updater.Api
 
         private static string ParseMarkdown(string markdown)
         {
-            var md = new MarkdownDeep.Markdown();
-            md.ExtraMode = true;
-            md.SafeMode = false;
+            // MarkdownDeep (ExtraMode, SafeMode off) has no modern .NET build; Markdig with the
+            // advanced extensions provides the same "Markdown Extra" feature set and also allows raw HTML.
+            var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
 
-            return md.Transform(markdown);
+            return Markdown.ToHtml(markdown ?? string.Empty, pipeline);
         }
     }
 }

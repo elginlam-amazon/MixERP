@@ -45,7 +45,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist.Helpers
         internal void SendEmail()
         {
 
-            IHtmlImageSerializer serializer = new HtmlRendererImageSerializer();
+            IHtmlImageSerializer serializer = new HtmlDocumentSerializer();
 
             string extension = ConfigurationHelper.GetTransactionChecklistParameter("EmailImageExtension") ?? ".png";
 

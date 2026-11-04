@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,11 +17,11 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using MixERP.Net.Common.Helpers;
 using MixERP.Net.Common;
 using MixERP.Net.Entities.Core;
 using MixERP.Net.Entities.Models.Transactions;
 using System.Collections.ObjectModel;
-using System.Web.Script.Serialization;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory.Helpers
 {
@@ -30,9 +30,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory.Helpers
         public static Collection<Attachment> GetAttachmentCollection(string json)
         {
             Collection<Attachment> details = new Collection<Attachment>();
-            var jss = new JavaScriptSerializer();
-
-            dynamic result = jss.Deserialize<dynamic>(json);
+            dynamic result = JSONHelper.DeserializeUntyped(json);
 
             if (result != null)
             {
@@ -53,9 +51,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory.Helpers
         public static Collection<StockDetail> GetStockMasterDetailCollection(string json, int storeId)
         {
             Collection<StockDetail> details = new Collection<StockDetail>();
-            var jss = new JavaScriptSerializer();
-
-            dynamic result = jss.Deserialize<dynamic>(json);
+            dynamic result = JSONHelper.DeserializeUntyped(json);
 
             foreach (dynamic item in result)
             {

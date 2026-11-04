@@ -1,4 +1,6 @@
-﻿/********************************************************************************
+#if NET
+// Web Forms base types are provided by CoreWebForms, which is available on the net10.0 target only.
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -25,6 +27,15 @@ namespace MixERP.Net.Framework.Controls
     public class MixERPWebPageBase : Page
     {
         private MixERPPageStatePersister pageStatePersister;
+
+        public MixERPWebPageBase()
+        {
+            // Former <pages clientIDMode="Static" enableViewState="false" enableEventValidation="false" theme="" />
+            // in web.config, which ASP.NET Core does not read. The scripts depend on the static client IDs.
+            this.ClientIDMode = ClientIDMode.Static;
+            this.EnableViewState = false;
+            this.EnableEventValidation = false;
+        }
 
         protected override PageStatePersister PageStatePersister
         {
@@ -115,3 +126,4 @@ namespace MixERP.Net.Framework.Controls
         }
     }
 }
+#endif

@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -21,12 +21,15 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+#if NET
 using System.Web.UI;
+#endif
 
 namespace MixERP.Net.Common.Helpers
 {
     public static class JSUtility
     {
+#if NET
         public static void AddJSReference(Page page, string resourceName, string key, Type type)
         {
             if (page != null)
@@ -35,6 +38,7 @@ namespace MixERP.Net.Common.Helpers
                 PageUtility.RegisterJavascript(key, script, page, false);
             }
         }
+#endif
 
         public static string GetEmbeddedScript(string embeddedScriptName, Assembly assembly)
         {

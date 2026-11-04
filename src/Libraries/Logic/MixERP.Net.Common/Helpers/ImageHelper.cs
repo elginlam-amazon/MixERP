@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,11 +18,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.IO;
-using System.Linq;
+using SkiaSharp;
 
 namespace MixERP.Net.Common.Helpers
 {
@@ -41,71 +38,52 @@ namespace MixERP.Net.Common.Helpers
             }
         }
 
-        public static ImageCodecInfo GetEncoder(ImageFormat format)
+        public static string GetFileExtension(SKEncodedImageFormat format)
         {
-            if (format == null)
+            switch (format)
             {
-                return null;
+                case SKEncodedImageFormat.Bmp: return ".BMP";
+                case SKEncodedImageFormat.Gif: return ".GIF";
+                case SKEncodedImageFormat.Png: return ".PNG";
+                default: return ".JPG";
             }
-
-            ImageCodecInfo[] codecs = ImageCodecInfo.GetImageDecoders();
-
-            foreach (ImageCodecInfo codec in codecs)
-            {
-                if (codec.FormatID == format.Guid)
-                {
-                    return codec;
-                }
-            }
-            return null;
         }
 
-        public static string GetFileExtension(ImageFormat format)
-        {
-            return ImageCodecInfo.GetImageEncoders()
-                .First(x => x.FormatID == format.Guid)
-                .FilenameExtension
-                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .First()
-                .Trim('*')
-                .ToUpperInvariant();
-        }
-
-        public static ImageFormat GetImageFormat(String path)
+        public static SKEncodedImageFormat GetImageFormat(String path)
         {
             switch (Path.GetExtension(path))
             {
-                case ".bmp": return ImageFormat.Bmp;
-                case ".gif": return ImageFormat.Gif;
-                case ".jpg": return ImageFormat.Jpeg;
-                case ".png": return ImageFormat.Png;
+                case ".bmp": return SKEncodedImageFormat.Bmp;
+                case ".gif": return SKEncodedImageFormat.Gif;
+                case ".jpg": return SKEncodedImageFormat.Jpeg;
+                case ".png": return SKEncodedImageFormat.Png;
             }
-            return ImageFormat.Jpeg;
+            return SKEncodedImageFormat.Jpeg;
         }
 
-        public static byte[] GetResizedImage(Image image, int width, int height)
+        public static byte[] GetResizedImage(SKBitmap image, int width, int height)
         {
-            Size thumbnailSize = new Size(width, height);
-
             if (image == null)
             {
                 return null;
             }
 
+            SKSizeI thumbnailSize = new SKSizeI(width, height);
+
             if (thumbnailSize.Width.Equals(0))
             {
-                thumbnailSize.Width = image.Size.Width;
+                thumbnailSize.Width = image.Width;
             }
 
             if (thumbnailSize.Height.Equals(0))
             {
-                thumbnailSize.Height = image.Size.Height;
+                thumbnailSize.Height = image.Height;
             }
 
-            float scalingRatio = CalculateScalingRatio(image.Size, thumbnailSize);
+            float scalingRatio = CalculateScalingRatio(new SKSizeI(image.Width, image.Height), thumbnailSize);
 
-            int scaledWidth = (int)Math.Round(image.Size.Width * scalingRatio);
-            int scaledHeight = (int)Math.Round(image.Size.Height * scalingRatio);
+            int scaledWidth = (int)Math.Round(image.Width * scalingRatio);
+            int scaledHeight = (int)Math.Round(image.Height * scalingRatio);
             int scaledLeft = (thumbnailSize.Width - scaledWidth) / 2;
             int scaledTop = (thumbnailSize.Height - scaledHeight) / 2;
 
@@ -116,24 +94,23 @@ namespace MixERP.Net.Common.Helpers
                 scaledTop = (thumbnailSize.Height - scaledHeight) / 4;
             }
 
-            Rectangle cropArea = new Rectangle(scaledLeft, scaledTop, scaledWidth, scaledHeight);
+            SKRect cropArea = SKRect.Create(scaledLeft, scaledTop, scaledWidth, scaledHeight);
 
-            using (Bitmap thumbnail = new Bitmap(thumbnailSize.Width, thumbnailSize.Height, PixelFormat.Format32bppPArgb))
+            using (SKBitmap thumbnail = new SKBitmap(new SKImageInfo(thumbnailSize.Width, thumbnailSize.Height, SKColorType.Bgra8888, SKAlphaType.Premul)))
             {
-                using (Graphics thumbnailGraphics = Graphics.FromImage(thumbnail))
+                using (SKCanvas canvas = new SKCanvas(thumbnail))
+                using (SKImage source = SKImage.FromBitmap(image))
+                using (SKPaint paint = new SKPaint { IsAntialias = true })
                 {
-                    thumbnailGraphics.CompositingQuality = CompositingQuality.HighQuality;
-                    thumbnailGraphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                    thumbnailGraphics.SmoothingMode = SmoothingMode.HighQuality;
-                    thumbnailGraphics.Clear(Color.Transparent);
-                    thumbnailGraphics.DrawImage(image, cropArea);
+                    canvas.Clear(SKColors.Transparent);
+                    canvas.DrawImage(source, cropArea, new SKSamplingOptions(SKCubicResampler.Mitchell), paint);
                 }
 
                 return Conversion.TryCastByteArray(thumbnail);
             }
         }
 
-        private static float CalculateScalingRatio(Size originalSize, Size targetSize)
+        private static float CalculateScalingRatio(SKSizeI originalSize, SKSizeI targetSize)
         {
             float originalAspectRatio = (float)originalSize.Width / originalSize.Height;
             float targetAspectRatio = (float)targetSize.Width / targetSize.Height;

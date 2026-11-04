@@ -319,7 +319,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Data
                 catch (NpgsqlException ex)
                 {
                     Log.Warning("{Sql}/{Data}/{Exception}.", sql, data, ex);
-                    throw new MixERPException(ex.Message, ex, ex.ConstraintName);
+                    throw new MixERPException(ex.Message, ex, (ex as PostgresException)?.ConstraintName);
                 }
             }
         }
@@ -410,7 +410,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Data
                 catch (NpgsqlException ex)
                 {
                     Log.Warning("{Sql}/{Data}/{Exception}.", sql, data, ex);
-                    throw new MixERPException(ex.Message, ex, ex.ConstraintName);
+                    throw new MixERPException(ex.Message, ex, (ex as PostgresException)?.ConstraintName);
                 }
             }
         }

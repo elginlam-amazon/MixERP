@@ -1,4 +1,4 @@
-﻿///#source 1 1 /Scripts/jquery-1.9.1.js
+///#source 1 1 /Scripts/jquery-1.9.1.js
 (function( window, undefined ) {
 // Can't do this because several apps including ASP.NET trace
 // the stack via arguments.caller.callee and Firefox dies if
@@ -51450,6 +51450,13 @@ if (typeof Sys !== "undefined") {
     Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () {
         //Fired on each ASP.net AJAX request.
         initializeItemSelector();
+    });
+};
+
+//pageLoad() used to be invoked by the ASP.NET AJAX runtime (ScriptManager), which is no longer rendered.
+if (typeof Sys === "undefined") {
+    $(document).ready(function () {
+        pageLoad();
     });
 };
 

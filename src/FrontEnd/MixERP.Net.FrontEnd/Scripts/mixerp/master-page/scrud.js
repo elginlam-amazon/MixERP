@@ -1,4 +1,4 @@
-﻿function pageLoad() {
+function pageLoad() {
     initializeItemSelector();
     $(".item-selector").colorbox({ iframe: true, innerWidth: 1024, innerHeight: 450, overlayClose: false });
     $(".preview").colorbox({ iframe: true, innerWidth: 1024, innerHeight: 450, overlayClose: false });
@@ -8,6 +8,13 @@ if (typeof Sys !== "undefined") {
     Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () {
         //Fired on each ASP.net AJAX request.
         initializeItemSelector();
+    });
+};
+
+//pageLoad() used to be invoked by the ASP.NET AJAX runtime (ScriptManager), which is no longer rendered.
+if (typeof Sys === "undefined") {
+    $(document).ready(function () {
+        pageLoad();
     });
 };
 

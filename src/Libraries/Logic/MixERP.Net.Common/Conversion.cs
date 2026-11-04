@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -20,31 +20,32 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.i18n;
 using Serilog;
 using System;
-using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Web.Hosting;
+using SkiaSharp;
+#if NET
 using System.Web;
 using System.Web.UI;
 using System.Web.UI.WebControls;
-using Image = System.Drawing.Image;
+#endif
 
 namespace MixERP.Net.Common
 {
     public static class Conversion
     {
-        public static byte[] ConvertImageToByteArray(Image imageToConvert, ImageFormat formatOfImage)
+        public static byte[] ConvertImageToByteArray(SKBitmap imageToConvert, SKEncodedImageFormat formatOfImage)
         {
             if (imageToConvert == null)
             {
                 return null;
             }
 
-            using (MemoryStream ms = new MemoryStream())
+            using (SKData data = imageToConvert.Encode(formatOfImage, 75))
             {
-                imageToConvert.Save(ms, formatOfImage);
-                return ms.ToArray();
+                return data == null ? null : data.ToArray();
             }
         }
 
@@ -74,7 +75,7 @@ namespace MixERP.Net.Common
                 return null;
             }
 
-            using (SHA512CryptoServiceProvider provider = new SHA512CryptoServiceProvider())
+            using (SHA512 provider = SHA512.Create())
             {
                 return BitConverter.ToString(provider.ComputeHash(Encoding.UTF8.GetBytes(password + salt))).Replace("-", "").ToLower(CultureInfo.InvariantCulture);
             }
@@ -102,7 +103,7 @@ namespace MixERP.Net.Common
             {
                 return null;
             }
-            string physicalApplicationPath = HttpContext.Current.Request.PhysicalApplicationPath;
+            string physicalApplicationPath = HostingEnvironment.ApplicationPhysicalPath;
 
             if (string.IsNullOrWhiteSpace(physicalApplicationPath))
             {
@@ -112,6 +113,7 @@ namespace MixERP.Net.Common
             return @"~/" + fullServerPath.Replace(physicalApplicationPath, String.Empty).Replace(@"\", "/");
         }
 
+#if NET
         public static string ResolveUrl(string url)
         {
             Page page = HttpContext.Current.Handler as Page;
@@ -123,6 +125,8 @@ namespace MixERP.Net.Common
 
             return (page).ResolveUrl(url);
         }
+
+#endif
 
         public static bool TryCastBoolean(object value)
         {
@@ -152,18 +156,9 @@ namespace MixERP.Net.Common
             return retVal;
         }
 
-        public static byte[] TryCastByteArray(Image image)
+        public static byte[] TryCastByteArray(SKBitmap image)
         {
-            if (image == null)
-            {
-                return null;
-            }
-
-            using (var ms = new MemoryStream())
-            {
-                image.Save(ms, ImageFormat.Jpeg);
-                return ms.ToArray();
-            }
+            return ConvertImageToByteArray(image, SKEncodedImageFormat.Jpeg);
         }
 
         public static DateTime TryCastDate(object value)
@@ -388,6 +383,7 @@ namespace MixERP.Net.Common
             return string.Empty;
         }
 
+#if NET
         public static Unit TryCastUnit(object value)
         {
             if (value == null)
@@ -403,6 +399,7 @@ namespace MixERP.Net.Common
 
             return Unit.Parse(value.ToString(), CultureInfo.DefaultThreadCurrentCulture);
         }
+#endif
 
         public static DateTime? TryCastNullableDate(object value)
         {

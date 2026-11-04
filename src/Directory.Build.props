@@ -1,0 +1,12 @@
+<Project>
+  <!-- Shared settings for all SDK-style projects in this solution. -->
+  <PropertyGroup>
+    <!-- Projects that keep a hand-written Properties/AssemblyInfo.cs (versions 1.2.0.1, CLSCompliant, etc.)
+         must not get a second, SDK-generated set of assembly attributes. -->
+    <GenerateAssemblyInfo Condition="Exists('$(MSBuildProjectDirectory)/Properties/AssemblyInfo.cs')">false</GenerateAssemblyInfo>
+    <!-- The assemblies keep [assembly: CLSCompliant(true)]. Their public Web Forms and imaging members now expose
+         types from CoreWebForms (System.Web.UI.*) and SkiaSharp, which do not declare CLS compliance
+         (System.Web did on .NET Framework). CS3001/CS3002/CS3003/CS3009 only report that dependency metadata. -->
+    <NoWarn>$(NoWarn);CS3001;CS3002;CS3003;CS3009</NoWarn>
+  </PropertyGroup>
+</Project>

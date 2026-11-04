@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -22,8 +22,10 @@ using MixERP.Net.i18n;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+#if NET
 using System.Web;
 using System.Web.UI;
+#endif
 
 namespace MixERP.Net.Common.jQueryHelper
 {
@@ -39,6 +41,7 @@ namespace MixERP.Net.Common.jQueryHelper
         /// <param name="maxDate">  The maximum date.</param>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if NET
         public static void AddjQueryUIDatePicker(Page p, string controlId, DateTime? minDate, DateTime? maxDate)
         {
             if (string.IsNullOrWhiteSpace(controlId))
@@ -55,6 +58,7 @@ namespace MixERP.Net.Common.jQueryHelper
 
             PageUtility.RegisterJavascript("datePicker_" + controlId + RandomNumber().ToString(CultureInfo.InvariantCulture), script, p, true);
         }
+#endif
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////
         /// <summary>Gets datepicker script.</summary>

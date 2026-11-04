@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -27,15 +27,23 @@ using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading;
 using System.Web;
-using System.Web.Security;
 using System.Web.UI;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.SystemWebAdapters;
 
 namespace MixERP.Net.FrontEnd.Base
 {
     public class MixERPWebpage : MixERPWebPageBase
     {
+        /// <summary>
+        ///     The sign in page (formerly the forms authentication loginUrl).
+        /// </summary>
+        public const string LoginUrl = "/SignIn.aspx";
+
         private string currentPage;
         private Menu[] menus;
 
@@ -62,9 +70,24 @@ namespace MixERP.Net.FrontEnd.Base
             HttpContext.Current.Response.Redirect("~/");
         }
 
+        /// <summary>
+        ///     Removes the authentication cookie (formerly FormsAuthentication.SignOut).
+        /// </summary>
+        public static void SignOut()
+        {
+            HttpContext context = HttpContext.Current;
+
+            if (context == null)
+            {
+                return;
+            }
+
+            context.AsAspNetCore().SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme).GetAwaiter().GetResult();
+        }
+
         public void RequestLoginPage()
         {
-            FormsAuthentication.SignOut();
+            SignOut();
             Log.Information("User {UserName} was signed off.", AppUsers.GetCurrent().View.UserName);
 
             Log.Debug("Clearing Http Cookies.");
@@ -84,13 +107,12 @@ namespace MixERP.Net.FrontEnd.Base
                 return;
             }
 
-            string loginUrl = (page).ResolveUrl(FormsAuthentication.LoginUrl);
+            string loginUrl = (page).ResolveUrl(LoginUrl);
 
             this.currentPage = HttpContext.Current.Request.Url.AbsolutePath;
             if (this.currentPage != loginUrl)
             {
-                FormsAuthentication.RedirectToLoginPage(this.currentPage);
-                HttpContext.Current.Response.Redirect("/SignIn.aspx?ReturnUrl=" + this.currentPage);
+                HttpContext.Current.Response.Redirect(LoginUrl + "?ReturnUrl=" + HttpUtility.UrlEncode(this.currentPage));
                 Log.Information("Redirected to login page.");
             }
         }
@@ -102,17 +124,27 @@ namespace MixERP.Net.FrontEnd.Base
                 return;
             }
 
-            FormsAuthenticationTicket ticket = new FormsAuthenticationTicket(1,
-                signInId.ToString(CultureInfo.InvariantCulture), DateTime.Now, DateTime.Now.AddMinutes(30), rememberMe,
-                String.Empty, FormsAuthentication.FormsCookiePath);
-            string encryptedCookie = FormsAuthentication.Encrypt(ticket);
+            HttpContext context = HttpContext.Current;
 
-            HttpCookie cookie = new HttpCookie(FormsAuthentication.FormsCookieName, encryptedCookie);
-            cookie.Domain = FormsAuthentication.CookieDomain;
-            cookie.Path = ticket.CookiePath;
+            if (context == null)
+            {
+                return;
+            }
 
-            response.Cookies.Add(cookie);
-            //response.Redirect(FormsAuthentication.GetRedirectUrl(signInId.ToString(CultureInfo.InvariantCulture), rememberMe));
+            // The forms authentication ticket is replaced by the ASP.NET Core authentication cookie.
+            // The user name stays the global login id, which AppUsers reads from User.Identity.Name.
+            ClaimsIdentity identity = new ClaimsIdentity(new[]
+            {
+                new Claim(ClaimTypes.Name, signInId.ToString(CultureInfo.InvariantCulture))
+            }, CookieAuthenticationDefaults.AuthenticationScheme);
+
+            AuthenticationProperties properties = new AuthenticationProperties
+            {
+                IsPersistent = rememberMe,
+                IssuedUtc = DateTimeOffset.UtcNow
+            };
+
+            context.AsAspNetCore().SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), properties).GetAwaiter().GetResult();
         }
 
         protected override void InitializeCulture()
@@ -170,7 +202,8 @@ namespace MixERP.Net.FrontEnd.Base
 
             if (!policyExists)
             {
-                Server.Transfer("~/Site/AccessIsDenied.aspx");
+                // Server.Transfer is not supported on ASP.NET Core; redirect to the same page instead.
+                this.Response.Redirect("~/Site/AccessIsDenied.aspx");
             }
 
             return policyExists;

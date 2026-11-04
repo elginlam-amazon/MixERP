@@ -54,12 +54,10 @@ namespace MixERP.Net.i18n
             {
                 Host = host,
                 Database = database,
-                UserName = username,
+                Username = username,
                 Password = password,
                 Port = port,
-                SyncNotification = true,
                 Pooling = true,
-                SSL = true,
                 SslMode = SslMode.Prefer,
                 MinPoolSize = 10,
                 MaxPoolSize = 100,

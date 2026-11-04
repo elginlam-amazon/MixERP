@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -20,14 +20,9 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common.Extensions;
 using MixERP.Net.Entities.Core;
-using System.Web.Script.Services;
-using System.Web.Services;
-
-
+using MixERP.Net.Framework.WebServices;
 namespace MixERP.Net.Core.Modules.Sales.Services.Receipt
 {
-    [WebService(Namespace = "http://tempuri.org/")]
-    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
     [System.ComponentModel.ToolboxItem(false)]
     [ScriptService]
     public class Currencies : WebService

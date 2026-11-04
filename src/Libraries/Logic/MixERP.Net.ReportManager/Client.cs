@@ -1,7 +1,6 @@
-﻿using Serilog;
+using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
@@ -52,9 +51,9 @@ namespace MixERP.Net.ReportManager
 
         internal string GetContent()
         {
-            using (WebClient client = new WebClient())
+            using (HttpClient client = new HttpClient())
             {
-                string content = client.DownloadString(this.Url);
+                string content = client.GetStringAsync(this.Url).GetAwaiter().GetResult();
                 Console.WriteLine("{0}", content);
                 return content;
             }

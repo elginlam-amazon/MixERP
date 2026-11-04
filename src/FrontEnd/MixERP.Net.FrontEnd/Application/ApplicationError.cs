@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -65,7 +65,6 @@ namespace MixERP.Net.FrontEnd.Application
                 Log.Error("Inner Exception. {InnerException}.", ex.InnerException);
             }
 
-            p:
             throw ex;
         }
     }
