@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,33 +17,25 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using MixERP.Net.i18n.Resources;
 using Serilog;
 using System;
-using System.Configuration;
 using System.Globalization;
 using System.IO;
-using System.Net;
+using System.Net.Http;
 using System.Web;
 using System.Web.Hosting;
 using System.Web.SessionState;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
 using MixERP.Net.Common.Helpers;
 
 namespace MixERP.Net.Common
 {
-    public static class PageUtility
+    public static partial class PageUtility
     {
-        public static void AddMeta(Page page, string name, string content)
-        {
-            using (HtmlMeta meta = new HtmlMeta())
-            {
-                meta.Name = name;
-                meta.Content = content;
-                page.Header.Controls.Add(meta);
-            }
-        }
+        /// <summary>
+        ///     Shared client used by <see cref="CleanUrl" /> to probe a url. HttpClient is meant to be
+        ///     long lived: a new instance per call leaks sockets.
+        /// </summary>
+        private static readonly HttpClient HeadClient = new HttpClient();
 
         private static string GetUserHostAddress()
         {
@@ -60,37 +52,27 @@ namespace MixERP.Net.Common
             return host;
         }
 
-        private static HttpBrowserCapabilities GetBrowser()
+        /// <summary>
+        ///     Returns the requesting user agent.
+        /// </summary>
+        /// <remarks>
+        ///     The Web Forms implementation logged <c>HttpBrowserCapabilities.Browsers</c>. Browser
+        ///     capability sniffing was removed from ASP.NET Core, so the raw user agent string is
+        ///     logged instead. See knowledge base doc 25.
+        /// </remarks>
+        private static string GetBrowser()
         {
             if (HttpContext.Current != null)
             {
-                if (HttpContext.Current.Request.UserHostAddress != null)
+                string userAgent = HttpContext.Current.Request.UserAgent;
+
+                if (!string.IsNullOrWhiteSpace(userAgent))
                 {
-                    return HttpContext.Current.Request.Browser;
+                    return userAgent;
                 }
             }
 
-            return new HttpBrowserCapabilities();
-        }
-
-        public static void CheckInvalidAttempts(Page page)
-        {
-            if (page != null)
-            {
-                int triedAttempts = InvalidPasswordAttempts(page.Session);
-                int allowedAttemps = Conversion.TryCastInteger(ConfigurationManager.AppSettings["MaxInvalidPasswordAttempts"]);
-
-                if (triedAttempts > 0)
-                {
-                    Log.Warning("{Count} of {Allowed} allowed invalid sign-in attempts from {Host}/{IP} using {Browser}.", triedAttempts, allowedAttemps, GetUserHostAddress(), GetUserIpAddress(), GetBrowser().Browsers);
-                }
-
-                if (triedAttempts >= allowedAttemps)
-                {
-                    Log.Error("Disallowed access to {Host}/{IP} using {Browser}.", GetUserHostAddress(), GetUserIpAddress(), GetBrowser().Browsers);
-                    page.Response.Redirect("~/Static/AccessIsDenied.html");
-                }
-            }
+            return string.Empty;
         }
 
         public static string MapPath(string path)
@@ -125,42 +107,33 @@ namespace MixERP.Net.Common
                 url = prefix + "://" + url;
             }
 
-            using (MyClient client = new MyClient())
+            //The Web Forms implementation used a WebClient subclass which rewrote the verb to HEAD.
+            //WebClient is obsolete (SYSLIB0014); HttpClient issues a HEAD request directly.
+            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Head, url))
             {
-                client.HeadOnly = true;
                 try
                 {
-                    client.DownloadString(url);
+                    using (HttpResponseMessage response = HeadClient.Send(request))
+                    {
+                        response.EnsureSuccessStatusCode();
+                    }
                 }
-                catch (WebException)
+                catch (HttpRequestException)
+                {
+                    url = string.Empty;
+                }
+                catch (InvalidOperationException)
+                {
+                    //The url was not a well formed absolute uri.
+                    url = string.Empty;
+                }
+                catch (UriFormatException)
                 {
                     url = string.Empty;
                 }
 
                 return url;
             }
-        }
-
-        public static Control FindControlIterative(Control root, string id)
-        {
-            if (root == null)
-            {
-                return null;
-            }
-
-            if (root.ID == id)
-            {
-                return root;
-            }
-            foreach (Control c in root.Controls)
-            {
-                Control t = FindControlIterative(c, id);
-                if (t != null)
-                {
-                    return t;
-                }
-            }
-            return null;
         }
 
         public static string GetCurrentDomainName()
@@ -180,38 +153,44 @@ namespace MixERP.Net.Common
             return url;
         }
 
-        public static string GetCurrentPageUrl(Page p)
+        /// <summary>
+        ///     Returns the IP address of the requesting client.
+        /// </summary>
+        /// <remarks>
+        ///     The Web Forms implementation read the <c>HTTP_X_FORWARDED_FOR</c> and <c>REMOTE_ADDR</c>
+        ///     server variables off the current <c>Page</c>. ASP.NET Core does not expose IIS server
+        ///     variables, so the forwarded header and <c>UserHostAddress</c> are used instead.
+        /// </remarks>
+        public static string GetUserIpAddress()
         {
-            if (p == null)
+            HttpContext context = HttpContext.Current;
+
+            if (context == null)
             {
                 return string.Empty;
             }
 
-            return p.Request.Url.AbsolutePath;
-        }
+            string ip = context.Request.Headers["X-Forwarded-For"];
 
-        public static string GetUserIpAddress()
-        {
-            Page page = HttpContext.Current.Handler as Page;
-
-            if (page != null)
+            if (!string.IsNullOrEmpty(ip))
             {
-                string ip = page.Request.ServerVariables["HTTP_X_FORWARDED_FOR"];
-                if (!string.IsNullOrEmpty(ip))
-                {
-                    string[] ipRange = ip.Split(',');
-                    ip = ipRange[0];
-                }
-                else
-                {
-                    ip = page.Request.ServerVariables["REMOTE_ADDR"];
-                }
-                return ip.Trim();
+                string[] ipRange = ip.Split(',');
+                ip = ipRange[0];
+            }
+            else
+            {
+                ip = context.Request.UserHostAddress;
             }
 
-            return string.Empty;
+            if (string.IsNullOrEmpty(ip))
+            {
+                return string.Empty;
+            }
+
+            return ip.Trim();
         }
 
+        [CLSCompliant(false)]
         public static int InvalidPasswordAttempts(HttpSessionState session, int increment = 0)
         {
             if (session == null)
@@ -235,78 +214,19 @@ namespace MixERP.Net.Common
 
             if (increment > 0)
             {
-                Log.Warning("{Count} Invalid attempt to sign in from {Host}/{IP} using {Browser}.", retVal, GetUserHostAddress(), GetUserIpAddress(), GetBrowser().Browsers);
+                Log.Warning("{Count} Invalid attempt to sign in from {Host}/{IP} using {Browser}.", retVal, GetUserHostAddress(), GetUserIpAddress(), GetBrowser());
             }
 
             return retVal;
         }
 
-        public static bool IsLocalUrl(Uri url, Page page)
-        {
-            if (page == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                Uri requested = new Uri(page.Request.Url, url);
-
-                if (requested.Host == page.Request.Url.Host)
-                {
-                    return true;
-                }
-            }
-            catch (InvalidOperationException)
-            {
-                //
-            }
-
-            return false;
-        }
-
-        public static bool IsLocalhost(Page page)
-        {
-            if (page == null)
-            {
-                return false;
-            }
-
-            return page.Request.IsLocal;
-        }
-
-        public static void RefreshPage(Page page)
-        {
-            if (page != null)
-            {
-                page.Response.Redirect(page.Request.Url.AbsolutePath);
-            }
-        }
-
-        public static void RegisterJavascript(string key, string javaScript, Page page, bool addScriptTags)
-        {
-            if (page == null)
-            {
-                page = HttpContext.Current.Handler as Page;
-            }
-
-            if (page == null)
-            {
-                throw new InvalidOperationException(Warnings.CouldNotRegisterJavascript);
-            }
-
-            ScriptManager.RegisterStartupScript(page, typeof (Page), key, javaScript, addScriptTags);
-        }
-
-        public static string ResolveAbsoluteUrl(Page page, string relativeUrl)
-        {
-            if (page != null)
-            {
-                return page.Request.Url.GetLeftPart(UriPartial.Authority) + page.ResolveUrl(relativeUrl);
-            }
-            return relativeUrl;
-        }
-
+        /// <summary>
+        ///     Resolves an application relative ("~/") url against the current application path.
+        /// </summary>
+        /// <remarks>
+        ///     The Web Forms implementation delegated to <c>Page.ResolveUrl</c>. There is no
+        ///     <c>Page</c> on modern .NET, so the application path is read off the current request.
+        /// </remarks>
         public static string ResolveUrl(string relativeUrl)
         {
             if (string.IsNullOrWhiteSpace(relativeUrl))
@@ -314,31 +234,22 @@ namespace MixERP.Net.Common
                 return string.Empty;
             }
 
-            if (HttpContext.Current != null)
+            if (!relativeUrl.StartsWith("~", StringComparison.Ordinal))
             {
-                Page p = HttpContext.Current.Handler as Page;
-                if (p != null)
-                {
-                    return p.ResolveUrl(relativeUrl);
-                }
+                return relativeUrl;
             }
-            return relativeUrl;
+
+            string applicationPath = "/";
+
+            HttpContext context = HttpContext.Current;
+
+            if (context != null && !string.IsNullOrWhiteSpace(context.Request.ApplicationPath))
+            {
+                applicationPath = context.Request.ApplicationPath;
+            }
+
+            return (applicationPath.TrimEnd('/') + "/" + relativeUrl.TrimStart('~').TrimStart('/', '\\')).Replace("\\", "/");
         }
 
-        private class MyClient : WebClient
-        {
-            public bool HeadOnly { private get; set; }
-
-            protected override WebRequest GetWebRequest(Uri address)
-            {
-                WebRequest req = base.GetWebRequest(address);
-
-                if (req != null && (this.HeadOnly && req.Method == "GET"))
-                {
-                    req.Method = "HEAD";
-                }
-                return req;
-            }
-        }
     }
 }

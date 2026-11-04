@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using MixERP.Net.Framework;
 using System.Configuration;
 using System.Web.Hosting;
 
@@ -31,7 +32,7 @@ namespace PetaPoco
                 return string.Empty;
             }
 
-            string path = HostingEnvironment.MapPath(ConfigurationManager.AppSettings[configFileName]);
+            string path = HostingEnvironment.MapPath(AppSettings.Get(configFileName));
 
             ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap {ExeConfigFilename = path};
             Configuration config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap,

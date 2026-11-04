@@ -66,9 +66,12 @@ namespace MixERP.Net.FrontEnd.Application
 
             levelSwitch.MinimumLevel = logLevel;
 
+            // Serilog.Sinks.RollingFile was retired; Serilog.Sinks.File rolls on its own with
+            // rollingInterval. GetLogFileName already puts each day in its own directory, so the
+            // interval only governs the suffix on the file itself.
             return
                 new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
-                    .WriteTo.RollingFile(GetLogFileName());
+                    .WriteTo.File(GetLogFileName(), rollingInterval: RollingInterval.Day);
         }
 
         internal static void IntializeLogger()

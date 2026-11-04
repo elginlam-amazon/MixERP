@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <!-- Legacy AssemblyInfo.cs files are kept in the tree; let them own the assembly attributes
+         instead of having the SDK generate a duplicate set (CS0579). -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AutoGenerateBindingRedirects>false</AutoGenerateBindingRedirects>
+    <!-- The legacy tree is signed with a per-project .snk that is not checked in everywhere. -->
+    <SignAssembly>false</SignAssembly>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+</Project>

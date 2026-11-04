@@ -316,7 +316,9 @@ namespace MixERP.Net.WebControls.ScrudFactory.Data
                 {
                     return Conversion.TryCastLong(DbOperation.GetScalarValue(catalog, command));
                 }
-                catch (NpgsqlException ex)
+                // ConstraintName moved to PostgresException when Npgsql split server reported
+                // errors out of the transport level NpgsqlException.
+                catch (PostgresException ex)
                 {
                     Log.Warning("{Sql}/{Data}/{Exception}.", sql, data, ex);
                     throw new MixERPException(ex.Message, ex, ex.ConstraintName);
@@ -407,7 +409,9 @@ namespace MixERP.Net.WebControls.ScrudFactory.Data
                 {
                     return DbOperation.ExecuteNonQuery(catalog, command);
                 }
-                catch (NpgsqlException ex)
+                // ConstraintName moved to PostgresException when Npgsql split server reported
+                // errors out of the transport level NpgsqlException.
+                catch (PostgresException ex)
                 {
                     Log.Warning("{Sql}/{Data}/{Exception}.", sql, data, ex);
                     throw new MixERPException(ex.Message, ex, ex.ConstraintName);

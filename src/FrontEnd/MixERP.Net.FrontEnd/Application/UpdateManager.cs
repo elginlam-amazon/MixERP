@@ -18,7 +18,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
-using System.Web;
+using System.Threading.Tasks;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.Updater.Api;
@@ -28,7 +28,17 @@ namespace MixERP.Net.FrontEnd.Application
 {
     internal static class UpdateManager
     {
-        internal static async void CheckForUpdates(HttpApplicationState application)
+        /// <summary>
+        ///     Whether a newer release was found when the application started.
+        /// </summary>
+        /// <remarks>
+        ///     This used to be kept in <c>HttpApplicationState</c> (<c>Application["UpdateAvailable"]</c>),
+        ///     which the System.Web adapters do not provide. Application state was always a single
+        ///     per process dictionary, so a static property is the direct equivalent.
+        /// </remarks>
+        internal static bool UpdateAvailable { get; private set; }
+
+        internal static async Task CheckForUpdates()
         {
             bool autoSuggestUpdate =
                 Conversion.TryCastBoolean(ConfigurationHelper.GetUpdaterParameter("AutoSuggestUpdate"));
@@ -42,7 +52,7 @@ namespace MixERP.Net.FrontEnd.Application
 
                     if (release != null)
                     {
-                        application["UpdateAvailable"] = true;
+                        UpdateAvailable = true;
                     }
                 }
                 catch (Exception ex)

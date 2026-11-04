@@ -17,19 +17,25 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using Microsoft.AspNet.SignalR;
+using Microsoft.AspNetCore.SignalR;
 using MixERP.Net.ApplicationState.Cache;
 using System;
+using System.Threading.Tasks;
 
 namespace MixERP.Net.FrontEnd.Hubs
 {
+    /// <remarks>
+    ///     Migrated from ASP.NET SignalR 2. ASP.NET Core SignalR has no dynamic client proxy, so
+    ///     client methods are invoked by name with <c>SendAsync</c>, and every hub invocation is
+    ///     asynchronous. See knowledge base doc 32.
+    /// </remarks>
     [CLSCompliant(false)]
     public class BaseHub : Hub
     {
-        public void Terminate(int counter)
+        public async Task Terminate(int counter)
         {
             string catalog = AppUsers.GetCurrentUserDB();
-            this.Clients.All.terminate(counter, catalog);
+            await this.Clients.All.SendAsync("terminate", counter, catalog);
         }
     }
 }
