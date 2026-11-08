@@ -14,7 +14,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Configuration;
 using System.Data.Common;
 using System.Data;
 using System.Text.RegularExpressions;
@@ -157,16 +156,30 @@ namespace PetaPoco
 
         public Database(string connectionStringName)
         {
+            // Named connection strings come from the host-supplied configuration seam
+            // (PetaPocoRuntime.Options.ConnectionStrings), which replaces the .NET Framework
+            // connection-string collection. Order is preserved, so "use the first entry when no
+            // name is supplied" behaves exactly as before.
+            var configuredConnectionStrings = PetaPocoRuntime.Options.ConnectionStrings;
+
             // Use first?
             if (connectionStringName == "")
-                connectionStringName = ConfigurationManager.ConnectionStrings[0].Name;
+            {
+                if (configuredConnectionStrings.Count == 0)
+                    throw new InvalidOperationException("No connection strings have been configured.");
+
+                connectionStringName = configuredConnectionStrings[0].Name;
+            }
+
+            var entry = configuredConnectionStrings.FirstOrDefault(e =>
+                string.Equals(e.Name, connectionStringName, StringComparison.OrdinalIgnoreCase));
 
             // Work out connection string and provider name
             var providerName = "System.Data.SqlClient";
-            if (ConfigurationManager.ConnectionStrings[connectionStringName] != null)
+            if (entry != null)
             {
-                if (!string.IsNullOrEmpty(ConfigurationManager.ConnectionStrings[connectionStringName].ProviderName))
-                    providerName = ConfigurationManager.ConnectionStrings[connectionStringName].ProviderName;
+                if (!string.IsNullOrEmpty(entry.ProviderName))
+                    providerName = entry.ProviderName;
             }
             else
             {
@@ -174,7 +187,7 @@ namespace PetaPoco
             }
 
             // Store factory and connection string
-            _connectionString = ConfigurationManager.ConnectionStrings[connectionStringName].ConnectionString;
+            _connectionString = entry.ConnectionString;
             _providerName = providerName;
             CommonConstruct();
         }
@@ -199,7 +212,13 @@ namespace PetaPoco
             ForceDateTimesToUtc = true;
 
             if (_providerName != null)
+            {
+                // On .NET Framework the provider factories were discovered from machine.config.
+                // Modern .NET requires explicit registration, so make sure the factories this
+                // library ships with are registered before resolving one by invariant name.
+                PetaPocoRuntime.RegisterProviderFactories();
                 _factory = DbProviderFactories.GetFactory(_providerName);
+            }
 
             string dbtype = (_factory == null ? _sharedConnection.GetType() : _factory.GetType()).Name;
 
