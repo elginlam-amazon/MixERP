@@ -1,0 +1,57 @@
+@* ---------------------------------------------------------------------------------------------
+   SERVER.TRANSFER REPLACEMENT (checklist tasks 54, 55, 56, 57).
+
+   The legacy authorization failures called Server.Transfer / Server.Execute, which replaced the
+   RESPONSE BODY with the AccessIsDenied (or RestrictedTransactionMode) page while LEAVING THE
+   URL EXACTLY WHERE IT WAS. A Blazor navigation would change the url, so the page base
+   (MixERPPageBase) and the control base (MixERPUserControl) record the denial on the scoped
+   PageAuthorizationState instead, and this outlet substitutes the denial content for the page
+   body.
+
+   SPECIALIST 5 (tasks 61-64): every layout MUST wrap its body in this outlet, i.e.
+
+       <AuthorizationOutlet>@Body</AuthorizationOutlet>
+
+   A layout that renders @Body directly silently drops EVERY in-place authorization denial -
+   the denied page would render its own content as if access had been granted.
+   --------------------------------------------------------------------------------------------- *@
+@using MixERP.Net.FrontEnd.Services.Authentication
+@implements IDisposable
+@inject PageAuthorizationState AuthorizationState
+
+@if (this.AuthorizationState.Denial == AuthorizationDenial.AccessIsDenied)
+{
+    <AccessIsDeniedContent />
+}
+else if (this.AuthorizationState.Denial == AuthorizationDenial.RestrictedTransactionMode)
+{
+    <RestrictedTransactionModeContent />
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter]
+    public RenderFragment ChildContent { get; set; }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        this.AuthorizationState.Changed += this.OnAuthorizationStateChanged;
+    }
+
+    private void OnAuthorizationStateChanged()
+    {
+        // The denial is usually recorded while the page is still initializing, but a control deeper
+        // in the tree can record one later; re-render then, otherwise the denial would not show
+        // until the next unrelated render.
+        this.InvokeAsync(this.StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        this.AuthorizationState.Changed -= this.OnAuthorizationStateChanged;
+    }
+}

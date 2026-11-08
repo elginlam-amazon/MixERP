@@ -1,0 +1,209 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from AttachmentManager.ascx + .ascx.cs + .ascx.designer.cs - the per-transaction
+   attachment screen: an upload form plus a card gallery of what is already attached.
+
+   The .ascx markup is reproduced EXACTLY, because js/AttachmentManager.ascx.js owns most of it:
+     * the inline <style> (the .modal-wide width override) stays as a <style> element - Blazor
+       strips <script>, not <style>;
+     * `<asp:Literal ID="TitleLiteral">` / `SubTitleLiteral` / `OKLiteral` were set from
+       Titles.UploadAttachments / Titles.ViewAttachments / Titles.OK, so they are those
+       expressions inline now;
+     * `<div id="images">` is where LoadImages() writes the whole card gallery - it must be
+       present and EMPTY at first render;
+     * `#opener` and its `.ui.teal.header`, `.content .ui.segment img`, `p.vpad8` and `.actions`
+       children are addressed by selector by initializeModal(), so the modal's structure, its
+       `<i class="close icon">` and even the placeholder `src="/"` on the <img> are preserved
+       byte-for-byte.
+
+   ⚠ OverridePath IS SET AT RUNTIME FROM THE QUERY STRING, and that is unique in this module.
+   The legacy SetOverridePath() read Request.QueryString["OverridePath"] and assigned it when
+   non-blank, so the menu-authorization identity of this screen is whatever the LINK that opened
+   it declared (each transaction screen's "attachments" link passes its own .mix path). That is
+   reproduced with NavigationManager + QueryHelpers, assigned in OnInitialized - the earliest
+   point at which a component has both its NavigationManager and its parameters, and the same
+   position in the lifecycle the legacy call occupied (SetOverridePath was the LAST statement of
+   OnControlLoad).
+     NOTE, and this is a REAL limitation worth recording rather than hiding: ModuleHost.razor
+     also reads OverridePath off an Activator.CreateInstance PROBE, and a probe has no query
+     string, so the probe reads null here. That is unavoidable - the value does not exist until
+     a request exists - and it is harmless today, because the host's post-review fix F1
+     established that VerifyAccess is NOT invoked from page activation (it never was in the
+     legacy app either, where the menus field was never populated). If VerifyAccess is ever
+     switched on, this screen is the one that will need the value plumbed through the request
+     rather than the probe.
+
+   ⚠ A PRE-EXISTING BUG IS PRESERVED, NOT FIXED: `if (!this.IsRestrictedMode)` gated the upload
+   form, but IsRestrictedMode is computed by the BASE CLASS's transaction-posting check, which
+   ran AFTER OnControlLoad in the legacy Initialize() order (log -> OnControlLoad ->
+   CheckAccessLevel -> CheckTransactionPostingStatus) - so when this line executed the flag was
+   still its default `false` and the upload form was ALWAYS rendered, even for a user with no
+   transaction-posting permission. The port keeps that exactly: the flag is sampled inside
+   OnControlLoad, which MixERPUserControlBase.OnInitialized still raises BEFORE
+   MixERPUserControl.OnInitializedAsync computes IsRestrictedMode. Reading the flag after the
+   check instead would newly HIDE the upload form from a set of users who can use it today, so
+   it is deliberately not "corrected" here. Raised separately.
+
+   The Attachment control is now a Blazor component and must be given its Catalog: the legacy
+   `new Attachment(AppUsers.GetCurrentUserDB())` constructor read a catalog that is EMPTY inside
+   a circuit, so it comes from ICurrentLogin.
+
+   The original declared no MasterPageId, RemoveTheme, IsLandingPage or AccessLevel override and
+   implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using Microsoft.AspNetCore.WebUtilities
+@using MixERP.Net.Core.Modules.BackOffice.Internal
+@using MixERP.Net.WebControls.AttachmentFactory
+@using MixERP.Net.i18n.Resources
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<style>
+    @@media screen and (min-width: 768px) {
+        .modal-wide .modal-dialog {
+            width: 700px;
+        }
+    }
+</style>
+
+<div class="ui massive teal header">
+    @(this.showUploadForm ? Titles.UploadAttachments : string.Empty)
+</div>
+
+@if (this.showUploadForm && !string.IsNullOrEmpty(this.catalog))
+{
+    <Attachment Catalog="@this.catalog" ShowSaveButton="true" />
+}
+
+<div class="ui massive teal header">
+    @Titles.ViewAttachments
+</div>
+
+<div id="images">
+</div>
+
+@* Modal *@
+<div class="ui large modal" id="opener">
+    <i class="close icon"></i>
+    <div class="ui teal header">
+    </div>
+    <div class="content">
+
+        <div class="ui segment">
+            <img src="/" alt="" />
+            <p class="vpad8"></p>
+        </div>
+
+        <div class="actions">
+            <div class="ui teal button">
+                @Titles.OK
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.BackOffice/js/AttachmentManager.ascx.js";
+
+    private bool showUploadForm;
+    private string catalog;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it -
+    ///     and here it carries REAL LOGIC, in the same position the original had it.
+    ///     <para>
+    ///         The <c>IsRestrictedMode</c> sample must happen HERE, not in
+    ///         <c>OnInitializedAsync</c>: the base raises this method from <c>OnInitialized</c>,
+    ///         i.e. BEFORE the transaction-posting check that computes the flag, which is exactly
+    ///         where the legacy read sat (and why it has always seen <c>false</c> - see the
+    ///         header).
+    ///     </para>
+    ///     <para>
+    ///         <c>SetOverridePath()</c> was the original's last statement and is the last
+    ///         statement here.
+    ///     </para>
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+        this.showUploadForm = !this.IsRestrictedMode;
+
+        this.SetOverridePath();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        //Was `new Attachment(AppUsers.GetCurrentUserDB())`, which is empty inside a circuit.
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        //The controller reads #images, #opener and the Attachment control's own #SaveButton out
+        //of the DOM at load time, so it is loaded after the first render, never earlier.
+        await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+    }
+
+    /// <summary>
+    ///     Port of the private <c>SetOverridePath()</c>:
+    ///     <c>Request.QueryString["OverridePath"]</c>, assigned only when non-blank. The
+    ///     "only when non-blank" part is behaviour - a missing query value must leave
+    ///     <c>OverridePath</c> alone rather than blank it.
+    /// </summary>
+    private void SetOverridePath()
+    {
+        string overridePath = this.GetQueryValue("OverridePath");
+
+        if (!string.IsNullOrWhiteSpace(overridePath))
+        {
+            this.OverridePath = overridePath;
+        }
+    }
+
+    private string GetQueryValue(string name)
+    {
+        Uri uri;
+
+        if (!Uri.TryCreate(this.Navigation.Uri, UriKind.Absolute, out uri))
+        {
+            return null;
+        }
+
+        Microsoft.Extensions.Primitives.StringValues values;
+
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue(name, out values))
+        {
+            return values.ToString();
+        }
+
+        return null;
+    }
+}

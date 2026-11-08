@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<bundle xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://vswebessentials.com/schemas/v1/bundle.xsd">
+  <settings>
+    <!--Determines if the bundle file should be automatically optimized after creation/update.-->
+    <minify>true</minify>
+    <!--Determine whether to generate/re-generate this bundle on building the solution.-->
+    <runOnBuild>false</runOnBuild>
+    <!--Specifies a custom subfolder to save files to. By default, compiled output will be placed in the same folder and nested under the original file.-->
+    <outputDirectory />
+  </settings>
+  <!--The order of the <file> elements determines the order of the files in the bundle.-->
+  <files>
+    <file>/tests/dom/cascading-pair.js</file>
+    <file>/tests/dom/checkable.js</file>
+    <file>/tests/dom/events.js</file>
+    <file>/tests/dom/visibility.js</file>
+    <file>/tests/dom/select.js</file>
+    <file>/tests/grid/cell.js</file>
+    <file>/tests/grid/grid.js</file>
+    <file>/tests/localization.js</file>
+    <file>/tests/transaction.js</file>
+    <file>/tests/validation.js</file>
+
+</files>
+</bundle>

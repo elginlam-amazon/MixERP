@@ -1,0 +1,55 @@
+@* ---------------------------------------------------------------------------------------------
+   Components/Routes.razor — the router (checklist task 67).
+
+   AuthorizeRouteView (never plain RouteView) is REQUIRED: Specialist 4's page bases express every
+   login/authorization rule through [Authorize] on MixERPAuthorizedPageBase, which a plain
+   RouteView ignores silently.
+
+   DefaultLayout is MixERPLayout — the layout of MixERPMaster.Master, which was the master page of
+   the overwhelming majority of the converted pages. A page family that used another master page
+   selects it per page with @layout (see migration-summary.md).
+
+   NotAuthorized: the cookie scheme's LoginPath/AccessDeniedPath only apply to HTTP requests, so
+   the circuit-side equivalent is rendered here — AccessIsDeniedContent for a signed-in user who
+   lacks the right, and a redirect to the sign-in url for an anonymous visitor (the same
+   RequestLoginPage outcome MixERPPageBase produces).
+
+   AdditionalAssemblies: re-grepped at execution time by the host-wiring pass, now that the host
+   references all EIGHT Modules/* Razor Class Libraries — `grep -rn "^@page" --include=*.razor`
+   over Modules/ returns NOTHING (and the module passes confirmed 0 RouteAttribute types by
+   reflection), and no control RCL under Libraries/ carries one either. All 194 ported module
+   components and all 8 dashboard widgets are NON-ROUTABLE: the host reaches them through its own
+   /Modules/{*path} ModuleHost page and the dashboard, which resolve them BY TYPE through
+   Services/Modules/ModuleComponentResolver. The list therefore stays intentionally absent and
+   MIRRORS Program.cs (which has no AddAdditionalAssemblies for the same reason). OBLIGATION (keep
+   this comment): if a @page is ever added to ANY referenced RCL, BOTH this Router's
+   AdditionalAssemblies AND MapRazorComponents<App>().AddAdditionalAssemblies(...) in Program.cs
+   must list it — one without the other produces intermittent 404s depending on how the user
+   reached the page.
+   --------------------------------------------------------------------------------------------- *@
+@using MixERP.Net.FrontEnd.Components.Base
+@using MixERP.Net.FrontEnd.Services.Authentication
+
+<Router AppAssembly="typeof(App).Assembly">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MixERPLayout)">
+            <NotAuthorized>
+                @if (context.User.Identity?.IsAuthenticated == true)
+                {
+                    <AccessIsDeniedContent />
+                }
+                else
+                {
+                    <RedirectToSignIn />
+                }
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="typeof(Layout.MixERPLayout)">
+            <PageTitle>Not found</PageTitle>
+            <p role="alert">Sorry, there's nothing at this address.</p>
+        </LayoutView>
+    </NotFound>
+</Router>

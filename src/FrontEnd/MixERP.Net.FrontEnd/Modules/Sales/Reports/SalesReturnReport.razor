@@ -1,0 +1,103 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/SalesReturnReport.ascx + .ascx.cs + .ascx.designer.cs - the
+   sales-return report.
+
+   `WebReport` NO LONGER EXISTS (it was a one-property Report subclass that set Catalog from
+   AppUsers.GetCurrentUserDB(), which is EMPTY inside a circuit), so <Report> is hosted
+   directly with Catalog from ICurrentLogin. AutoInitialize is false and InitializeReport()
+   is called once the @ref exists, because the original pushed its parameters in BEFORE
+   initializing - see CustomerInvoiceReport.razor for the full rationale.
+
+   TWO ODDITIES OF THE ORIGINAL, BOTH PRESERVED VERBATIM: the @transaction_master_id pair is
+   added to the list TWICE, and that same list is then handed to AddParameterToCollection
+   TWICE. Both are what the Sales.Return.xml report was fed.
+
+   PRESERVED SURFACE: MasterPageId = "MixERPReportMaster.Master" and RemoveTheme = true,
+   assigned in the CONSTRUCTOR because ModuleHost.razor reads them off an Activator-created
+   probe instance. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using System.Collections.ObjectModel
+@using MixERP.Net.Core.Modules.Sales.Internal
+@using MixERP.Net.WebControls.ReportEngine
+@inject NavigationManager Navigation
+
+@if (this.loaded)
+{
+    <Report @ref="this.report" AutoInitialize="false" Catalog="@this.catalog" Path="@ReportFilePath" />
+}
+
+@code {
+    private const string ReportFilePath = "~/Modules/Sales/Reports/Source/Sales.Return.xml";
+
+    private Report report;
+    private bool loaded;
+    private bool initializePending;
+    private string catalog;
+
+    public SalesReturnReport()
+    {
+        //<%@ Control ... MasterPageId="MixERPReportMaster.Master" RemoveTheme="true" %>
+        this.MasterPageId = "MixERPReportMaster.Master";
+        this.RemoveTheme = true;
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the report above, which is markup now.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+        this.initializePending = true;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+
+        if (!this.initializePending || this.report == null)
+        {
+            return;
+        }
+
+        this.initializePending = false;
+
+        string tranId = ModuleQuery.Get(this.Navigation, "TranId");
+
+        Collection<KeyValuePair<string, object>> list = new Collection<KeyValuePair<string, object>>();
+        list.Add(new KeyValuePair<string, object>("@transaction_master_id", tranId));
+        list.Add(new KeyValuePair<string, object>("@transaction_master_id", tranId));
+
+        this.report.ParameterCollection.Clear();
+        this.report.AddParameterToCollection(list);
+        this.report.AddParameterToCollection(list);
+        this.report.InitializeReport();
+        this.StateHasChanged();
+    }
+}

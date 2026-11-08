@@ -1,0 +1,160 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Entry/TransferDelivery.ascx + .ascx.cs + .ascx.designer.cs - the stock
+   transfer DELIVERY entry screen, always entered from a transfer request as
+   Entry/TransferDelivery.mix?RequestId=<id>.
+
+   THE ACCESS GUARD IS THE REAL LOGIC OF THIS CODE-BEHIND AND IS FULLY PRESERVED:
+   OnControlLoad read RequestId off the query string and, when
+   StockTransferRequest.IsValidStockTransferRequestId() rejected it (or it was <= 0),
+   rendered an <h1> carrying Warnings.AccessIsDenied and returned WITHOUT adding the form at
+   all. That is reproduced below as an @@if/else over `requestIsValid`, so an invalid or
+   missing request id still yields the denial heading and NO entry form - the same
+   server-side gate, not a client-side one.
+
+   OnControlLoad otherwise built a StockAdjustmentFactory `FormView` and added it to
+   <asp:PlaceHolder ID="Placeholder1">. FormView is now the Blazor component
+   `MixERP.Net.WebControls.StockAdjustmentFactory.StockAdjustmentForm`, so the placeholder
+   plus the property assignments ARE the markup below; the `using (...)` wrapper is gone
+   because the migrated component is not IDisposable.
+
+   DISTINGUISHING FLAGS, preserved: DisplayShipper = true and DisplaySourceStore = true -
+   they are what make FormView.js render #ShippingCompanySelect and #SourceStoreSelect, the
+   two ids the save callback validates and posts - plus ValidateSides = false and
+   HideSides = true. This is also the only one of the three entry screens that sets
+   ShippingCompanyServiceUrl.
+
+   PROPERTY NAME PRESERVED AS THE CONTROL DECLARES IT: `ItemIdQuerySericeUrl` is misspelled
+   upstream ("Serice", not "Service"); it is the migrated component's public parameter name.
+
+   SERVICE URLS REPOINTED to this project's new minimal-API endpoints; the preserved
+   {"d": ...} envelope keeps FormView.js's ajaxDataBind response handling unchanged.
+
+   The inline <script> block - the ?RequestId= model pre-load AND
+   StockAdjustmentFactory_FormvView_SaveButton_Callback() - moved VERBATIM to
+   wwwroot/js/entry/TransferDelivery.js, since a .razor file may not contain <script>.
+
+   REVIEW - AN UPSTREAM GAP, PRESERVED: this screen does NOT render
+   <input type="hidden" id="ItemIdHidden" />, even though its ItemPopupUrl carries
+   &AssociatedControlId=ItemIdHidden. Its two siblings (Entry/Transfer.ascx:22 and
+   Entry/TransferRequest.ascx:27) DO render it, and StockAdjustmentFactory's
+   migration-summary.md §5.1 names only those two as the element's owners. So the F4 item
+   popup on THIS screen has always written the chosen item id into an element that does not
+   exist, leaving the lookup inert. Adding the element here would newly switch that lookup
+   on, so it is deliberately NOT added - the gap is reported for an upstream decision
+   instead.
+
+   PRESERVED SURFACE: this .ascx declared NO OverridePath (unlike its two Entry siblings),
+   so nothing is assigned in a constructor; ITransaction IS implemented, and the host's
+   CheckTransactionPostingStatusAsync reads it to enforce RestrictedTransactionMode. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@implements MixERP.Net.Entities.Contracts.ITransaction
+@using MixERP.Net.Common
+@using MixERP.Net.Core.Modules.Inventory.Data.Transactions
+@using MixERP.Net.Core.Modules.Inventory.Internal
+@using MixERP.Net.WebControls.StockAdjustmentFactory
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+@if (this.loaded)
+{
+    @if (!this.requestIsValid)
+    {
+        @* The legacy denial: new HtmlGenericControl("h1") { InnerHtml = Warnings.AccessIsDenied }
+           added to Placeholder1, followed by an immediate return - so no form is rendered. *@
+        <h1>@Warnings.AccessIsDenied</h1>
+    }
+    else
+    {
+        <StockAdjustmentForm Text="@Titles.StockTransferDelivery"
+                             StoreServiceUrl="/services/inventory/itemdata/getstores"
+                             ItemServiceUrl="/services/inventory/itemdata/getitems"
+                             UnitServiceUrl="/services/inventory/itemdata/getunits"
+                             ItemPopupUrl="/Modules/Inventory/Setup/ItemsPopup.mix?modal=1&CallBackFunctionName=loadItems&AssociatedControlId=ItemIdHidden"
+                             ItemIdQuerySericeUrl="/services/inventory/itemdata/getitemcodebyitemid"
+                             ShippingCompanyServiceUrl="/services/inventory/itemdata/getshippers"
+                             DisplayShipper="true"
+                             DisplaySourceStore="true"
+                             ValidateSides="false"
+                             HideSides="true"
+                             Catalog="@this.catalog"
+                             OfficeId="@this.officeId" />
+    }
+}
+
+@code {
+    private const string ScriptUrl =
+        "_content/MixERP.Net.Core.Modules.Inventory/js/entry/TransferDelivery.js";
+
+    private bool loaded;
+    private bool requestIsValid;
+    private string catalog;
+    private int officeId;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body's two halves both need an asynchronous value - the access guard needs
+    ///     the catalog to validate the request id, and the form needs Catalog + OfficeId - so
+    ///     both live in OnInitializedAsync. Nothing was dropped; see the header.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        long tranId = Conversion.TryCastLong(ModuleQuery.Get(this.Navigation, "RequestId"));
+
+        this.requestIsValid = this.IsValidStockTransferRequestId(tranId);
+        this.loaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            await ModuleScripts.LoadAsync(this.JS, ScriptUrl);
+        }
+    }
+
+    /// <summary>Port of IsValidStockTransferRequestId, unchanged apart from the catalog source.</summary>
+    private bool IsValidStockTransferRequestId(long requestId)
+    {
+        if (requestId <= 0)
+        {
+            return false;
+        }
+
+        return StockTransferRequest.IsValidStockTransferRequestId(this.catalog, requestId);
+    }
+}

@@ -1,0 +1,132 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Entry/Return.ascx + .ascx.cs + .ascx.designer.cs - the purchase-return
+   ENTRY form. OnControlLoad did TWO things:
+     1. long tranId = Conversion.TryCastLong(this.Request.QueryString["TranId"]);
+        if (tranId <= 0) this.Response.Redirect("~/Modules/Sales/Return.mix");
+        A purchase return may only be entered against an existing transaction, so a
+        missing or non-positive TranId sends the user away. Response.Redirect has no
+        counterpart in a circuit: NavigationManager.NavigateTo does the same thing, and
+        the form is suppressed while the redirect is pending (Response.Redirect ended the
+        response, so the form never rendered in that case either). The "~/" app-relative
+        token is a WebForms-ism that resolved to the app root, so it becomes a leading "/"
+        - the same normalization the ported Sales/Entry/Return.razor applies.
+
+        REVIEW - UPSTREAM ODDITY, CARRIED VERBATIM: the redirect target is
+        "~/Modules/SALES/Return.mix", not ".../PURCHASE/Return.mix". On a purchase-return
+        entry screen that lands the user on the SALES return list. This is an upstream
+        copy-paste bug of the same family as the three the module migration summary
+        records (Inventory/Confirmation/Adjustment, Sales/Confirmation/Receipt,
+        Sales/Confirmation/Return). It is NOT "fixed" here: changing it changes where a
+        user lands and is a product decision, so it is preserved and raised separately.
+
+     2. built a StockTransactionForm into <asp:PlaceHolder ID="Placeholder1"> - that
+        placeholder plus its property assignments ARE the markup below.
+
+   PRESERVED SURFACE: OverridePath = "/Modules/Purchase/Return.mix" (from the
+   <%@ Control %> directive, assigned in the CONSTRUCTOR because ModuleHost.razor reads it
+   off an Activator-created probe instance on which NO lifecycle method runs) and
+   ITransaction.
+
+   Catalog / OfficeId come from ICurrentLogin - an empty login inside a circuit otherwise.
+   The .ascx's <script src="..."> element moved to OnAfterRenderAsync. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@implements MixERP.Net.Entities.Contracts.ITransaction
+@using MixERP.Net.Common
+@using MixERP.Net.Core.Modules.Purchase.Internal
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.StockTransactionFactory
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+@if (this.loaded && !this.redirecting)
+{
+    <StockTransactionForm Book="TranBook.Purchase"
+                          SubBook="SubTranBook.Return"
+                          Text="@Titles.PurchaseReturn"
+                          ShowPriceTypes="true"
+                          ShowStore="true"
+                          Catalog="@this.catalog"
+                          OfficeId="@this.officeId" />
+}
+
+@code {
+    private bool loaded;
+    private bool redirecting;
+    private string catalog;
+    private int officeId;
+
+    public Return()
+    {
+        //<%@ Control ... OverridePath="/Modules/Purchase/Return.mix" %>
+        this.OverridePath = "/Modules/Purchase/Return.mix";
+    }
+
+    /// <summary>
+    ///     The TranId guard of the legacy OnControlLoad. It stays HERE (and not in
+    ///     OnInitializedAsync) because MixERPUserControlBase raises OnControlLoad from
+    ///     OnInitialized, which runs BEFORE OnInitializedAsync - the same "before anything else"
+    ///     position the original check had.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+        long tranId = Conversion.TryCastLong(ModuleQuery.Get(this.Navigation, "TranId"));
+
+        if (tranId <= 0)
+        {
+            this.redirecting = true;
+
+            //PRESERVED VERBATIM: the original redirected to the SALES return list - see the
+            //REVIEW note in the file header.
+            this.Navigation.NavigateTo("/Modules/Sales/Return.mix");
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        if (this.redirecting)
+        {
+            return;
+        }
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender && !this.redirecting)
+        {
+            await ModuleScripts.LoadAsync(this.JS,
+                "_content/MixERP.Net.Core.Modules.Purchase/js/entry/Return.js");
+        }
+    }
+}

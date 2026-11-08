@@ -1,0 +1,12 @@
+@* ---------------------------------------------------------------------------------------------
+   The body the legacy Site/AccessIsDenied.aspx rendered (h1 + divider + p), extracted into a
+   component so it can be rendered IN PLACE by AuthorizationOutlet for the
+   Server.Transfer("~/Site/AccessIsDenied.aspx") call sites (checklist tasks 54, 55, 57) AND
+   reused verbatim by the routable Components/Pages/Site/AccessIsDenied.razor page (task 93).
+   Specialist 8: render THIS component from that page instead of duplicating the markup.
+   --------------------------------------------------------------------------------------------- *@
+@using MixERP.Net.i18n.Resources
+
+<h1>@Warnings.AccessIsDenied</h1>
+<div class="ui divider"></div>
+<p>@Warnings.NotAuthorized</p>

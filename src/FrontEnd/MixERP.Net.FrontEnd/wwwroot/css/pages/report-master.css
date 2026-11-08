@@ -1,0 +1,14 @@
+/*
+    The inline <style> block of the legacy Reports/ReportMaster.aspx
+    (<asp:Content ContentPlaceHolderID="StyleSheetContentPlaceholder">), moved out of the
+    markup because a .razor file links its stylesheets through <HeadContent> instead of
+    carrying an inline style element. Rules are byte-identical to the original.
+*/
+
+#IFramePlaceholder {
+    width: 800px;
+}
+
+iframe {
+    min-height: 1000px;
+}

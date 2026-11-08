@@ -1,0 +1,114 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Confirmation/Order.ascx + .ascx.cs + .ascx.designer.cs - the purchase-order
+   transaction CHECK LIST.
+
+   OnControlLoad built a `Checklist` and added it to <asp:PlaceHolder ID="Placeholder1">.
+   `MixERP.Net.FrontEnd.Controls.Checklist` NO LONGER EXISTS: it was a one-property
+   subclass of TransactionChecklistForm whose only job was setting Catalog from
+   AppUsers.GetCurrentUserDB(), which returns an EMPTY catalog inside a Blazor circuit. The
+   markup therefore uses <TransactionChecklistForm> directly and supplies Catalog from
+   ICurrentLogin.
+
+   A purchase order is a NON-GL transaction, which drives three differences from its
+   siblings, all preserved: IsNonGlTransaction = true, AttachmentBookName
+   "non-gl-transaction" (not "transaction"), and NO withdraw button and NO GL-advice
+   button/path - there are no GL entries to withdraw or print.
+
+   PRESERVED SURFACE:
+     * the control's own OverridePath = "/Modules/Purchase/Order.mix" (from the
+       <%@ Control %> directive), assigned in the CONSTRUCTOR because the host's
+       ModuleHost.razor reads it off an Activator-created PROBE INSTANCE on which no
+       lifecycle method runs.
+     * the SEPARATE OverridePath the code-behind assigned onto the hosted check list
+       (also "/Modules/Purchase/Order.mix") - now a parameter on the element below.
+     * RestrictedTransactionMode = this.IsRestrictedMode, which the base computes during
+       base.OnInitializedAsync().
+
+   The original declared no AccessLevel, MasterPageId, RemoveTheme or IsLandingPage
+   override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.TransactionCheckListControl
+@using MixERP.Net.Common
+@using MixERP.Net.Core.Modules.Purchase.Internal
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.TransactionChecklist
+@using MixERP.Net.i18n.Resources
+@inject NavigationManager Navigation
+
+@if (this.loaded)
+{
+    <TransactionChecklistForm ViewReportButtonText="@Titles.ViewThisOrder"
+                              EmailReportButtonText="@Titles.EmailThisOrder"
+                              Text="@Titles.PurchaseOrder"
+                              PartyEmailAddress="@this.partyEmailAddress"
+                              AttachmentBookName="non-gl-transaction"
+                              OverridePath="/Modules/Purchase/Order.mix"
+                              DisplayViewReportButton="true"
+                              DisplayEmailReportButton="true"
+                              DisplayAttachmentButton="true"
+                              IsNonGlTransaction="true"
+                              ReportPath="~/Modules/Purchase/Reports/PurchaseOrderReport.mix"
+                              ViewPath="/Modules/Purchase/Order.mix"
+                              AddNewPath="/Modules/Purchase/Entry/Order.mix"
+                              UserId="@this.userId"
+                              RestrictedTransactionMode="@this.IsRestrictedMode"
+                              Catalog="@this.catalog" />
+}
+
+@code {
+    private bool loaded;
+    private int userId;
+    private string catalog;
+    private string partyEmailAddress;
+
+    public Order()
+    {
+        //<%@ Control ... OverridePath="/Modules/Purchase/Order.mix" %>
+        this.OverridePath = "/Modules/Purchase/Order.mix";
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the check list above, which is markup now; the TranId lookup and
+    ///     the two login-derived values are asynchronous, so they are read in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks AND computes IsRestrictedMode,
+        //which the check list below is given - never skip it, and never read IsRestrictedMode
+        //before it.
+        await base.OnInitializedAsync();
+
+        long transactionMasterId = Conversion.TryCastLong(ModuleQuery.Get(this.Navigation, "TranId"));
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.userId = login.UserId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.partyEmailAddress = Data.Helpers.Parties.GetEmailAddress(this.catalog,
+            TranBook.Purchase, SubTranBook.Order, transactionMasterId);
+        this.loaded = true;
+    }
+}

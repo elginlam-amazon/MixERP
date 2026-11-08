@@ -1,0 +1,336 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/TrialBalance.ascx + .ascx.cs + .ascx.designer.cs - the trial balance
+   (previous period / current period / closing, each with a debit and a credit column).
+
+   The screen was built procedurally (CreateHeader / CreateForm / CreateGrid /
+   RegisterJavascript) into <asp:PlaceHolder ID="Placeholder1">; it is markup now, in the same
+   child order and with the same ids and classes: an h2, a "ui form segment" wrapping an
+   "eight inline fields" div (From, To, Factor, three toggles, Show, Print), then a
+   div[style="width:100%;"] wrapping #TrialBalanceGridView.
+
+   THIS GRID WAS A MixERPGridView (not a plain GridView), so the migrated
+   MixERP.Net.WebControls.Common.MixERPGridView component is used - it reproduces that
+   control's "ui striped table " class prefix, its empty-data text and its header/cell
+   alignment, which a hand-written table would not. AutoGenerateColumns is false and the EIGHT
+   explicit columns are passed in the ORIGINAL ORDER with the original header texts (Debit and
+   Credit each appear three times - that is intentional and the script relies on it):
+     1 account_number, 2 account, 3 previous_debit, 4 previous_credit, 5 debit, 6 credit,
+     7 closing_debit, 8 closing_credit.
+
+   ⚠ POSITIONAL JAVASCRIPT CONTRACT. js/reports/TrialBalance.js - the .ascx's inline block,
+   moved verbatim - PREPENDS a grouped header row and then moves the first two header cells
+   into it with rowspan=2, and sums columns 2..7 into a total footer row. Every one of those is
+   a column INDEX, so the order above must not change. The script is loaded on the render AFTER
+   the query, never on firstRender, because it reads the rendered rows.
+
+   THE THREE LOCALIZED GLOBALS the script needs for that grouped header
+   (perviousPeriodLocalized - the misspelling is the original's - currentPeriodLocalized and
+   closingLocalized) were registered by the code-behind through
+   PageUtility.RegisterJavascript("TrialBalance_Vars", ...). They are registered here through
+   the same interop module, the same "TrialBalance_Vars" key and the same JSUtility.GetVar
+   output, but AWAITED and BEFORE the script file is appended - PageUtility's own method is
+   fire-and-forget, and the script reads the three variables at document-ready. (It also keeps
+   its own English fallbacks, as it always did.)
+
+   THE SHOW BUTTON IS A SERVER HANDLER (an <asp:Button> with Click -> BindGrid) and stays one.
+   Its SIX inputs are read at click time through ElementValueReader: the two dates (written by
+   the jQuery UI datepicker), the factor, and the THREE hidden fields #IsCompactHidden,
+   #ChangeSideWhenNegativeHidden and #IncludeZeroBalanceAccountHidden - which are written ONLY
+   by the script's three change handlers, so @@bind could never see them. Under WebForms all six
+   arrived on the postback. ShowCompact() / ChangeSideWhenNegative() /
+   IncludeZeroBalanceAccounts() keep their exact `value == "1"` tests, and the three starting
+   values are the original's (compact "0" unchecked, change-side "1" CHECKED, zero-balance "1"
+   CHECKED). The PRINT button had no server handler.
+
+   ⚠ UPSTREAM ODDITY, CARRIED VERBATIM: AddFromDateTextBoxField set the FROM box's
+   OfficeId from the USER id (`AppUsers.GetCurrent().View.UserId.ToInt()`) while every sibling
+   field uses the office id. That decides which office's fiscal quarter the From date defaults
+   to, so "fixing" it would silently change the default date range. Preserved, and raised
+   separately.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using System.Data
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Core.Modules.Finance.Internal
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.i18n.Resources
+@inject IJSRuntime JS
+
+<style>
+    th[rowspan] {
+        border: 1px solid #D4D4D5;
+    }
+</style>
+
+<h2>@Titles.TrialBalance</h2>
+
+<div class="ui form segment">
+    <div class="eight inline fields">
+        <div class="field">
+            <label for="FromDateTextBox">@Titles.From</label>
+            @* The OfficeId below really is the USER id in the original - see the header note. *@
+            <DateTextBox ID="FromDateTextBox" Mode="@(FrequencyType.QuarterStartDate)"
+                         Catalog="@this.catalog" OfficeId="@this.userId" @bind-Text="this.fromDate" />
+        </div>
+        <div class="field">
+            <label for="ToDateTextBox">@Titles.To</label>
+            <DateTextBox ID="ToDateTextBox" Mode="@(FrequencyType.QuarterEndDate)"
+                         Catalog="@this.catalog" OfficeId="@this.officeId" @bind-Text="this.toDate" />
+        </div>
+        <div class="field">
+            <label for="FactorInputText">@Titles.Factor</label>
+            <input type="text" id="FactorInputText" class="small input integer" value="@this.factor" />
+        </div>
+        <div class="field">
+            <div class="ui checkbox">
+                <input type="checkbox" id="CompactCheckBox" />
+                <input type="hidden" id="IsCompactHidden" value="0" />
+                <label>@Titles.ShowCompact</label>
+            </div>
+        </div>
+        <div class="field">
+            <div class="ui checkbox">
+                <input type="checkbox" id="ChangeSideCheckBox" checked="checked" />
+                <input type="hidden" id="ChangeSideWhenNegativeHidden" value="1" />
+                <label>@Titles.ChangeSideWhenNegative</label>
+            </div>
+        </div>
+        <div class="field">
+            <div class="ui checkbox">
+                <input type="checkbox" id="ZeroBalanceCheckBox" checked="checked" />
+                <input type="hidden" id="IncludeZeroBalanceAccountHidden" value="1" />
+                <label>@Titles.IncludeZeroBalanceAccounts</label>
+            </div>
+        </div>
+        <button id="ShowButton" type="button" class="ui positive button" @onclick="this.ShowButton_Click">@Titles.Show</button>
+        <input type="button" id="PrintButton" class="ui orange button" value="@Titles.Print" />
+    </div>
+</div>
+
+<div style="width:100%;">
+    <MixERPGridView ID="TrialBalanceGridView"
+                    CssClass="ui celled segment table nowrap"
+                    AutoGenerateColumns="false"
+                    Columns="@this.columns"
+                    DataSource="@this.table" />
+</div>
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.Finance/js/reports/TrialBalance.js";
+
+    private const string VariablesKey = "TrialBalance_Vars";
+
+    private ElementValueReader elementValues;
+
+    private string catalog;
+    private int officeId;
+    private int userId;
+
+    private string fromDate;
+    private string toDate;
+    private string factor = "1000";
+    private string isCompact = "0";
+    private string changeSideWhenNegative = "1";
+    private string includeZeroBalanceAccount = "1";
+
+    private IReadOnlyList<MixERPGridViewColumn> columns;
+    private DataTable table;
+    private bool bound;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body called the three Create* builders (markup now), RegisterJavascript()
+    ///     - which needs a rendered document and so moved to OnAfterRenderAsync - and
+    ///     BindGrid(), which needs the catalog and is therefore asynchronous.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        this.elementValues = new ElementValueReader(this.JS);
+        this.columns = CreateColumns();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.userId = login.UserId;
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        //`if (!this.Page.IsPostBack) this.BindGrid();`
+        this.BindGrid();
+    }
+
+    /// <summary>
+    ///     Port of CreateColumns(): the eight explicit columns, in order, with the original
+    ///     header texts and the "{0:N}" + right alignment on the six money columns.
+    /// </summary>
+    private static IReadOnlyList<MixERPGridViewColumn> CreateColumns()
+    {
+        List<MixERPGridViewColumn> list = new List<MixERPGridViewColumn>();
+
+        list.Add(Text("account_number", Titles.AccountNumber));
+        list.Add(Text("account", Titles.Account));
+        list.Add(Number("previous_debit", Titles.Debit));
+        list.Add(Number("previous_credit", Titles.Credit));
+        list.Add(Number("debit", Titles.Debit));
+        list.Add(Number("credit", Titles.Credit));
+        list.Add(Number("closing_debit", Titles.Debit));
+        list.Add(Number("closing_credit", Titles.Credit));
+
+        return list;
+    }
+
+    private static MixERPGridViewColumn Text(string dataField, string headerText)
+    {
+        return new MixERPGridViewColumn(dataField, headerText, typeof(string));
+    }
+
+    /// <summary>
+    ///     A money column: right aligned (GridViewHelper's alignRight) and rendered through a
+    ///     template so the value is formatted with "{0:N}" exactly as the former BoundField's
+    ///     DataFormatString did - MixERPGridView's own Decimal path leaves a zero unformatted.
+    /// </summary>
+    private static MixERPGridViewColumn Number(string dataField, string headerText)
+    {
+        //Razor's @@<...> template syntax is not available inside an object initializer, so the
+        //fragment is built with the builder overload.
+        string field = dataField;
+
+        return new MixERPGridViewColumn
+        {
+            DataField = field,
+            HeaderText = headerText,
+            DataType = typeof(decimal),
+            CssClass = "text right",
+            HeaderCssClass = "text right",
+            Template = row => (RenderFragment)(builder =>
+                builder.AddContent(0, GridFormat.Format(row as DataRow, field, "{0:N}")))
+        };
+    }
+
+    private async Task ShowButton_Click()
+    {
+        string from = await this.elementValues.GetValueAsync("FromDateTextBox");
+        string to = await this.elementValues.GetValueAsync("ToDateTextBox");
+        string factorValue = await this.elementValues.GetValueAsync("FactorInputText");
+        string compact = await this.elementValues.GetValueAsync("IsCompactHidden");
+        string changeSide = await this.elementValues.GetValueAsync("ChangeSideWhenNegativeHidden");
+        string zeroBalance = await this.elementValues.GetValueAsync("IncludeZeroBalanceAccountHidden");
+
+        if (from != null)
+        {
+            this.fromDate = from;
+        }
+
+        if (to != null)
+        {
+            this.toDate = to;
+        }
+
+        if (factorValue != null)
+        {
+            this.factor = factorValue;
+        }
+
+        if (compact != null)
+        {
+            this.isCompact = compact;
+        }
+
+        if (changeSide != null)
+        {
+            this.changeSideWhenNegative = changeSide;
+        }
+
+        if (zeroBalance != null)
+        {
+            this.includeZeroBalanceAccount = zeroBalance;
+        }
+
+        this.BindGrid();
+    }
+
+    private bool ShowCompact()
+    {
+        return this.isCompact != null && this.isCompact.Equals("1");
+    }
+
+    private bool ChangeSideWhenNegative()
+    {
+        return this.changeSideWhenNegative != null && this.changeSideWhenNegative.Equals("1");
+    }
+
+    private bool IncludeZeroBalanceAccounts()
+    {
+        return this.includeZeroBalanceAccount != null && this.includeZeroBalanceAccount.Equals("1");
+    }
+
+    /// <summary>
+    ///     Port of BindGrid(), verbatim - the same nine arguments in the same order.
+    /// </summary>
+    private void BindGrid()
+    {
+        DateTime from = Conversion.TryCastDate(this.fromDate);
+        DateTime to = Conversion.TryCastDate(this.toDate);
+        decimal factorValue = Conversion.TryCastDecimal(this.factor);
+
+        bool compact = this.ShowCompact();
+        bool changeSide = this.ChangeSideWhenNegative();
+        bool includeZeroBalanceAccounts = this.IncludeZeroBalanceAccounts();
+
+        this.table = Data.Reports.TrialBalance.GetTrialBalance(this.catalog, from, to, this.userId,
+            this.officeId, compact, factorValue, changeSide, includeZeroBalanceAccounts);
+        this.bound = true;
+    }
+
+    /// <summary>
+    ///     Port of RegisterJavascript() plus the .ascx's &lt;script src&gt;. The three
+    ///     variables are registered FIRST and awaited, then the controller file is appended -
+    ///     which is the document order the original had.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!this.bound)
+        {
+            return;
+        }
+
+        string script = JSUtility.GetVar("perviousPeriodLocalized", Titles.PreviousPeriod);
+        script += JSUtility.GetVar("currentPeriodLocalized", Titles.CurrentPeriod);
+        script += JSUtility.GetVar("closingLocalized", Titles.ClosingBalance);
+
+        await ModuleScripts.RunAsync(this.JS, VariablesKey, script);
+        await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+    }
+}

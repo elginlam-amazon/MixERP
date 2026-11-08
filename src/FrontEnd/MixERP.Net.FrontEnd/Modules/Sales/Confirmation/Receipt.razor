@@ -1,0 +1,107 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Confirmation/Receipt.ascx + .ascx.cs + .ascx.designer.cs - the
+   customer-receipt transaction CHECK LIST.
+
+   `Checklist` NO LONGER EXISTS (it was a one-property TransactionChecklistForm subclass that
+   set Catalog from AppUsers.GetCurrentUserDB(), which is EMPTY inside a circuit), so the
+   markup uses <TransactionChecklistForm> directly with Catalog from ICurrentLogin.
+
+   PRESERVED SURFACE - INCLUDING AN UPSTREAM ODDITY, DELIBERATELY NOT "FIXED":
+     * the control's own OverridePath is "/Modules/Sales/Receipt.mix" (the <%@ Control %>
+       directive), assigned in the CONSTRUCTOR because ModuleHost.razor reads it off an
+       Activator-created probe instance;
+     * the SEPARATE OverridePath the code-behind assigned onto the hosted check list is
+       "/Modules/Sales/DirectSales.mix" - a DIRECT SALES path on a RECEIPT screen. It looks
+       like an upstream copy-paste bug, but it decides menu authorization
+       (MixERPAuthorization.VerifyAccess compares a menu Url against it), so changing it
+       would silently change who can reach this screen. It is carried across verbatim and
+       raised separately.
+     * RestrictedTransactionMode = this.IsRestrictedMode.
+   Note also that ViewPath/AddNewPath are "~"-prefixed here while the sibling screens use a
+   leading "/" - also carried verbatim. *@
+
+@inherits MixERP.Net.Framework.Controls.TransactionCheckListControl
+@using MixERP.Net.Common
+@using MixERP.Net.Core.Modules.Sales.Internal
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.TransactionChecklist
+@using MixERP.Net.i18n.Resources
+@inject NavigationManager Navigation
+
+@if (this.loaded)
+{
+    <TransactionChecklistForm ViewReportButtonText="@Titles.PrintReceipt"
+                              EmailReportButtonText="@Titles.EmailThisReceipt"
+                              Text="@Titles.SalesReceipt"
+                              PartyEmailAddress="@this.partyEmailAddress"
+                              AttachmentBookName="transaction"
+                              OverridePath="/Modules/Sales/DirectSales.mix"
+                              DisplayWithdrawButton="true"
+                              DisplayViewReportButton="true"
+                              DisplayEmailReportButton="true"
+                              DisplayPrintGlEntryButton="true"
+                              DisplayAttachmentButton="true"
+                              ReportPath="~/Modules/Sales/Reports/CustomerReceiptReport.mix"
+                              GlAdvicePath="~/Modules/Finance/Reports/GLAdviceReport.mix"
+                              ViewPath="~/Modules/Sales/Receipt.mix"
+                              AddNewPath="~/Modules/Sales/Entry/Receipt.mix"
+                              UserId="@this.userId"
+                              RestrictedTransactionMode="@this.IsRestrictedMode"
+                              Catalog="@this.catalog" />
+}
+
+@code {
+    private bool loaded;
+    private int userId;
+    private string catalog;
+    private string partyEmailAddress;
+
+    public Receipt()
+    {
+        //<%@ Control ... OverridePath="/Modules/Sales/Receipt.mix" %>
+        this.OverridePath = "/Modules/Sales/Receipt.mix";
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the check list above, which is markup now; the TranId lookup and
+    ///     the two login-derived values are asynchronous, so they are read in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks AND computes IsRestrictedMode.
+        await base.OnInitializedAsync();
+
+        long transactionMasterId = Conversion.TryCastLong(ModuleQuery.Get(this.Navigation, "TranId"));
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.userId = login.UserId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.partyEmailAddress = Data.Helpers.Parties.GetEmailAddress(this.catalog,
+            TranBook.Sales, SubTranBook.Receipt, transactionMasterId);
+        this.loaded = true;
+    }
+}

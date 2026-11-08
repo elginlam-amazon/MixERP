@@ -1,0 +1,117 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+
+@* Ported from Frequency.ascx + .ascx.cs + .ascx.designer.cs.
+   OnControlLoad built a Scrud over core.frequency_setups and added it to
+   <asp:PlaceHolder ID="ScrudPlaceholder">, which is this markup now.
+
+   AccessLevel.AdminOnly IS PRESERVED. The host's
+   ModuleHost.razor reads the surface properties off an Activator.CreateInstance PROBE on which
+   no lifecycle method runs, and MixERPUserControl.RunAuthorizationChecksAsync then enforces the
+   value through MixERPAuthorization.CheckAccessLevelAsync - which, for AdminOnly, requires
+   View.IsAdmin and logs "Access to {Control} is denied to {User} from {IP}." on refusal. Losing
+   it would expose this setup screen to every signed-in user.
+
+   The display-field/display-view lookups read
+   DbConfig.GetDbParameter(AppUsers.GetCurrentUserDB(), ...); that catalog is EMPTY inside a
+   Blazor circuit, so it comes from ICurrentLogin in OnInitializedAsync - which is also why
+   the Scrud renders only once `loaded` is true (the display fields decide which column of
+   each parent view is shown).
+
+   NOTE the frequency parent view is a *_selector_view, not a *_scrud_view like its sibling - preserved as found.
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme, IsLandingPage or
+   IsRestrictedMode override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.WebControls.ScrudFactory
+@using MixERP.Net.i18n.Resources
+
+@if (this.loaded)
+{
+    <Scrud KeyColumn="frequency_setup_id"
+           TableSchema="core"
+           Table="frequency_setups"
+           ViewSchema="core"
+           View="frequency_setup_scrud_view"
+           DisplayFields="@this.displayFields"
+           DisplayViews="@this.displayViews"
+           Text="@Titles.Frequencies" />
+}
+
+@code {
+    /// <summary>
+    ///     The legacy <c>public override AccessLevel AccessLevel</c>, carried across unchanged.
+    ///     <para>
+    ///         <c>MixERPUserControlBase.AccessLevel</c> is an ABSTRACT GET-ONLY property, so it is
+    ///         overridden rather than assigned - which is also what the probe needs:
+    ///         <c>ModuleHost.razor</c> reads the surface off an <c>Activator.CreateInstance</c>
+    ///         instance on which no lifecycle method runs, and a getter answers there.
+    ///     </para>
+    /// </summary>
+    public override AccessLevel AccessLevel
+    {
+        get { return AccessLevel.AdminOnly; }
+    }
+
+    private bool loaded;
+    private string displayFields;
+    private string displayViews;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY built the Scrud above, which is markup now; its display-field
+    ///     lookups need the catalog, which is asynchronous.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.displayFields = GetDisplayFields(catalog);
+        this.displayViews = GetDisplayViews();
+        this.loaded = true;
+    }
+
+    private static string GetDisplayFields(string catalog)
+    {
+        List<string> displayFields = new List<string>();
+        ScrudHelper.AddDisplayField(displayFields, "core.frequencies.frequency_id",
+            DbConfig.GetDbParameter(catalog, "FrequencyDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.fiscal_year.fiscal_year_code",
+            DbConfig.GetDbParameter(catalog, "FiscalYearDisplayField"));
+        return string.Join(",", displayFields);
+    }
+
+    private static string GetDisplayViews()
+    {
+        List<string> displayViews = new List<string>();
+        ScrudHelper.AddDisplayView(displayViews, "core.frequencies.frequency_id", "core.frequency_selector_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.fiscal_year.fiscal_year_code", "core.fiscal_year_scrud_view");
+        return string.Join(",", displayViews);
+    }
+}

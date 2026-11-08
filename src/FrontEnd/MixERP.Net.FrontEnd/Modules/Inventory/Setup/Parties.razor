@@ -1,0 +1,100 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Setup/Parties.ascx - the party maintenance screen in its NORMAL, in-layout
+   form (/Modules/Inventory/Setup/Parties.mix).
+
+   UPSTREAM SHAPE, PRESERVED: Parties.ascx has NO code-behind and NO designer file of its
+   own. Its directive declares Inherits="MixERP.Net.Core.Modules.Inventory.Setup.PartiesPopup"
+   (with a CodeBehind attribute that points at the DESIGNER file,
+   "PartiesPopup.ascx.designer.cs" - an upstream typo that WebForms ignored, since
+   Inherits is what actually binds the class). So the screen SHARED the popup's code-behind
+   and differed ONLY in its markup:
+
+     * the wrapper is <div id="OverflowDiv"> instead of <div class="container" id="container">;
+     * it declares NO MasterPageId, so it renders inside the normal backend layout, while
+       PartiesPopup.ascx declares MasterPageId="MixERPBlankMaster.Master".
+
+   Both differences are reproduced here. Everything else - the Scrud configuration, the
+   display lists and the partyNameParameter global that Parties.js reads - is reused from
+   PartiesPopup rather than duplicated, exactly the sharing the single shared code-behind
+   expressed, so the two screens cannot drift.
+
+   The original declared no OverridePath, AccessLevel, RemoveTheme or IsLandingPage override
+   and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.WebControls.ScrudFactory
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<div id="OverflowDiv">
+    @if (this.loaded)
+    {
+        <Scrud KeyColumn="party_id"
+               TableSchema="core"
+               Table="parties"
+               ViewSchema="core"
+               View="party_scrud_view"
+               Exclude="party_code, account_id"
+               DisplayFields="@this.displayFields"
+               DisplayViews="@this.displayViews"
+               Description="@Labels.PartyDescription"
+               Text="@Titles.Parties" />
+    }
+</div>
+
+@code {
+    private bool loaded;
+    private string displayFields;
+    private string displayViews;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The shared legacy body (PartiesPopup.ascx.cs) built the Scrud above - markup now -
+    ///     and called RegisterJavascript(); both are handled in the async lifecycle methods.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.displayFields = PartiesPopup.GetDisplayFields(catalog);
+        this.displayViews = PartiesPopup.GetDisplayViews();
+        this.loaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            //Emits the partyNameParameter global and THEN appends Parties.js, which reads it.
+            await PartiesPopup.RegisterJavascriptAsync(this.JS);
+        }
+    }
+}

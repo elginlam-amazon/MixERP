@@ -1,0 +1,99 @@
+@* ---------------------------------------------------------------------------------------------
+   Dashboard/Index.aspx (+ Index.aspx.cs) -> Components/Pages/Dashboard/Index.razor
+   (checklist task 85).
+
+   The page used ~/BackendMaster.Master -> @layout BackendLayout, and its ScriptContentPlaceholder,
+   StyleSheetContentPlaceholder and BottomScriptContentPlaceholder <asp:Content> blocks were all
+   EMPTY, so no <SectionContent> is emitted.
+
+   LoadWidgets(): page.LoadControl(item.WidgetSource) has no counterpart on modern .NET (there is
+   no .ascx and no virtual-path provider), so each widget is rendered through <DynamicComponent>
+   with the type resolved from the widget_source virtual path over the DiscoveryAssemblies set
+   (Services/Modules/ModuleComponentResolver). The explicit widget.OnControlLoad(...) call of the
+   original is gone because MixERPUserControlBase.OnInitialized raises OnControlLoad itself for
+   every control — the same single invocation per widget instance.
+   --------------------------------------------------------------------------------------------- *@
+@page "/Dashboard/Index"
+@layout BackendLayout
+@inherits MixERPAuthorizedPageBase
+@using MixERP.Net.FrontEnd.Services.Modules
+@using Serilog
+
+<div id="sortable-container" class="ui stackable grid">
+    @foreach (IGrouping<int, Widget> group in this.WidgetGroups)
+    {
+        @foreach (Widget item in group)
+        {
+            Type widgetType = ModuleComponentResolver.ResolveWidget(item.WidgetSource);
+
+            @* The legacy "as MixERPWidget" cast produced null for an unresolvable control and the
+               page added nothing — the same outcome as skipping it here. *@
+            if (widgetType != null)
+            {
+                <DynamicComponent Type="widgetType" />
+            }
+        }
+    }
+</div>
+
+<div style="clear: both;"></div>
+<br />
+
+
+<div class="ui tiny buttons">
+    <button class="ui button">Save Position</button>
+    <div class="or"></div>
+    <button class="ui button">Widget Manager</button>
+</div>
+
+@code {
+    private IEnumerable<IGrouping<int, Widget>> WidgetGroups { get; set; } = new List<IGrouping<int, Widget>>();
+
+    /// <summary>
+    ///     Page_Init: the dashboard has no menu entry of its own, so the policy check must not run
+    ///     against it. Set in the constructor because the base activation sequence (which reads it)
+    ///     runs in OnInitializedAsync.
+    /// </summary>
+    public Index()
+    {
+        this.IsLandingPage = true;
+    }
+
+    /// <summary>
+    ///     Page_Load -> LoadWidgets(): Widget.GetWidgets(catalog), ordered by row then column and
+    ///     grouped by row. The original's three null-guards are all preserved: the "placeholder ==
+    ///     null" guard is structural here (the #sortable-container div is part of this component, so
+    ///     it cannot be missing), and the "page == null" / "widgetModels == null" guards are the two
+    ///     early returns below — both of which LOG instead of returning silently.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync().ConfigureAwait(true);
+
+        string catalog = await this.CurrentLogin.GetCatalogAsync().ConfigureAwait(true);
+
+        if (string.IsNullOrWhiteSpace(catalog))
+        {
+            //Guard 1 of the original (page == null): without a catalog there is nothing to load the
+            //widgets from. Logged rather than silently skipped.
+            Log.Warning("The dashboard widgets were not loaded: the current user has no catalog.");
+            return;
+        }
+
+        IEnumerable<Widget> widgets = MixERP.Net.FrontEnd.Data.Core.Widget.GetWidgets(catalog);
+
+        if (widgets == null)
+        {
+            //Guard 2 of the original (widgetModels == null).
+            Log.Warning("The dashboard widgets were not loaded: core.widgets returned nothing.");
+            return;
+        }
+
+        this.WidgetGroups = widgets
+            .Where(x => x != null && !string.IsNullOrWhiteSpace(x.WidgetSource))
+            .OrderBy(x => x.RowNumber)
+            .ThenBy(x => x.ColumnNumber)
+            .GroupBy(x => x.RowNumber)
+            .ToList();
+    }
+}

@@ -1,0 +1,129 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Entry/Transfer.ascx + .ascx.cs + .ascx.designer.cs - the stock transfer ENTRY
+   screen.
+
+   OnControlLoad built a StockAdjustmentFactory `FormView` and added it to
+   <asp:PlaceHolder ID="Placeholder1">. FormView is now the Blazor component
+   `MixERP.Net.WebControls.StockAdjustmentFactory.StockAdjustmentForm`, so the placeholder
+   plus the property assignments ARE the markup below. The `using (FormView form = ...)`
+   wrapper is gone because the migrated component is not IDisposable (it owns no WebForms
+   child-control tree).
+
+   ===== #ItemIdHidden - THE HOST-SUPPLIED ELEMENT OBLIGATION, SATISFIED HERE =====
+   StockAdjustmentFactory's FormView.js selects $("#ItemIdHidden") but the control does NOT
+   render it: the element is owned by the CONSUMER PAGE, and it is where the item popup
+   writes the chosen item id before ajaxDataBindCallBack() looks the item code up through
+   ItemIdQuerySericeUrl. The legacy .ascx carried
+   <input type="hidden" id="ItemIdHidden" /> at line 22 and the ItemPopupUrl below carries
+   the matching &AssociatedControlId=ItemIdHidden. BOTH are preserved verbatim; dropping
+   either silently kills the F4 item lookup.
+
+   PROPERTY NAME PRESERVED AS THE CONTROL DECLARES IT: `ItemIdQuerySericeUrl` is misspelled
+   upstream ("Serice", not "Service"). It is the migrated component's public parameter name,
+   so it is used exactly as-is.
+
+   SERVICE URLS REPOINTED to this project's new minimal-API endpoints (the former
+   /Modules/Inventory/Services/ItemData.asmx/* methods). The ASMX {"d": ...} envelope is
+   preserved, so FormView.js's ajaxDataBind response handling is unchanged.
+
+   The inline StockAdjustmentFactory_FormvView_SaveButton_Callback() block moved VERBATIM to
+   wwwroot/js/entry/Transfer.js - a .razor file may not contain <script>. That global name is
+   a host obligation FormView.js calls; see the script's own header.
+
+   PRESERVED SURFACE: OverridePath = "/Modules/Inventory/Transfer.mix" (from the
+   <%@ Control %> directive), assigned in the CONSTRUCTOR because the host's
+   ModuleHost.razor reads it off an Activator.CreateInstance probe instance on which no
+   lifecycle method runs; and ITransaction, which the host's
+   CheckTransactionPostingStatusAsync reads to enforce RestrictedTransactionMode.
+
+   ValidateSides = true is this screen's distinguishing flag - a transfer must balance
+   Dr/Cr - while its TransferRequest sibling sets ValidateSides = false + HideSides = true. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@implements MixERP.Net.Entities.Contracts.ITransaction
+@using MixERP.Net.Core.Modules.Inventory.Internal
+@using MixERP.Net.WebControls.StockAdjustmentFactory
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+@if (this.loaded)
+{
+    <StockAdjustmentForm Text="@Titles.StockTransferJournal"
+                         StoreServiceUrl="/services/inventory/itemdata/getstores"
+                         ItemServiceUrl="/services/inventory/itemdata/getitems"
+                         UnitServiceUrl="/services/inventory/itemdata/getunits"
+                         ItemPopupUrl="/Modules/Inventory/Setup/ItemsPopup.mix?modal=1&CallBackFunctionName=loadItems&AssociatedControlId=ItemIdHidden"
+                         ItemIdQuerySericeUrl="/services/inventory/itemdata/getitemcodebyitemid"
+                         ValidateSides="true"
+                         Catalog="@this.catalog"
+                         OfficeId="@this.officeId" />
+}
+
+@* The host-supplied hidden element FormView.js reads - see the header. *@
+<input type="hidden" id="ItemIdHidden" />
+
+@code {
+    private const string ScriptUrl =
+        "_content/MixERP.Net.Core.Modules.Inventory/js/entry/Transfer.js";
+
+    private bool loaded;
+    private string catalog;
+    private int officeId;
+
+    public Transfer()
+    {
+        //<%@ Control ... OverridePath="/Modules/Inventory/Transfer.mix" %>
+        this.OverridePath = "/Modules/Inventory/Transfer.mix";
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY built the StockAdjustmentForm above, which is markup now; the
+    ///     two login-derived values it also set (Catalog, OfficeId) are asynchronous, so they
+    ///     are read in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            await ModuleScripts.LoadAsync(this.JS, ScriptUrl);
+        }
+    }
+}

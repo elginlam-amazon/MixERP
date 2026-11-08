@@ -1,0 +1,16 @@
+@* ---------------------------------------------------------------------------------------------
+   Components/Layout/PassThroughLayout.razor
+
+   A layout that renders NOTHING but its body. It exists for one page: Components/Pages/Modules/
+   ModuleHost.razor (checklist task 87), which must choose its master page AT RUNTIME from the
+   loaded control's MasterPageId — something @layout (a compile-time attribute) cannot express.
+   ModuleHost therefore declares this layout and renders the REAL layout itself through
+   <LayoutView Layout="...">, which is where the chrome, the AuthorizationOutlet and the
+   master-page javascript globals come from.
+
+   It deliberately does NOT wrap its body in <AuthorizationOutlet>: the layout rendered inside it
+   does, and wrapping twice would render a denial twice.
+   --------------------------------------------------------------------------------------------- *@
+@inherits LayoutComponentBase
+
+@Body

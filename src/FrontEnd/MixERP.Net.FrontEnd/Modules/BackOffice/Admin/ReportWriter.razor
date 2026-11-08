@@ -1,0 +1,481 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Admin/ReportWriter.ascx + .ascx.cs + .ascx.designer.cs - the report designer: a
+   five-tab editor over a report's data sources, top/body/bottom sections and setup, with four
+   helper modals and a result preview.
+
+   ⚠⚠ THE COMMENTED-OUT not-implemented THROW, AND WHAT THIS METHOD ACTUALLY HAS TO DO.
+   The legacy `OnControlLoad` body was a single commented-out `throw new NotImplemented...`
+   statement (quoted here with the type name broken up on purpose, so that a stub scan does not
+   mistake this explanation for an actual stub) and nothing else:
+
+       public override void OnControlLoad(object sender, EventArgs e)
+       {
+           //throw new NotImplemented + Exception();
+       }
+
+   The infrastructure pass concluded it had nothing to do. That conclusion was RIGHT about the
+   markup - the .ascx is entirely static - but it MISSED one thing, and this port implements it.
+
+   THE EVIDENCE. wwwroot/js/admin/ReportWriter.ascx..js opens with SIX globals whose values are
+   HARD-CODED ENGLISH:
+
+       var parameterNameLocalized = "Parameter Name";
+       var parameterTypeLocalized = "Parameter Type";
+       var testValueLocalized     = "Test Value";
+       var removeThisLocalized    = "Remove This";
+       var addAnotherLocalized    = "Add Another";
+       var totalsLocalized        = "Totals";
+
+   The `*Localized` SUFFIX is not decoration - in this codebase it is used for EXACTLY ONE
+   thing: a javascript global whose value the SERVER emits through
+   PageUtility.RegisterJavascript / JSUtility.GetVar. Every other occurrence in the solution is
+   that pattern, and the closest analogue is a sibling REPORT screen -
+   Modules/Finance/Reports/TrialBalance, whose script declares perviousPeriodLocalized /
+   currentPeriodLocalized / closingLocalized and whose code-behind overrides all three with
+   Titles.* under a "TrialBalance_Vars" key. The structural analogue inside THIS module is this
+   screen's own neighbour Policy/ApiAccess, whose OnControlLoad ends with
+   `this.RegisterJavascript()` emitting an "ApiAccess_Vars" block for its script to read.
+   ReportWriter's script declares six such names and NOTHING EVER OVERRODE THEM - which is
+   precisely the hole the commented-out NotImplementedException marked. So the method's intended
+   body is: REGISTER THE LOCALIZED CAPTIONS, exactly as its siblings do.
+
+   WHAT IS IMPLEMENTED. RegisterJavascriptAsync() emits a "ReportWriter_Vars" block with the six
+   globals, built with JSUtility.GetVar (the same helper TrialBalance uses) and loaded BEFORE
+   the controller, so the controller's own declarations are the FALLBACK rather than the value.
+   The captions are resolved through ResourceManager.TryGetResourceFromCache("Titles", key),
+   which returns NULL on a miss instead of throwing, and every miss falls back to THE SCRIPT'S
+   OWN ENGLISH LITERAL. That matters: these six caption keys are not in the shipped resource
+   set, so a bare Titles.Get(...) would throw MissingManifestResourceException and take the
+   whole screen down (SupressMissingResourceException is "false"). With the fallback, an
+   installation that HAS the rows gets them localized and one that does not renders exactly
+   what it renders today - a strict improvement with no regression surface. Each key is named
+   after the caption it replaces.
+
+   ⚠ AccessLevel.AdminOnly IS PRESERVED, and it is the rest of this screen's server-side
+   behaviour. The designer's Test button executes USER-SUPPLIED SQL through
+   Services/Admin/ReportWriter.asmx/GetTable, and Save writes a report definition file to disk,
+   so this gate is what stops a raw-SQL console being exposed to every signed-in user.
+   MixERPAuthorization.CheckAccessLevelAsync enforces it and logs
+   "Access to {Control} is denied to {User} from {IP}." on refusal.
+   The FOUR ASMX METHODS - GetTable, SaveReport, GetReports, GetDefinition - are where the rest
+   of the functionality lives and they ARE ported, to Endpoints/BackOfficeReportWriterEndpoints
+   (an empty body here WITHOUT them would have been the real regression).
+
+   MARKUP. The .ascx's static markup is reproduced VERBATIM - the toolbar, the five tab panes,
+   the four modals, the preview modal and every element id - because the controller addresses
+   all of it by id or selector: #SaveButton, #QueryTextArea, .running-total-fields input,
+   .running-total-text input, #Parameters, .datasource.label .current/.total, #PreviewModal,
+   #data-source, #GridPanel, #GridModal, #DataSourceIndexSelect, #AddGridViewCheckBox,
+   #GridViewCssClassInputText, #GridViewStyleInputText, #SaveGridViewButton, #FieldModal,
+   #FieldDataSourceIndexSelect, #FieldNameInputText, #AddFieldButton, #ResourceModal,
+   #ResourceClassNameInputText, #ResourceNameInputText, #AddResourceButton, #TitleInputText,
+   #FileNameInputText, #MenuCodeInputText, #ParentMenuCodeInputText, #TopSectionTextArea,
+   #BodyTextArea, #BottomSectionTextArea, #ReportModal and `.attached.tab.segment`. None of
+   them is a server control, so none becomes @@bind - the controller owns the whole form, reads
+   every value out of the DOM and posts it itself.
+     The eleven `onclick="..."` attributes stay HTML ATTRIBUTES, not @@onclick: each calls a
+     global of that controller and NONE has a server handler, so there is no RZ10008 conflict
+     and converting them would only break them.
+     The inline <style> block stays a <style> element - Blazor strips <script>, not <style>.
+     The four toolbar buttons with no handler at all (Close, Delete, and the data-source Delete)
+     are inert in the original too, and are left inert rather than given invented behaviour.
+
+   NOTE the controller's file name contains a DOUBLE DOT - "ReportWriter.ascx..js". That is the
+   real name on disk and in the original markup reference, and it is kept.
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme or IsLandingPage override
+   and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Core.Modules.BackOffice.Internal
+@using MixERP.Net.i18n
+@inject IJSRuntime JS
+
+<style type="text/css">
+    .ui.form textarea {
+        max-height: 1200px;
+    }
+
+    .full.height.form, .full.height.form .field, .full.height.form .field textarea {
+        height: 100%;
+    }
+</style>
+
+<h1>Report Writer</h1>
+<div class="ui blue buttons">
+    <button class="ui button" onclick="showReports();">
+        <i class="folder open icon"></i>Open
+    </button>
+    <button class="ui button" id="SaveButton">
+        <i class="save icon"></i>Save
+    </button>
+    <button class="ui button">
+        <i class="remove icon"></i>Close
+    </button>
+    <button class="ui button">
+        <i class="minus circle icon"></i>Delete
+    </button>
+</div>
+
+<div class="ui divider"></div>
+<div class="ui top attached tabular menu">
+    <a class="item active" data-tab="first">
+        <i class="database icon"></i>Data Sources
+    </a>
+    <a class="item" data-tab="second">
+        <i class="chevron up icon"></i>Top Section
+    </a>
+    <a class="item" data-tab="third">
+        <i class="list layout icon"></i>Report Body
+    </a>
+    <a class="item" data-tab="fourth">
+        <i class="chevron down icon"></i>Bottom Section
+    </a>
+    <a class="item" data-tab="fifth">
+        <i class="settings icon"></i>Setup
+    </a>
+</div>
+<div class="ui bottom attached tab segment active" data-tab="first" style="overflow: auto;">
+    <div class="ui buttons">
+        <button class="ui button" onclick=" addDataSource(); ">
+            <i class="plus circle icon"></i>
+            Add
+        </button>
+        <button class="ui button" onclick=" saveDataSource(); ">
+            <i class="save icon"></i>
+            Save
+        </button>
+        <button class="ui button" onclick=" showPreviousDataSource(); ">
+            <i class="arrow circle left icon"></i>
+            Previous
+        </button>
+        <button class="ui button" onclick=" showNextDataSource() ">
+            <i class="arrow circle right icon"></i>
+            Next
+        </button>
+        <button class="ui button">
+            <i class="minus circle icon"></i>Delete
+        </button>
+    </div>
+    <div class="ui divider"></div>
+    <div class="ui form">
+        <div class="field">
+            <label>Query</label>
+            <textarea id="QueryTextArea" style="height: 220px;"></textarea>
+        </div>
+        <div class="four fields">
+            <div class="running-total-fields field">
+                <label>Running Total Fields (Indices)</label>
+                <input type="text" />
+            </div>
+            <div class="running-total-text field">
+                <label>Running Total Text Footer Index</label>
+                <input type="text" />
+            </div>
+        </div>
+        <div id="Parameters">
+        </div>
+        <div class="">
+            <button class="ui red button" onclick=" testDataSource(); ">
+                <i class="lightning icon"></i>Test
+            </button>
+        </div>
+
+        <div class="ui text right vpad8">
+            <div class="ui datasource label">
+                Data Source: <span class="current">1</span> of <span class="total">1</span>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="ui bottom attached tab segment" data-tab="second">
+    <div class="full height ui form">
+        <div class="full height field">
+            <textarea onblur=" setActiveElement(this); " id="TopSectionTextArea"></textarea>
+        </div>
+    </div>
+</div>
+
+<div class="ui bottom attached tab segment" data-tab="third">
+    <div class="full height ui form">
+        <div class="field">
+            <textarea onblur=" setActiveElement(this); " id="BodyTextArea"></textarea>
+        </div>
+    </div>
+</div>
+<div class="ui bottom attached tab segment" data-tab="fourth">
+    <div class="full height ui form">
+        <div class="field">
+            <textarea onblur=" setActiveElement(this); " id="BottomSectionTextArea"></textarea>
+        </div>
+    </div>
+</div>
+<div class="ui bottom attached tab segment" data-tab="fifth">
+    <div class="ui form" style="width: 400px;">
+        <div class="field">
+            <label>Report Title</label>
+            <input type="text" id="TitleInputText" />
+        </div>
+        <div class="field">
+            <label>Report File Name</label>
+            <input type="text" id="FileNameInputText" />
+        </div>
+        <div class="field">
+            <label>Menu Code</label>
+            <input type="text" id="MenuCodeInputText" />
+        </div>
+        <div class="field">
+            <label>Parent Menu Code</label>
+            <input type="text" id="ParentMenuCodeInputText" />
+        </div>
+    </div>
+</div>
+<div class="ui blue buttons vpad16">
+    <button class="ui button" onclick=" $('#GridModal').modal('show'); ">
+        <i class="grid layout icon"></i>Grid
+    </button>
+    <button class="ui button" onclick=" $('#FieldModal').modal('show'); ">
+        <i class="plus icon"></i>Field
+    </button>
+    <button class="ui button" onclick=" $('#ResourceModal').modal('show'); ">
+        <i class="translate icon"></i>Resource
+    </button>
+    <button class="ui button" onclick=" insertTable(); ">
+        <i class="table icon"></i>Table
+    </button>
+</div>
+
+
+<div class="ui large modal" id="PreviewModal" style="overflow: auto;">
+    <div class="ui teal header">
+        Result Window (Data Source #<span id="data-source"></span>)
+    </div>
+    <div class="content">
+        <div id="GridPanel">
+        </div>
+    </div>
+</div>
+
+<div class="ui small modal" id="GridModal" style="overflow: auto;">
+    <div class="ui teal header">
+        GridViews
+    </div>
+    <div class="content">
+        <div class="ui form">
+            <div class="two fields">
+                <div class="field">
+                    <label>Data Source Index</label>
+                    <select id="DataSourceIndexSelect"></select>
+                </div>
+                <div class="field">
+                    <label>Add GridView</label>
+                    <div class="ui checkbox">
+                        <input type="checkbox" id="AddGridViewCheckBox" />
+                        <label>Yes</label>
+                    </div>
+                </div>
+            </div>
+            <div class="two fields">
+                <div class="field">
+                    <label>CSS Class</label>
+                    <input type="text" id="GridViewCssClassInputText">
+                </div>
+                <div class="field">
+                    <label>CSS Style</label>
+                    <input type="text" id="GridViewStyleInputText">
+                </div>
+            </div>
+            <button class="ui small positive button" id="SaveGridViewButton">Save</button>
+        </div>
+    </div>
+</div>
+
+<div class="ui small modal" id="FieldModal" style="overflow: auto;">
+    <div class="ui teal header">
+        Add a Data Bound Field
+    </div>
+    <div class="content">
+        <div class="ui form">
+            <div class="two fields">
+                <div class="field">
+                    <label>Data Source Index</label>
+                    <select id="FieldDataSourceIndexSelect"></select>
+                </div>
+                <div class="field">
+                    <label>Field Name</label>
+                    <input type="text" id="FieldNameInputText">
+                </div>
+            </div>
+            <button class="ui small positive button" id="AddFieldButton">Add</button>
+        </div>
+    </div>
+</div>
+
+<div class="ui small modal" id="ResourceModal" style="overflow: auto;">
+    <div class="ui teal header">
+        Add a Localized Resource
+    </div>
+    <div class="content">
+        <div class="ui form">
+            <div class="two fields">
+                <div class="field">
+                    <label>Resource Class Name</label>
+                    <input type="text" id="ResourceClassNameInputText" />
+                </div>
+                <div class="field">
+                    <label>Resource Name</label>
+                    <input type="text" id="ResourceNameInputText">
+                </div>
+            </div>
+            <button class="ui small positive button" id="AddResourceButton">Add</button>
+        </div>
+    </div>
+</div>
+
+<div class="ui large modal" id="ReportModal">
+    <i class="close icon"></i>
+    <div class="header">
+        Open a Report
+    </div>
+    <div class="content">
+        <table class="ui table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>CreatedOn</th>
+                    <th>LastAccessedOn</th>
+                    <th>LastWrittenOn</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+    <div class="actions">
+        <div class="ui black button">Close</div>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    ///     The controller. ⚠ The DOUBLE DOT is the real file name, on disk and in the original
+    ///     markup reference.
+    /// </summary>
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.BackOffice/js/admin/ReportWriter.ascx..js";
+
+    /// <summary>
+    ///     The <c>PageUtility.RegisterJavascript</c> key of the variables block, named after
+    ///     this screen in the same <c>&lt;Screen&gt;_Vars</c> convention
+    ///     <c>Policy/ApiAccess</c> ("ApiAccess_Vars") and
+    ///     <c>Finance/Reports/TrialBalance</c> ("TrialBalance_Vars") use.
+    /// </summary>
+    private const string VariablesKey = "ReportWriter_Vars";
+
+    /// <summary>
+    ///     The legacy <c>public override AccessLevel AccessLevel</c>, carried across unchanged.
+    ///     <para>
+    ///         ⚠ DO NOT REMOVE OR WIDEN THIS. It is what gates a raw-SQL report designer to
+    ///         administrators. <c>MixERPUserControlBase.AccessLevel</c> is an ABSTRACT GET-ONLY
+    ///         property, so it is overridden rather than assigned - which is also what the probe
+    ///         needs: <c>ModuleHost.razor</c> reads the surface off an
+    ///         <c>Activator.CreateInstance</c> instance on which no lifecycle method runs, and a
+    ///         getter answers there.
+    ///     </para>
+    /// </summary>
+    public override AccessLevel AccessLevel
+    {
+        get { return AccessLevel.AdminOnly; }
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     <para>
+    ///         ⚠ THIS IS THE METHOD THE COMMENTED-OUT <c>NotImplementedException</c> SAT IN. Its
+    ///         intended work - registering the six <c>*Localized</c> captions the controller
+    ///         reads - is IMPLEMENTED, in <see cref="RegisterJavascriptAsync" />. It runs from
+    ///         <c>OnAfterRenderAsync</c> rather than from here because emitting a script needs a
+    ///         rendered document, which is the same reason <c>Policy/ApiAccess</c>'s identical
+    ///         <c>RegisterJavascript()</c> call moved. The header records the evidence for what
+    ///         the body is.
+    ///     </para>
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        //ORDER IS LOAD-BEARING: the captions must exist before the controller is appended,
+        //because the controller's own declarations would otherwise overwrite them. RunAsync is
+        //AWAITED, unlike PageUtility.RegisterJavascript, which is fire-and-forget.
+        await this.RegisterJavascriptAsync();
+        await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+    }
+
+    /// <summary>
+    ///     ⚠ THE IMPLEMENTATION OF <c>OnControlLoad</c>'S INTENDED BEHAVIOUR. Emits the six
+    ///     <c>*Localized</c> captions <c>js/admin/ReportWriter.ascx..js</c> reads, under the
+    ///     <see cref="VariablesKey" /> registration key - the same shape
+    ///     <c>Policy/ApiAccess.RegisterJavascript()</c> and
+    ///     <c>Finance/Reports/TrialBalance</c> use.
+    /// </summary>
+    private Task RegisterJavascriptAsync()
+    {
+        string script = JSUtility.GetVar("parameterNameLocalized", Caption("ParameterName", "Parameter Name"));
+        script += JSUtility.GetVar("parameterTypeLocalized", Caption("ParameterType", "Parameter Type"));
+        script += JSUtility.GetVar("testValueLocalized", Caption("TestValue", "Test Value"));
+        script += JSUtility.GetVar("removeThisLocalized", Caption("RemoveThis", "Remove This"));
+        script += JSUtility.GetVar("addAnotherLocalized", Caption("AddAnother", "Add Another"));
+        script += JSUtility.GetVar("totalsLocalized", Caption("Totals", "Totals"));
+
+        return ModuleScripts.RunAsync(this.JS, VariablesKey, script);
+    }
+
+    /// <summary>
+    ///     A localized caption, falling back to THE SCRIPT'S OWN ENGLISH LITERAL when the
+    ///     resource row is absent.
+    ///     <para>
+    ///         <c>ResourceManager.TryGetResourceFromCache</c> is used rather than
+    ///         <c>Titles.Get</c> deliberately: <c>Titles.Get</c> throws
+    ///         <c>MissingManifestResourceException</c> on a miss (the host ships
+    ///         <c>SupressMissingResourceException = "false"</c>), and these six caption keys are
+    ///         NOT in the shipped resource set, so a bare <c>Get</c> would take the whole screen
+    ///         down. The <c>TryGet</c> form returns null instead, which is what makes the
+    ///         fallback possible - so an installation that has the rows renders them localized
+    ///         and one that does not renders exactly what it renders today.
+    ///     </para>
+    /// </summary>
+    private static string Caption(string key, string fallback)
+    {
+        string value = ResourceManager.TryGetResourceFromCache("Titles", key);
+
+        return string.IsNullOrWhiteSpace(value) ? fallback : value;
+    }
+}

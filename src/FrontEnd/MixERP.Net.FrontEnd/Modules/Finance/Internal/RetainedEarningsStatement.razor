@@ -1,0 +1,206 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* The SHARED retained-earnings statement screen.
+
+   ⚠ WHY THIS COMPONENT EXISTS - A SHARED CODE-BEHIND IN THE ORIGINAL. Reports/RetainedEarnings.ascx
+   AND Reports/RetainedEarningsPopup.ascx both declared
+       CodeBehind="RetainedEarnings.ascx.cs"
+       Inherits="MixERP.Net.Core.Modules.Finance.Reports.RetainedEarnings"
+   i.e. ONE class served BOTH .ascx files (the popup had no .cs and no .designer.cs of its
+   own). Treating the popup as "a control with no code-behind" would have silently emptied that
+   screen. The sharing is preserved STRUCTURALLY here, so the two screens cannot drift: this
+   component carries the entire ported screen (the form, the Show/Print buttons, the query and
+   the 8-column grid) and Reports/RetainedEarnings.razor + Reports/RetainedEarningsPopup.razor
+   are thin hosts that differ only in what the two .ascx files actually differed in - the
+   popup's MasterPageId, its padding wrapper and its lack of the print script.
+
+   It is a plain component, not a MixERPUserControl: the two HOSTS are the user controls (they
+   carry the authorization run and the probe-visible flags), and a control may not be nested in
+   another control's authorization. It therefore injects ICurrentLogin itself.
+
+   #RetainedEarningsGridView is emitted as the HTML the plain WebForms GridView rendered - same
+   id, same css class, the 8 explicit bound columns in the original order with the original
+   header texts, "{0:d}" on the value date, "{0:N}" + "text right" on the three money columns.
+
+   THE SHOW BUTTON IS A SERVER HANDLER (it was an <asp:Button> with Click -> BindGrid) and
+   stays one; its two inputs are re-read from the DOM at click time through ElementValueReader,
+   because the jQuery UI datepicker writes the date without raising an input event - that read
+   is the faithful equivalent of the WebForms postback. The PRINT button never had a server
+   handler.
+
+   SetQueryParameters() is preserved verbatim, including the two guards: a ?Date= is applied
+   only when it is not an empty date, and a ?Factor= only when it is greater than zero -
+   which is what lets BalanceSheet's retained-earning drill-down open this screen pre-filled. *@
+
+@using System.Data
+@using System.Globalization
+@using MixERP.Net.Common
+@using MixERP.Net.Entities
+@using MixERP.Net.Framework.Security
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.i18n.Resources
+@inject ICurrentLogin CurrentLogin
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+@* CreateTopPanel() *@
+<h2>@Titles.RetainedEarnings</h2>
+
+@* CreateForm(): GetFormSegment() -> "ui form segment", GetInlineFields() -> "inline fields" *@
+<div class="ui form segment">
+    <div class="inline fields">
+        <div class="field">
+            <label for="DateTextBox">@Titles.Date</label>
+            <DateTextBox ID="DateTextBox" Mode="@(FrequencyType.FiscalYearEndDate)"
+                         Catalog="@this.catalog" OfficeId="@this.officeId" @bind-Text="this.date" />
+        </div>
+        <div class="field">
+            <label for="FactorInputText">@Titles.Factor</label>
+            <input type="text" id="FactorInputText" class="integer" value="@this.factor" />
+        </div>
+        <button id="ShowButton" type="button" class="ui green button" @onclick="this.ShowButton_Click">@Titles.Show</button>
+        <input type="button" id="PrintButton" class="ui orange button" value="@Titles.Print" />
+    </div>
+</div>
+
+@* CreateGridPanel() *@
+<div class="auto-overflow-panel">
+    <table id="RetainedEarningsGridView" class="ui celled segment table nowrap">
+        <thead>
+            <tr>
+                <th class="text left">@Titles.ValueDate</th>
+                <th class="text left">@Titles.TranCode</th>
+                <th class="text left">@Titles.StatementReference</th>
+                <th class="text right">@Titles.Debit</th>
+                <th class="text right">@Titles.Credit</th>
+                <th class="text right">@Titles.Balance</th>
+                <th class="text left">@Titles.Office</th>
+                <th class="text left">@Titles.Account</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (this.table != null)
+            {
+                @foreach (DataRow row in this.table.Rows)
+                {
+                    <tr>
+                        <td>@GridFormat.Format(row, "value_date", "{0:d}")</td>
+                        <td>@GridFormat.Text(row, "tran_code")</td>
+                        <td>@GridFormat.Text(row, "statement_reference")</td>
+                        <td class="text right">@GridFormat.Format(row, "debit", "{0:N}")</td>
+                        <td class="text right">@GridFormat.Format(row, "credit", "{0:N}")</td>
+                        <td class="text right">@GridFormat.Format(row, "balance", "{0:N}")</td>
+                        <td>@GridFormat.Text(row, "office")</td>
+                        <td>@GridFormat.Text(row, "account")</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private ElementValueReader elementValues;
+
+    private string catalog;
+    private int officeId;
+
+    private string date;
+    private string factor = "1000";
+
+    private DataTable table;
+
+    /// <summary>
+    ///     True once the grid has been bound at least once - the host component uses it to
+    ///     decide when its print script may be loaded (the script reads the rendered rows).
+    /// </summary>
+    public bool Bound { get; private set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        this.elementValues = new ElementValueReader(this.JS);
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.SetQueryParameters();
+
+        //`if (!this.Page.IsPostBack) this.BindGrid();`
+        this.BindGrid();
+    }
+
+    /// <summary>
+    ///     Port of SetQueryParameters(), guards included.
+    /// </summary>
+    private void SetQueryParameters()
+    {
+        DateTime queryDate = Conversion.TryCastDate(ModuleQuery.Get(this.Navigation, "Date"));
+        int queryFactor = Conversion.TryCastInteger(ModuleQuery.Get(this.Navigation, "Factor"));
+
+        if (!Conversion.IsEmptyDate(queryDate))
+        {
+            this.date = queryDate.ToShortDateString();
+        }
+
+        if (queryFactor > 0)
+        {
+            this.factor = queryFactor.ToString(CultureInfo.CurrentUICulture);
+        }
+    }
+
+    /// <summary>
+    ///     Port of ShowButton_Click -> BindGrid(), with the WebForms postback read of the two
+    ///     filter elements reproduced through the interop reader.
+    /// </summary>
+    private async Task ShowButton_Click()
+    {
+        string dateValue = await this.elementValues.GetValueAsync("DateTextBox");
+        string factorValue = await this.elementValues.GetValueAsync("FactorInputText");
+
+        if (dateValue != null)
+        {
+            this.date = dateValue;
+        }
+
+        if (factorValue != null)
+        {
+            this.factor = factorValue;
+        }
+
+        this.BindGrid();
+    }
+
+    /// <summary>
+    ///     Port of BindGrid(), verbatim - same four arguments in the same order.
+    /// </summary>
+    private void BindGrid()
+    {
+        DateTime value = Conversion.TryCastDate(this.date);
+        int factorValue = Conversion.TryCastInteger(this.factor);
+
+        this.table = Data.Reports.RetainedEarnings.GetRetainedEarningStatementDataTable(this.catalog,
+            value, this.officeId, factorValue);
+        this.Bound = true;
+    }
+}

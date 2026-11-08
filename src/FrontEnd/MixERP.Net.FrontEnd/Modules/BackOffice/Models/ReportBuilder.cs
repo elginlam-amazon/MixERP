@@ -1,4 +1,5 @@
 using MixERP.Net.Common;
+using MixERP.Net.Common.Helpers;
 using MixERP.Net.Core.Modules.BackOffice.Data;
 /********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
@@ -21,7 +22,13 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Web.Hosting;
+//MIGRATION: System.Web.Hosting.HostingEnvironment.MapPath has no counterpart on ASP.NET
+//Core. MixERPConfiguration.MapPath is the documented equivalent - it resolves an
+//application-relative ("~/x" or "x/y") path against the CONTENT ROOT, which is exactly what
+//HostingEnvironment.MapPath resolved against, and is the resolver every other MixERP path read
+//now uses. Both values resolved here are content-root paths, not wwwroot ones: the report
+//container comes from Resource/Configs/ReportParameters.config and License.txt sits at the
+//application root, so neither is (or was) served over HTTP.
 using System.Xml;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Models
@@ -202,7 +209,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Models
 
         private string GetLicense()
         {
-            string licenseFile = HostingEnvironment.MapPath("~/License.txt");
+            string licenseFile = MixERPConfiguration.MapPath("~/License.txt");
 
             if (!string.IsNullOrWhiteSpace(licenseFile) && File.Exists(licenseFile))
             {

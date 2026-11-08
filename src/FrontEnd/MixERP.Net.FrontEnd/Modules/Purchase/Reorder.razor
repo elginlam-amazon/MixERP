@@ -1,0 +1,208 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reorder.ascx + .ascx.cs + .ascx.designer.cs - the "items below reorder
+   level" screen, which lets a buyer tick items and raise purchase orders for them in bulk.
+   This is the only Purchase control with real procedural markup-building logic.
+
+   OnControlLoad called AddTitle / AddRuler / AddButton / AddGridView, each of which built
+   server controls into <asp:PlaceHolder ID="Placeholder1">. All four are plain markup now:
+
+     AddTitle    -> <h1 class="lead heading">, InnerText = Titles.ItemsBelowReorderLevel
+     AddRuler    -> <div class="ui divider">
+     AddButton   -> <div class="vpad16"> wrapping an HtmlInputButton, which renders as
+                    <input type="button" class="ui positive button"
+                           onclick="ReorderInputButtonClick()" value="...">.
+                    The onclick stays an HTML attribute rather than becoming @@onclick: the
+                    handler is a javascript function in wwwroot/js/Reorder.js that reads the
+                    ticked rows and the per-row <select>/<input> values straight out of the
+                    DOM - state that only exists client-side, because Reorder.js REPLACES
+                    the contents of six cells per row after render. A Blazor @@onclick could
+                    not see any of it.
+     AddGridView -> the <table id="ReorderGrid"> below.
+
+   THE GRIDVIEW IS A JAVASCRIPT CONTRACT, NOT DECORATION. Reorder.js addresses this table
+   purely POSITIONALLY - it fills cells 1, 6, 7, 8, 9 and 10 with the checkbox, the supplier
+   select, the unit select, the quantity input, the price input and the tax select, and it
+   reads cells 2, 3, 5, 13, 14 (and 16 - see below) for the values it seeds them with. So
+   the fifteen columns are emitted in EXACTLY the order CreateColumns added them, with the
+   five BoundFields that the script reads in exactly their original positions:
+
+     1  Check                                (TemplateField - empty, filled by the script)
+     2  ItemId                               (read: the posted ItemId)
+     3  ItemCode                             (read: the GetUnits argument)
+     4  ItemName
+     5  Unit                                 (read: pre-selects the unit select)
+     6  SelectSupplier                       (TemplateField - empty)
+     7  SelectUnit                           (TemplateField - empty)
+     8  ReorderQuantityAbbreviated           (TemplateField - empty)
+     9  Price                                (TemplateField - empty)
+     10 TaxRate                              (TemplateField - empty)
+     11 QuantityOnHandAbbreviated
+     12 ReorderLevel
+     13 DefaultReorderQuantityAbbreviated    (read: seeds the quantity input)
+     14 PreferredSupplier                    (read: pre-selects the supplier select)
+     15 Price                                (read: seeds the price input)
+
+   Changing a single position, or dropping an "unused" column, silently breaks the screen.
+   A GridView renders its headers as <th> and its data as <td>, which is what the script's
+   `tr td:first-child` / `.not(":first-child")` idioms rely on to tell the two apart, so
+   that distinction is kept too.
+
+   The <style> block is kept inline: Blazor strips <script>, not <style>.
+
+   REVIEW - PRESERVED UPSTREAM BUG: Reorder.js reads td:nth-child(16) to pre-select each
+   row's tax, but there are only FIFTEEN columns, so the tax select is never pre-selected.
+   Carried verbatim rather than guessed at - see the note in Reorder.js.
+
+   Also preserved: ReorderButton_Click, the control's empty server-side click handler. It
+   was wired to NOTHING (the rendered button is an HtmlInputButton with a javascript
+   onclick, not an asp:Button), so it had no caller and no body - it is a leftover of an
+   earlier server-postback design and is therefore not carried over as a method.
+
+   OTHER BEHAVIOUR PRESERVED: the grid is bound to
+   Data.Transactions.Reorder.GetReorderView(catalog, officeId); when that returns no rows
+   a GridView with no EmptyDataTemplate renders NOTHING, so no table is emitted either.
+   officeId / catalog come from ICurrentLogin, because AppUsers.GetCurrent() /
+   GetCurrentUserDB() return an EMPTY login inside a Blazor circuit.
+
+   PRESERVED SURFACE: ITransaction (the host reads it to enforce RestrictedTransactionMode).
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@implements MixERP.Net.Entities.Contracts.ITransaction
+@using MixERP.Net.Core.Modules.Purchase.Internal
+@using MixERP.Net.Entities.Transactions
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<style type="text/css">
+    #ReorderGrid td, #ReorderGrid th {
+        vertical-align: middle !important;
+        padding: 4px;
+        cursor: pointer;
+    }
+
+    input[type=checkbox] {
+        margin-left: 10px;
+    }
+</style>
+
+@if (this.loaded)
+{
+    <h1 class="lead heading">@Titles.ItemsBelowReorderLevel</h1>
+
+    <div class="ui divider"></div>
+
+    <div class="vpad16">
+        <input type="button" class="ui positive button" onclick="ReorderInputButtonClick()"
+               value="@Titles.PlaceReorderRequests" />
+    </div>
+
+    @if (this.items != null && this.items.Count > 0)
+    {
+        <table id="ReorderGrid">
+            <tr>
+                <th scope="col">@Titles.Check</th>
+                <th scope="col">@Titles.ItemId</th>
+                <th scope="col">@Titles.ItemCode</th>
+                <th scope="col">@Titles.ItemName</th>
+                <th scope="col">@Titles.Unit</th>
+                <th scope="col">@Titles.SelectSupplier</th>
+                <th scope="col">@Titles.SelectUnit</th>
+                <th scope="col">@Titles.ReorderQuantityAbbreviated</th>
+                <th scope="col">@Titles.Price</th>
+                <th scope="col">@Titles.TaxRate</th>
+                <th scope="col">@Titles.QuantityOnHandAbbreviated</th>
+                <th scope="col">@Titles.ReorderLevel</th>
+                <th scope="col">@Titles.DefaultReorderQuantityAbbreviated</th>
+                <th scope="col">@Titles.PreferredSupplier</th>
+                <th scope="col">@Titles.Price</th>
+            </tr>
+            @foreach (DbGetReorderViewFunctionResult item in this.items)
+            {
+                <tr>
+                    <td></td>
+                    <td>@item.ItemId</td>
+                    <td>@item.ItemCode</td>
+                    <td>@item.ItemName</td>
+                    <td>@item.Unit</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td>@item.QuantityOnHand</td>
+                    <td>@item.ReorderLevel</td>
+                    <td>@item.ReorderQuantity</td>
+                    <td>@item.PreferredSupplier</td>
+                    <td>@item.Price</td>
+                </tr>
+            }
+        </table>
+    }
+}
+
+@code {
+    private bool loaded;
+    private bool scriptPending;
+    private List<DbGetReorderViewFunctionResult> items;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body was the four Add* calls, all of which are markup now; the one piece
+    ///     that is not markup - the reorder query, plus the login values it needs - is
+    ///     asynchronous, so it runs in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.items = Data.Transactions.Reorder.GetReorderView(catalog, login.OfficeId).ToList();
+        this.loaded = true;
+        this.scriptPending = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        //NOT on firstRender: the grid is rendered by the SECOND render, after the asynchronous
+        //reorder query above completes. Reorder.js's top-level block reads #ReorderGrid out of
+        //the DOM and rewrites six cells per row, so loading it against the first (empty) render
+        //would leave every row's checkbox, selects and inputs unbuilt.
+        if (this.scriptPending && this.loaded)
+        {
+            this.scriptPending = false;
+
+            await ModuleScripts.LoadAsync(this.JS,
+                "_content/MixERP.Net.Core.Modules.Purchase/js/Reorder.js");
+        }
+    }
+}

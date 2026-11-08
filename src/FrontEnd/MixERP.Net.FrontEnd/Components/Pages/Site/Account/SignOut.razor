@@ -1,0 +1,61 @@
+@* ---------------------------------------------------------------------------------------------
+   Site/Account/SignOut.aspx (+ .aspx.cs) -> Components/Pages/Site/Account/SignOut.razor
+   (checklist task 96). The route is the one the migrated layouts link to (Specialist 5).
+
+   The legacy Page_Init was:
+       this.IsLandingPage = true;
+       this.Session.Remove("UserName");
+       FormsAuthentication.SignOut();
+       this.Response.Redirect("~/SignIn.aspx");
+
+   WHY THIS PAGE FORCE-LOADS AN ENDPOINT. Removing a session entry and signing a cookie out are
+   both response mutations, and HttpContext is READ-ONLY inside a circuit -- doing them from
+   component code silently does nothing. Specialist 4 therefore owns the sign-out as the HTTP
+   endpoint AuthEndpoints.SignOutRoute ("/_auth/signout"), which performs exactly the three steps
+   above: SessionHelper.RemoveSessionKey("UserName") (VERIFIED present), then
+   MixERPAuthentication.SignOutAsync(context), then Response.Redirect(MixERPAuthentication.LoginPath)
+   -- the migrated form of "~/SignIn.aspx". This component's single job is to force-load that url,
+   which it does on its first render (an interactive navigation would stay inside the circuit and
+   never reach the endpoint).
+
+   This page deliberately does NOT declare @page "/_auth/signout": the endpoint owns that url, and
+   a component claiming it would shadow the only code that can actually sign the user out.
+
+   The body of the legacy page was EMPTY (all four <asp:Content> blocks were blank) because it
+   redirected before rendering. The same holds here apart from the one-line notice below, which is
+   what the user sees for the moment between the first render and the browser following the
+   force-load.
+   --------------------------------------------------------------------------------------------- *@
+@page "/Site/Account/SignOut"
+@layout BackendLayout
+@inherits MixERPAuthorizedPageBase
+
+<p>@Titles.SignOut</p>
+
+@code {
+    /// <summary>
+    ///     Page_Init: <c>this.IsLandingPage = true</c> (no menu entry -- the policy check must not
+    ///     run against the sign-out page). Set in the constructor because the base activation
+    ///     sequence that reads it runs in OnInitializedAsync.
+    /// </summary>
+    public SignOut()
+    {
+        this.IsLandingPage = true;
+    }
+
+    /// <summary>
+    ///     Session.Remove("UserName") + FormsAuthentication.SignOut() + Response.Redirect: all
+    ///     three happen on the /_auth/signout endpoint, which is reached with forceLoad so the
+    ///     browser performs a real HTTP request and the endpoint's own redirect to the sign-in page
+    ///     takes effect.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender).ConfigureAwait(true);
+
+        if (firstRender)
+        {
+            this.NavigationManager.NavigateTo(AuthEndpoints.SignOutRoute, true);
+        }
+    }
+}

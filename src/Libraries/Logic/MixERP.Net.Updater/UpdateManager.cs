@@ -20,6 +20,27 @@ namespace MixERP.Net.Updater
         {
             IEnumerable<Release> releases = await Releases.GetReleases();
 
+            return SelectLatestRelease(releases);
+        }
+
+        /// <summary>
+        ///     ADDITIVE overload (nothing else changed): performs the identical lookup over a
+        ///     caller-supplied <see cref="System.Net.Http.HttpClient" />, so a DI enabled host can
+        ///     hand in an <c>IHttpClientFactory</c> client instead of the library's own
+        ///     process-lifetime one. The release-selection rule is shared with the parameterless
+        ///     overload, so the two cannot drift.
+        /// </summary>
+        public async Task<Release> GetLatestRelease(System.Net.Http.HttpClient client,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            IEnumerable<Release> releases =
+                await new Releases(client).GetReleasesAsync(cancellationToken);
+
+            return SelectLatestRelease(releases);
+        }
+
+        private static Release SelectLatestRelease(IEnumerable<Release> releases)
+        {
             if (releases == null)
             {
                 return null;

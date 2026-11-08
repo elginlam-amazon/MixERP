@@ -1,0 +1,160 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from UpdateExchangeRates.ascx + .ascx.cs + .ascx.designer.cs - the screen that pulls
+   exchange rates from a configured currency-conversion API and saves them.
+
+   The markup is the .ascx's own static markup, carried over unchanged apart from the two
+   runat="server" inputs: OnControlLoad's ENTIRE body was
+       this.OfficeInputText.Value  = AppUsers.GetCurrent().View.OfficeName;
+       this.CurrencyInputText.Value = AppUsers.GetCurrent().View.CurrencyCode;
+   so the two read-only inputs now render those values from ICurrentLogin (AppUsers returns an
+   EMPTY login inside a circuit, which would have shown two blank boxes). Their ids, readonly
+   flag and surrounding fields are unchanged because UpdateExchangeRates.js reads
+   #CurrencyInputText when it builds each row.
+
+   #ExchangeRatesGridView IS A JAVASCRIPT CONTRACT: the <tbody> is left EMPTY on the server,
+   exactly as the .ascx left it - UpdateExchangeRates.js fills one row per currency from
+   /services/finance/currencydata/getexchangecurrencies and writes the fetched rate into
+   column 5. The six <th> headers, their order and the two nth-child width rules therefore
+   stay byte-identical. The <style> block is kept in the markup (a .razor file may carry a
+   <style> element; only <script> is stripped).
+
+   The three buttons (#RequestButton, #SaveButton and the #ModuleSelect dropdown) had NO
+   server-side handler - they were plain html inputs driven entirely by the script - so they
+   carry no @@onclick here either.
+
+   PRESERVED SURFACE: the class implements ITransaction, which the host reads to enforce
+   RestrictedTransactionMode. The original declared no OverridePath, AccessLevel,
+   MasterPageId, RemoveTheme or IsLandingPage override.
+
+   The literal English labels ("Update Exchange Rates", "Office", "Base Currency",
+   "Select API", "Request", "Save" and the six column headers) are the ORIGINAL'S - this
+   screen was never localized through Titles.*, and substituting resources now would change
+   what every non-English installation displays. Carried over verbatim. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@implements MixERP.Net.Entities.Contracts.ITransaction
+@using MixERP.Net.Core.Modules.Finance.Internal
+@inject IJSRuntime JS
+
+<style type="text/css">
+    #ExchangeRatesGridView th:nth-child(5) {
+        width: 125px;
+    }
+
+    #ExchangeRatesGridView th:nth-child(6) {
+        width: 250px;
+    }
+</style>
+<h1>Update Exchange Rates</h1>
+<div class="ui divider"></div>
+
+<div class="ui form">
+    <div class="fields">
+        <div class="field">
+            <label for="OfficeInputText">
+                Office
+            </label>
+            <input type="text" id="OfficeInputText" readonly="readonly" value="@this.officeName" />
+        </div>
+        <div class="field">
+            <label for="CurrencyInputText">
+                Base Currency
+            </label>
+            <input type="text" id="CurrencyInputText" readonly="readonly" value="@this.currencyCode" />
+        </div>
+
+        @* The duplicated for="OfficeInputText" on this label is the original's. *@
+        <div class="field">
+            <label for="OfficeInputText">
+                Select API
+            </label>
+            <select id="ModuleSelect" class="ui dropdown"></select>
+        </div>
+        <div class="field">
+            <label for="RequestButton">Request</label>
+            <input type="button" id="RequestButton" value="Request" class="ui pink button" />
+        </div>
+
+    </div>
+</div>
+
+<table class="ui very compact small striped collapsing table" id="ExchangeRatesGridView">
+    <thead>
+        <tr>
+            <th>Currency Code</th>
+            <th>Currency Symbol</th>
+            <th>Currency Name</th>
+            <th>Hundredth Name</th>
+            <th>Exchange Rate</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
+
+<input type="button" id="SaveButton" value="Save" class="ui green button" />
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.Finance/js/UpdateExchangeRates.js";
+
+    private string officeName;
+    private string currencyCode;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body did nothing but fill the two read-only inputs from the current login,
+    ///     which is asynchronous here and therefore lives in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it. For an
+        //ITransaction control that includes the restricted-transaction-mode check.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.officeName = login.OfficeName;
+        this.currencyCode = login.CurrencyCode;
+    }
+
+    /// <summary>
+    ///     The .ascx carried &lt;script src="js/UpdateExchangeRates.js"&gt;, which a .razor file
+    ///     may not; it is loaded after the first render, once #ExchangeRatesGridView and the
+    ///     two buttons it binds exist in the document.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+    }
+}

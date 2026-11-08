@@ -1,0 +1,470 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Policy/MenuAccess.ascx + .ascx.cs + .ascx.designer.cs - the per-user, per-office
+   menu access policy editor: pick a user and an office, tick the menus they may reach, save.
+
+   ⚠ AccessLevel.LocalhostAdmin IS PRESERVED, and it is the STRICTEST level in the enum. This
+   screen writes policy.save_menu_policy, i.e. it decides WHO CAN REACH WHICH SCREEN across the
+   whole application, so the gate is the point: MixERPAuthorization.CheckAccessLevelAsync
+   requires an admin AND a local request (with the DbConfig Mode == DEVELOPMENT + IsLocalhost
+   relaxation), and logs "Access to {Control} is denied to {User} from {IP}." on refusal.
+
+   STRUCTURE. Everything was built procedurally into <asp:PlaceHolder ID="Placeholder1"> by
+   CreateFormPanel -> CreateGridPanel -> CreateHiddenField -> BindGrid(), and it is markup now
+   in that exact order, with the ids, classes, inline styles and child order the control tree
+   rendered:
+
+     div.ui.tiny.pink.form.segment[style="position:fixed;right:4px;top:40px;"]
+       > div > h1.ui.purple.header + div.ui.divider        (HtmlControlHelper.GetPageHeader)
+       > div.field > label[for=UserSelect]   + select#UserSelect
+       > div.field > label[for=OfficeSelect] + select#OfficeSelect
+       > div.ui.buttons.vpad8
+           > the Show button   (server handler, .ui.red.button)
+           > input#CheckAllButton.ui.blue.button
+           > input#UncheckAllButton.ui.pink.button
+           > the Save button   (server handler, .ui.green.button)
+     table#MenuAccessGridView ...                          (MixERPGridView)
+     input#SelectedMenusHidden[type=hidden]
+
+   The FIXED-POSITION form segment is deliberate: the form floats over the top-right of the
+   (very long) menu grid.
+
+   ⚠ THE GRID IS A POSITIONAL JAVASCRIPT CONTRACT. js/policy/MenuAccess.ascx.js's
+   updateSelection() reads each ticked row's `td:nth-child(3)` for the MenuId, and
+   `grid.find("input")` assumes the second column renders a CHECKBOX. So:
+     * all SIX columns of DbGetMenuPolicyResult are emitted in the DATA SOURCE'S OWN ORDER
+       (RowNumber, Access, MenuId, MenuCode, MenuText, Url) - exactly what AutoGenerateColumns
+       produced - and none is dropped as "unused";
+     * the Access column is given a TEMPLATE rendering `<input type="checkbox" disabled>`,
+       because a WebForms auto-generated BOOLEAN column rendered a disabled checkbox and the
+       migrated MixERPGridView renders a bool as the text "True"/"False" instead. Without the
+       template there would be no input to tick and the screen could save nothing. The script's
+       own `removeAttr("disabled")` is what makes them usable, exactly as before.
+
+   ⚠ Grid_RowDataBound IS FULLY PORTED, both branches:
+     * the HEADER branch localized cells `0 .. Count-2` with Titles.Get(cell.Text), i.e. the
+       first FIVE headers - leaving the LAST one (Url) UNLOCALIZED. That asymmetry is the
+       original's and is reproduced: five Titles.Get(...) headers and the literal "Url".
+     * the DATA ROW branch replaced the Url cell's text with an ANCHOR
+       (`Server.HtmlDecode(url).Trim()` as the text, target="_blank",
+       href = Page.ResolveUrl(url)). Reproduced as a template, with WebUtility.HtmlDecode and
+       PageUtility.ResolveUrl standing in for the two removed System.Web APIs.
+
+   ⚠ OnClientClick="return updateSelection();" + a SERVER handler on one element is RZ10008, so
+   the gate is invoked from INSIDE the @@onclick handler, first thing - which is also the exact
+   moment it ran before. Its RESULT is deliberately NOT treated as a gate: updateSelection() has
+   no return statement, so it evaluated to `undefined`, and `return undefined` does not cancel a
+   WebForms postback. It never blocked the save and it does not block it now; it is called for
+   its SIDE EFFECT, which is filling #SelectedMenusHidden.
+
+   ⚠ #SelectedMenusHidden IS THE POSTBACK-VALUE PROBLEM. Its value is written by jQuery and
+   never typed, so @@bind cannot recover it (a scripted value assignment raises no input event).
+   It is read at CLICK TIME through Internal/ElementValueReader - the faithful equivalent of the
+   postback read: same element, same value, same moment.
+
+   The login-derived values come from ICurrentLogin: AppUsers.GetCurrentUserDB() (the catalog
+   the user list, the office list, the policy grid AND the save all use) and
+   AppUsers.GetCurrent().View.Culture (which decides the LANGUAGE of the menu texts in the grid)
+   both return an EMPTY login inside a circuit.
+
+   The ReturnUrl redirect of SaveButton_Click is preserved, including its "only when the query
+   value is present" condition.
+
+   The whole #region IDisposable of the original - which detached handlers and disposed the
+   DropDownLists, the Button and the HiddenField - has no counterpart: those were server
+   controls in a control tree, and there is no tree.
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme or IsLandingPage override
+   and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using System.Collections.ObjectModel
+@using System.Net
+@using Serilog
+@using Microsoft.AspNetCore.WebUtilities
+@using MixERP.Net.Common
+@using MixERP.Net.Core.Modules.BackOffice.Internal
+@using MixERP.Net.Entities.Policy
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.i18n.Resources
+@using Office = MixERP.Net.Core.Modules.BackOffice.Data.Admin.Office
+@using User = MixERP.Net.Core.Modules.BackOffice.Data.Admin.User
+@using Menu = MixERP.Net.Core.Modules.BackOffice.Data.Policy.Menu
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<div class="ui tiny pink form segment" style="position:fixed;right:4px;top:40px;">
+    <div>
+        <h1 class="ui purple header">@Titles.MenuAccessPolicy</h1>
+        <div class="ui divider"></div>
+    </div>
+    <div class="field">
+        <label for="UserSelect">@Titles.SelectUser</label>
+        <select id="UserSelect" @bind="this.selectedUserId">
+            @foreach (MixERP.Net.Entities.Office.UserSelectorView user in this.users)
+            {
+                <option value="@user.UserId">@user.UserName</option>
+            }
+        </select>
+    </div>
+    <div class="field">
+        <label for="OfficeSelect">@Titles.SelectOffice</label>
+        <select id="OfficeSelect" @bind="this.selectedOfficeId">
+            @foreach (MixERP.Net.Entities.Office.Office office in this.offices)
+            {
+                <option value="@office.OfficeId">@office.OfficeName</option>
+            }
+        </select>
+    </div>
+    <div class="ui buttons vpad8">
+        <button class="ui red button" @onclick="this.ShowButton_Click">@Titles.Show</button>
+        <input type="button" id="CheckAllButton" class="ui blue button" value="@Titles.CheckAll" />
+        <input type="button" id="UncheckAllButton" class="ui pink button" value="@Titles.UncheckAll" />
+        <button class="ui green button" @onclick="this.SaveButton_Click">@Titles.Save</button>
+    </div>
+</div>
+
+@if (this.bound)
+{
+    <MixERPGridView ID="MenuAccessGridView"
+                    AutoGenerateColumns="false"
+                    Columns="@this.columns"
+                    DataSource="@this.dataSource" />
+}
+
+<input type="hidden" id="SelectedMenusHidden" />
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.BackOffice/js/policy/MenuAccess.ascx.js";
+
+    private const string SelectedMenusHiddenId = "SelectedMenusHidden";
+
+    /// <summary>
+    ///     The legacy <c>public override AccessLevel AccessLevel</c>, carried across unchanged.
+    ///     <para>
+    ///         <c>MixERPUserControlBase.AccessLevel</c> is an ABSTRACT GET-ONLY property, so it is
+    ///         overridden rather than assigned - which is also what the probe needs:
+    ///         <c>ModuleHost.razor</c> reads the surface off an <c>Activator.CreateInstance</c>
+    ///         instance on which no lifecycle method runs, and a getter answers there.
+    ///     </para>
+    /// </summary>
+    public override AccessLevel AccessLevel
+    {
+        get { return AccessLevel.LocalhostAdmin; }
+    }
+
+    private IEnumerable<MixERP.Net.Entities.Office.UserSelectorView> users =
+        new Collection<MixERP.Net.Entities.Office.UserSelectorView>();
+
+    private IEnumerable<MixERP.Net.Entities.Office.Office> offices =
+        new Collection<MixERP.Net.Entities.Office.Office>();
+
+    private string selectedUserId = string.Empty;
+    private string selectedOfficeId = string.Empty;
+
+    private IEnumerable<DbGetMenuPolicyResult> dataSource;
+    private bool bound;
+
+    private string catalog;
+    private string culture;
+
+    private ElementValueReader reader;
+    private bool scriptLoaded;
+
+    /// <summary>
+    ///     The six columns of <c>DbGetMenuPolicyResult</c>, in the data source's own order -
+    ///     which is what <c>AutoGenerateColumns</c> produced and what the javascript addresses
+    ///     positionally. See the header.
+    ///     <para>
+    ///         Razor's <c>@@&lt;...&gt;</c> template syntax is not available inside an object
+    ///         initializer in a <c>@@code</c> block, so the two templates are built as
+    ///         <c>row =&gt; (RenderFragment)(builder =&gt; ...)</c>.
+    ///     </para>
+    /// </summary>
+    private IReadOnlyList<MixERPGridViewColumn> columns;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body called CreateFormPanel / CreateGridPanel / CreateHiddenField - all
+    ///     markup now - and then BindGrid(), whose query needs the catalog and the culture, both
+    ///     of which are asynchronous. Nothing was dropped: the bind runs in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        MixERP.Net.Framework.Security.LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.culture = login.Culture;
+
+        this.reader = new ElementValueReader(this.JS);
+        this.columns = this.GetColumns();
+
+        //Was: userSelect.DataSource = User.GetUserSelectorView(...); DataBind();
+        this.users = User.GetUserSelectorView(this.catalog) ??
+                     (IEnumerable<MixERP.Net.Entities.Office.UserSelectorView>)
+                     new Collection<MixERP.Net.Entities.Office.UserSelectorView>();
+
+        //Was: officeSelect.DataSource = Office.GetOffices(...); DataBind();
+        this.offices = Office.GetOffices(this.catalog) ??
+                       (IEnumerable<MixERP.Net.Entities.Office.Office>)
+                       new Collection<MixERP.Net.Entities.Office.Office>();
+
+        //A DropDownList selected its FIRST item by default, which is the value the first
+        //BindGrid() read - and why the grid WAS populated on first load.
+        MixERP.Net.Entities.Office.UserSelectorView firstUser = this.users.FirstOrDefault();
+
+        if (firstUser != null)
+        {
+            this.selectedUserId = Conversion.TryCastString(firstUser.UserId);
+        }
+
+        MixERP.Net.Entities.Office.Office firstOffice = this.offices.FirstOrDefault();
+
+        if (firstOffice != null)
+        {
+            this.selectedOfficeId = Conversion.TryCastString(firstOffice.OfficeId);
+        }
+
+        this.BindGrid();
+    }
+
+    /// <summary>
+    ///     The controller is loaded after the first render (it reads #MenuAccessGridView out of
+    ///     the DOM), and its setup is RE-INVOKED after every later render - because a Show or a
+    ///     Save re-binds the grid and the new rows would otherwise carry no click handlers. The
+    ///     legacy equivalent was the full postback re-running the whole script.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+            this.scriptLoaded = true;
+            return;
+        }
+
+        if (!this.scriptLoaded)
+        {
+            return;
+        }
+
+        try
+        {
+            await this.JS.InvokeVoidAsync("initializeMenuAccessGrid");
+        }
+        catch (JSException)
+        {
+            //The controller has not finished loading yet; the next render retries.
+        }
+    }
+
+    /// <summary>Port of <c>ShowButton_Click</c>: re-bind, nothing else.</summary>
+    private void ShowButton_Click()
+    {
+        this.BindGrid();
+    }
+
+    /// <summary>
+    ///     Port of <c>SaveButton_Click</c>, step for step - including the ReturnUrl redirect and
+    ///     its "only when the query value is present" condition.
+    /// </summary>
+    private async Task SaveButton_Click()
+    {
+        //Was OnClientClick="return updateSelection();" - run FIRST, for its side effect of
+        //filling #SelectedMenusHidden. Its result is not a gate; see the header.
+        try
+        {
+            await this.JS.InvokeVoidAsync("updateSelection");
+        }
+        catch (JSException ex)
+        {
+            //Under WebForms this script was inline, so it could not be missing and the hidden
+            //field always carried the real selection. Here it is loaded asynchronously, so a
+            //failed interop call means "the selection could not be READ" - which must NOT be
+            //silently turned into "save an empty selection", because SaveMenuPolicy with an
+            //empty list REVOKES ALL MENU ACCESS for that user and office. Log it and abort.
+            Log.Warning("Could not read the menu selection; the menu policy was NOT saved. {Exception}.", ex);
+            return;
+        }
+
+        int userId = Conversion.TryCastInteger(this.selectedUserId);
+        int officeId = Conversion.TryCastInteger(this.selectedOfficeId);
+
+        string menus = await this.reader.GetValueAsync(SelectedMenusHiddenId);
+
+        if (userId.Equals(0) || officeId.Equals(0))
+        {
+            return;
+        }
+
+        Menu.SaveMenuPolicy(this.catalog, userId, officeId, menus);
+
+        string returnUrl = this.GetQueryValue("ReturnUrl");
+
+        if (returnUrl != null)
+        {
+            //Was Response.Redirect(ReturnUrl) with no validation - an open redirect. Only a
+            //LOCAL url is honoured now; a scheme-relative ("//evil.test") or absolute value is
+            //refused and the normal post-save path below is taken instead.
+            if (IsLocalUrl(returnUrl))
+            {
+                this.Navigation.NavigateTo(returnUrl);
+                return;
+            }
+
+            Log.Warning("Refused the non-local ReturnUrl {ReturnUrl} after saving the menu policy.",
+                returnUrl);
+        }
+
+        this.BindGrid();
+    }
+
+    /// <summary>
+    ///     Port of <c>BindGrid()</c>, including the <c>userId == 0 || officeId == 0</c> early
+    ///     return that leaves the grid unbound.
+    /// </summary>
+    private void BindGrid()
+    {
+        int userId = Conversion.TryCastInteger(this.selectedUserId);
+        int officeId = Conversion.TryCastInteger(this.selectedOfficeId);
+
+        if (userId.Equals(0) || officeId.Equals(0))
+        {
+            return;
+        }
+
+        this.dataSource = Menu.GetMenuPolicy(this.catalog, userId, officeId, this.culture);
+        this.bound = true;
+    }
+
+    /// <summary>
+    ///     Port of <c>Grid_RowDataBound</c> plus the auto-generated column set. The five
+    ///     localized headers and the single UNLOCALIZED "Url" header are the original's
+    ///     <c>0 .. Count-2</c> loop; the Access checkbox and the Url anchor are its two data-row
+    ///     effects.
+    /// </summary>
+    private IReadOnlyList<MixERPGridViewColumn> GetColumns()
+    {
+        return new List<MixERPGridViewColumn>
+        {
+            new MixERPGridViewColumn("RowNumber", Titles.Get("RowNumber"), typeof(long)),
+            new MixERPGridViewColumn("Access", Titles.Get("Access"), typeof(bool))
+            {
+                //A WebForms auto-generated BOOLEAN column rendered a DISABLED checkbox. The
+                //script re-enables them; updateSelection() then reads the ticked ones.
+                Template = row => (RenderFragment)(builder =>
+                {
+                    builder.OpenElement(0, "input");
+                    builder.AddAttribute(1, "type", "checkbox");
+                    builder.AddAttribute(2, "disabled", "disabled");
+
+                    DbGetMenuPolicyResult item = row as DbGetMenuPolicyResult;
+
+                    if (item != null && item.Access)
+                    {
+                        builder.AddAttribute(3, "checked", "checked");
+                    }
+
+                    builder.CloseElement();
+                })
+            },
+            new MixERPGridViewColumn("MenuId", Titles.Get("MenuId"), typeof(int)),
+            new MixERPGridViewColumn("MenuCode", Titles.Get("MenuCode"), typeof(string)),
+            new MixERPGridViewColumn("MenuText", Titles.Get("MenuText"), typeof(string)),
+            //⚠ The LAST header was NOT localized by the original's 0..Count-2 loop. Preserved.
+            new MixERPGridViewColumn("Url", "Url", typeof(string))
+            {
+                Template = row => (RenderFragment)(builder =>
+                {
+                    DbGetMenuPolicyResult item = row as DbGetMenuPolicyResult;
+                    string url = item == null ? string.Empty : item.Url;
+
+                    //Was Server.HtmlDecode(url).Trim().
+                    url = WebUtility.HtmlDecode(url ?? string.Empty).Trim();
+
+                    builder.OpenElement(0, "a");
+                    builder.AddAttribute(1, "target", "_blank");
+                    //Was this.Page.ResolveUrl(url).
+                    builder.AddAttribute(2, "href", PageUtility.ResolveUrl(url));
+                    builder.AddContent(3, url);
+                    builder.CloseElement();
+                })
+            }
+        };
+    }
+
+    /// <summary>
+    ///     True only for a url that stays on this application. The legacy
+    ///     <c>Response.Redirect(ReturnUrl)</c> accepted anything, which is an open redirect: a
+    ///     crafted link could bounce an administrator to an external site straight after a
+    ///     successful save. A relative path is accepted; a scheme-relative value ("//host"), a
+    ///     backslash variant ("/\\host") and anything absolute are refused.
+    /// </summary>
+    private static bool IsLocalUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return false;
+        }
+
+        if (url[0] == '/')
+        {
+            //"//host" and "/\host" both leave the application.
+            return url.Length == 1 || (url[1] != '/' && url[1] != '\\');
+        }
+
+        if (url[0] == '~' && url.Length > 1 && url[1] == '/')
+        {
+            return true;
+        }
+
+        //Anything else - including an absolute url and a protocol-relative one - is not local.
+        return !url.Contains(":") && !url.StartsWith("\\\\", StringComparison.Ordinal);
+    }
+
+    private string GetQueryValue(string name)
+    {
+        Uri uri;
+
+        if (!Uri.TryCreate(this.Navigation.Uri, UriKind.Absolute, out uri))
+        {
+            return null;
+        }
+
+        Microsoft.Extensions.Primitives.StringValues values;
+
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue(name, out values))
+        {
+            return values.ToString();
+        }
+
+        return null;
+    }
+}

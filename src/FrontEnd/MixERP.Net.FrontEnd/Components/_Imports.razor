@@ -1,0 +1,53 @@
+@* ---------------------------------------------------------------------------------------------
+   Components/_Imports.razor — the global @using set of every .razor file (checklist task 68).
+
+   Nothing below may be removed: `@using static ...RenderMode` is what makes
+   `@rendermode="InteractiveServer"` resolve (CS0103 without it).
+
+   NOTE ON SCOPE: _Imports.razor applies to the folder it lives in AND its subfolders, i.e. to
+   Components/** (App, Routes, Base/*, Layout/*) and to every converted page placed under
+   Components/. A .razor file created OUTSIDE Components/ does not see these usings.
+   --------------------------------------------------------------------------------------------- *@
+
+@* --- framework --- *@
+@using System
+@using System.Collections.Generic
+@using System.Globalization
+@using System.Linq
+@using System.Net.Http
+@using System.Threading.Tasks
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Sections
+@using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using Microsoft.JSInterop
+
+@* --- host --- *@
+@using MixERP.Net.FrontEnd
+@using MixERP.Net.FrontEnd.Application
+@using MixERP.Net.FrontEnd.Base
+@using MixERP.Net.FrontEnd.Components
+@using MixERP.Net.FrontEnd.Components.Base
+@using MixERP.Net.FrontEnd.Components.Layout
+@using MixERP.Net.FrontEnd.Models
+@using MixERP.Net.FrontEnd.Services.Authentication
+@using MixERP.Net.FrontEnd.Services.Layout
+
+@* --- shared libraries the converted pages and layouts use --- *@
+@using MixERP.Net.ApplicationState.Cache
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Extensions
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Entities.Core
+@using MixERP.Net.Framework
+@using MixERP.Net.Framework.Controls
+
+@* --- i18n: the resource classes are referenced UNQUALIFIED in the master pages' markup
+       (Titles.SignOut, Labels.UserGreeting, Warnings.*), so the resource namespace is imported
+       rather than the individual classes. --- *@
+@using MixERP.Net.i18n
+@using MixERP.Net.i18n.Resources

@@ -1,0 +1,129 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Widgets/SalesByGeographyWidget.ascx + .ascx.cs + .ascx.designer.cs - the
+   dashboard world map of sales per country.
+
+   OnControlLoad called CreateGridView(Placeholder1) then CreateWidget(Placeholder1), both of
+   which built their output with `new MixERPGridView()` / `new HtmlGenericControl("div")` +
+   Controls.Add. Both are markup now, IN THE SAME ORDER (the grid first, then the widget
+   chrome), because wwwroot/js/widgets/SalesByGeographyWidget.ascx.js captures
+   $("#SalesByGeographyGridView") and #map-container and needs both present.
+
+   MixERPGridView is a Blazor component now, so the grid is the <MixERPGridView> element with
+   the same ID, the same CssClass ("initially hidden") and the same DataSource; its
+   AutoGenerateColumns default (true) is what produced the country_code/sales columns that
+   the script reads as td:first-child / td:last-child of each tbody row.
+   DataSource + DataBind() become the single DataSource parameter - Blazor re-renders on
+   state change, so there is no separate bind step.
+
+   HtmlControlHelper.GetIcon("<class>") emitted <i class="<class>"></i>; those four icons are
+   written out literally.
+
+   The catalog comes from ICurrentLogin: AppUsers.GetCurrentUserDB() returns an EMPTY catalog
+   inside a Blazor circuit, and a widget deriving from MixERPWidget does not inherit the
+   CurrentLogin property (that is declared by MixERPUserControl).
+
+   The five <script src> elements of the .ascx (d3, topojson, datamaps, the host's
+   country-codes.js and this widget's own controller) are loaded SEQUENTIALLY, in that exact
+   order, after the data has rendered - the controller depends on all four. A .razor file may
+   not contain <script>.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPWidget
+@using MixERP.Net.Core.Modules.Sales.Data.Reports
+@using MixERP.Net.Core.Modules.Sales.Internal
+@using MixERP.Net.Entities.Transactions
+@using MixERP.Net.Framework.Security
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject ICurrentLogin CurrentLogin
+@inject IJSRuntime JS
+
+@* CreateGridView(this.Placeholder1) *@
+<MixERPGridView ID="SalesByGeographyGridView"
+                CssClass="initially hidden"
+                DataSource="@this.rows" />
+
+@* CreateWidget(this.Placeholder1) *@
+<div id="SalesByGeographyWidget" class="sixteen wide column widget">
+    <div class="ui attached segment">
+        <div class="ui left floated column">
+            <div class="ui header">@Titles.WorldSalesStatistics</div>
+        </div>
+        <div class="right floated column">
+            <i class="expand disabled icon"></i>
+            <i class="move icon"></i>
+            <i class="help icon"></i>
+            <i class="close icon"></i>
+        </div>
+    </div>
+    <div class="ui attached segment">
+        <div id="map-container" style="height: 400px; width: 980px;"></div>
+    </div>
+</div>
+
+@code {
+    private IEnumerable<SalesByCountryView> rows = new List<SalesByCountryView>();
+    private bool scriptsLoaded;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body called CreateGridView() and CreateWidget(), whose entire output is the
+    ///     markup above; the only thing left is the catalog-scoped query, which is asynchronous
+    ///     and therefore lives in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.rows = SalesByGeography.GetSalesByCountry(catalog);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (this.scriptsLoaded)
+        {
+            return;
+        }
+
+        //The controller captures the rendered table and the map container at parse time, so it
+        //must not run before they are in the DOM - which is the render AFTER the asynchronous
+        //query completed.
+        this.scriptsLoaded = true;
+
+        await ModuleScripts.LoadAsync(this.JS,
+            "/js/d3.min.js",
+            "/js/Datamaps/topojson.js",
+            "/js/Datamaps/datamaps.all.min.js",
+            "/js/mixerp/utitlities/country-codes.js",
+            "_content/MixERP.Net.Core.Modules.Sales/js/widgets/SalesByGeographyWidget.ascx.js");
+    }
+}

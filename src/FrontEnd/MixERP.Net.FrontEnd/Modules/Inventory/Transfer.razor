@@ -1,0 +1,84 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Transfer.ascx + .ascx.cs + .ascx.designer.cs - the stock transfer
+   TRANSACTION LIST screen (the stock transfer journal).
+
+   OnControlLoad built a StockTransactionView and added it to
+   <asp:PlaceHolder ID="Placeholder1">; StockTransactionView is a Blazor component now, so
+   the placeholder plus the property assignments ARE this markup. The `using (...)` wrapper
+   has no counterpart and disappears.
+
+   UserId / OfficeId / Catalog came from AppUsers.GetCurrent() / GetCurrentUserDB(), which
+   return an EMPTY login inside a Blazor circuit (there is no HttpContext over SignalR), so
+   they are resolved through ICurrentLogin - hence the deferred render.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction (the ENTRY screen does; this is
+   the read-only list). *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.StockTransactionViewFactory
+@using MixERP.Net.i18n.Resources
+
+@if (this.loaded)
+{
+    <StockTransactionView Text="@Titles.StockTransferJournal"
+                          Book="TranBook.Inventory"
+                          SubBook="SubTranBook.Transfer"
+                          AddNewUrl="~/Modules/Inventory/Entry/Transfer.mix"
+                          PreviewUrl="~/Modules/Inventory/Reports/InventoryTransferReport.mix"
+                          ChecklistUrl="~/Modules/Inventory/Confirmation/Transfer.mix"
+                          DbTableName="transactions.transaction_master"
+                          PrimaryKey="transaction_master_id"
+                          UserId="@this.userId"
+                          OfficeId="@this.officeId"
+                          Catalog="@this.catalog" />
+}
+
+@code {
+    private bool loaded;
+    private int userId;
+    private int officeId;
+    private string catalog;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY built the StockTransactionView above, which is markup now; the
+    ///     three login-derived values it also set are asynchronous, so they are read in
+    ///     OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.userId = login.UserId;
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+    }
+}

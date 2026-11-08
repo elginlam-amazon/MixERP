@@ -35,6 +35,10 @@ namespace MixERP.Net.FrontEnd.Application
 
             if (ex is ThreadAbortException)
             {
+                // ThreadAbortException can no longer be raised on modern .NET
+                // (Thread.Abort throws PlatformNotSupportedException), so this branch is
+                // unreachable in practice. It is kept because it is the ONLY behaviour the
+                // original had for this type: log at Verbose and swallow.
                 Log.Verbose("The thread was being aborted. {Exception}.", ex);
                 return;
             }
@@ -65,7 +69,7 @@ namespace MixERP.Net.FrontEnd.Application
                 Log.Error("Inner Exception. {InnerException}.", ex.InnerException);
             }
 
-            p:
+            // The original carried a dead `p:` label here (nothing branched to it); it is dropped.
             throw ex;
         }
     }

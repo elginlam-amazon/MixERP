@@ -1,0 +1,33 @@
+@* ---------------------------------------------------------------------------------------------
+   Site/AccessIsDenied.aspx (+ .aspx.cs) -> Components/Pages/Site/AccessIsDenied.razor
+   (checklist task 93).
+
+   MasterPageFile="~/BackendMaster.Master" -> @layout BackendLayout. The Script/StyleSheet/
+   BottomScript <asp:Content> blocks were all EMPTY -> no <SectionContent>.
+
+   Page_Init built the body programmatically into Placeholder1:
+       h1 = Warnings.AccessIsDenied -> HtmlControlHelper.GetDivider() -> p = Warnings.NotAuthorized
+   That exact markup lives in Specialist 4's Components/Base/AccessIsDeniedContent.razor, which
+   AuthorizationOutlet renders IN PLACE for the former Server.Transfer call sites. It is REUSED
+   here rather than duplicated, so the in-place denial and this routed page can never drift apart.
+
+   The cookie scheme's AccessDeniedPath (Program.cs) is this route, so it must keep it verbatim.
+   --------------------------------------------------------------------------------------------- *@
+@page "/Site/AccessIsDenied"
+@layout BackendLayout
+@inherits MixERPAuthorizedPageBase
+
+<AccessIsDeniedContent />
+
+@code {
+    /// <summary>
+    ///     Page_Init: <c>this.IsLandingPage = true</c> -- the denial page has no menu entry of its
+    ///     own, so the policy check must not run against it (and must certainly not redirect a
+    ///     denied user back to a denial page). Set in the constructor because the base activation
+    ///     sequence that reads it runs in OnInitializedAsync.
+    /// </summary>
+    public AccessIsDenied()
+    {
+        this.IsLandingPage = true;
+    }
+}

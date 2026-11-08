@@ -1,0 +1,209 @@
+@* ---------------------------------------------------------------------------------------------
+   Site/RuntimeError.aspx (+ .aspx.cs) -> Components/Pages/Site/RuntimeError.razor
+   (checklist task 94).
+
+   TWO ROUTES. The legacy url was /Site/RuntimeError.aspx, and Specialist 3's
+   MixERPErrorHandler.RuntimeErrorRoute (what MixERPExceptionHandlingMiddleware and
+   MixERPErrorHandler redirect to) is "/site/runtime-error". Both are declared, so neither the
+   migrated redirect nor an old bookmark/link 404s.
+
+   MasterPageFile="~/BackendMaster.Master" -> @layout BackendLayout; the Script/StyleSheet/
+   BottomScript <asp:Content> blocks were EMPTY -> no <SectionContent>.
+
+   DISPLAY DECISION (Page_Load), preserved exactly:
+       server software header absent  -> this is the development host  -> show details
+       otherwise                      -> show details only when DisplayErrorDetails == "true"
+   ConfigurationManager.AppSettings["DisplayErrorDetails"] is read through IConfiguration
+   (Specialist 2 carried the key over with the SAME "true" value in appsettings.json and
+   appsettings.Development.json, so the behaviour is identical before and after). The original
+   dereferenced the setting unconditionally (a NullReferenceException if it were missing); the
+   null-safe comparison below is the only change and cannot alter the outcome for the shipped
+   configuration.
+
+   THE STORED EXCEPTION -- BOTH handoff slots are read (Specialist 3's note), in the order the
+   exception can arrive:
+     1. MixERPErrorState (scoped)   - the circuit-side replacement for Session["ex"], written by
+                                      IMixERPErrorHandler.Handle when the failure happened inside
+                                      a circuit;
+     2. Session["ex"]               - MixERPExceptionHandlingMiddleware.ExceptionSessionKey, the
+                                      LEGACY key, written as a string for a plain HTTP request
+                                      that had no circuit;
+     3. IExceptionHandlerFeature    - the exception of the current failed request, when the
+                                      pipeline re-executed into this page without going through
+                                      either slot above.
+   DisplayError() rendered string.Format("<h2>{0}</h2>", ex.Message) into a Literal and logged
+   Log.Warning("{Exception}.", ex); both are preserved (the message is now rendered as encoded
+   text inside a real <h2> element, which is the correct posture for exception text and produces
+   the same element).
+
+   PRERENDERING. The session and the HttpContext only exist during the initial static render; the
+   interactive render is a second component instance with no HttpContext and would show nothing.
+   The resolved message therefore crosses the two renders through PersistentComponentState, the
+   same technique Specialist 7 used for the SignIn challenge.
+   --------------------------------------------------------------------------------------------- *@
+@page "/Site/RuntimeError"
+@page "/site/runtime-error"
+@layout BackendLayout
+@inherits MixERPAuthorizedPageBase
+@implements IDisposable
+@using Microsoft.AspNetCore.Diagnostics
+@using Microsoft.AspNetCore.Http
+@using Microsoft.Extensions.Configuration
+@using MixERP.Net.FrontEnd.Application
+@using Serilog
+
+@inject IConfiguration Configuration
+@inject IHttpContextAccessor HttpContextAccessor
+@inject MixERP.Net.Framework.Errors.MixERPErrorState ErrorState
+@inject PersistentComponentState ApplicationState
+
+<h1 class="ui red header">An Exception Occurred</h1>
+<div class="ui divider"></div>
+@if (!string.IsNullOrWhiteSpace(this.exceptionMessage))
+{
+    @* The ExceptionLiteral's content: string.Format(culture, "<h2>{0}</h2>", ex.Message). *@
+    <h2>@this.exceptionMessage</h2>
+}
+@* The back link keeps its original javascript: url rather than moving to IJSRuntime: this page is
+   reached when the application has ALREADY failed (possibly with a broken circuit), and a plain
+   href keeps working when interop does not. *@
+<a class="ui red button" href="javascript:history.go(-1);"><i class="long arrow left icon"></i>@Titles.Back</a>
+
+@code {
+    private const string PersistenceKey = "RuntimeError_ExceptionMessage";
+
+    private string exceptionMessage;
+    private PersistingComponentStateSubscription persistingSubscription;
+
+    /// <summary>
+    ///     Page_Init: <c>this.IsLandingPage = true</c> (no menu entry -- the policy check must not
+    ///     run against the error page). Set in the constructor because the base activation sequence
+    ///     that reads it runs in OnInitializedAsync.
+    /// </summary>
+    public RuntimeError()
+    {
+        this.IsLandingPage = true;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync().ConfigureAwait(true);
+
+        this.persistingSubscription = this.ApplicationState.RegisterOnPersisting(this.PersistAsync);
+
+        string persisted;
+
+        if (this.ApplicationState.TryTakeFromJson<string>(PersistenceKey, out persisted))
+        {
+            //The interactive render of a page whose static render already resolved the message.
+            this.exceptionMessage = persisted;
+            return;
+        }
+
+        this.exceptionMessage = this.ResolveMessage();
+    }
+
+    private Task PersistAsync()
+    {
+        this.ApplicationState.PersistAsJson(PersistenceKey, this.exceptionMessage ?? string.Empty);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    ///     Page_Load's display decision plus DisplayError(). Returns the message to render, or null
+    ///     when details must not be displayed or no exception was stored (the legacy page rendered
+    ///     the header, divider and back link in that case, and so does this one).
+    /// </summary>
+    private string ResolveMessage()
+    {
+        HttpContext context = this.HttpContextAccessor == null ? null : this.HttpContextAccessor.HttpContext;
+
+        if (!this.DisplayErrorDetails(context))
+        {
+            return null;
+        }
+
+        //Slot 1: the circuit-scoped error state (the Session["ex"] replacement).
+        MixERP.Net.Framework.MixERPException stored = this.ErrorState == null ? null : this.ErrorState.Exception;
+
+        if (stored != null)
+        {
+            Log.Verbose("Exception displayed to user.");
+            Log.Warning("{Exception}.", stored);
+            return stored.Message;
+        }
+
+        if (context != null)
+        {
+            //Slot 2: the legacy session key, written by the exception-handling middleware for a
+            //request that had no circuit. The middleware stores the MESSAGE, not the object.
+            string sessionMessage = this.GetSessionMessage(context);
+
+            if (!string.IsNullOrWhiteSpace(sessionMessage))
+            {
+                Log.Verbose("Exception displayed to user.");
+                Log.Warning("{Exception}.", sessionMessage);
+                return sessionMessage;
+            }
+
+            //Slot 3: the failed request's own exception, when the pipeline re-executed into this
+            //page. IExceptionHandlerFeature is the modern form of Server.GetLastError().
+            IExceptionHandlerFeature feature = context.Features.Get<IExceptionHandlerFeature>();
+
+            if (feature != null && feature.Error != null)
+            {
+                Log.Verbose("Getting the innermost exception.");
+                Log.Verbose("Exception displayed to user.");
+                Log.Warning("{Exception}.", feature.Error);
+                return feature.Error.Message;
+            }
+        }
+
+        return null;
+    }
+
+    private string GetSessionMessage(HttpContext context)
+    {
+        try
+        {
+            if (context.Session == null)
+            {
+                return null;
+            }
+
+            return context.Session.GetString(MixERPExceptionHandlingMiddleware.ExceptionSessionKey);
+        }
+        catch (InvalidOperationException ex)
+        {
+            //Session is not available for this request (UseSession did not run for it).
+            Log.Verbose("The runtime-error page could not read the session. {Exception}.", ex);
+            return null;
+        }
+    }
+
+    /// <summary>
+    ///     <c>Request.ServerVariables["SERVER_SOFTWARE"]</c> was empty under the Visual Studio
+    ///     development server and carried the IIS product string in production. Its modern
+    ///     counterpart is the response's <c>Server</c> header (Kestrel/IIS product string), so an
+    ///     absent/blank value still means "development host" and still forces the details on.
+    /// </summary>
+    private bool DisplayErrorDetails(HttpContext context)
+    {
+        string server = context == null ? null : (string)context.Response.Headers["Server"];
+
+        if (string.IsNullOrWhiteSpace(server))
+        {
+            //This is the development host: display the detailed error message.
+            return true;
+        }
+
+        string displayError = this.Configuration == null ? null : this.Configuration["DisplayErrorDetails"];
+
+        return "true".Equals(displayError, StringComparison.Ordinal);
+    }
+
+    public void Dispose()
+    {
+        this.persistingSubscription.Dispose();
+    }
+}

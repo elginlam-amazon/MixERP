@@ -1,0 +1,236 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/BalanceSheet.ascx + .ascx.cs + .ascx.designer.cs - the interactive
+   balance sheet (previous period vs current period, with drill-down links).
+
+   The whole screen was built procedurally (CreateTopPanel / CreateForm / CreateGridPanel) into
+   <asp:PlaceHolder ID="Placeholder1">. It is markup now, in the same child order and with the
+   same ids and css classes the control tree rendered: an h2, a "ui form segment" wrapping an
+   "inline fields" div (previous period, current period, factor, Show, Print), then a
+   div.auto-overflow-panel wrapping #BalanceSheetGridView.
+
+   ⚠ #BalanceSheetGridView IS A POSITIONAL JAVASCRIPT CONTRACT. js/reports/BalanceSheet.js
+   (the .ascx's inline block, moved verbatim - a .razor file may not contain <script>) reads
+   the grid by column POSITION: td:nth-child(4) is account_id (used to build the
+   AccountStatementPopup link and to indent non-account rows), td:nth-child(5) is
+   is_retained_earning as the literal text "True"/"False", and cells 2 and 3 are the two
+   balances it turns into links and colours red when negative. It then DELETES columns 4 and 5.
+   So all FIVE columns are emitted in the original order, with the original header texts (the
+   first and last are deliberately EMPTY, as the original set them) and the original
+   "text right" classes on the two balance columns - dropping an "unused" column would silently
+   break the screen. The grid is emitted as the HTML the GridView rendered, rather than through
+   MixERPGridView, which would prepend its own "ui striped table" classes and format the
+   numbers differently.
+
+   The script is loaded on the render AFTER the query, never on firstRender, because its
+   top-level block reads the rendered rows out of the DOM.
+
+   THE SHOW BUTTON IS A SERVER HANDLER (it was an <asp:Button> with Click -> BindGrid) and
+   stays one. Its three inputs are read AT CLICK TIME through ElementValueReader: the two dates
+   are written into the DateTextBox inputs by the jQuery UI datepicker and the factor by the
+   user, and a value jQuery writes raises no input event - under WebForms they arrived on the
+   postback, so reading the elements at click time is the faithful equivalent. The PRINT button
+   had no server handler (it was an HtmlInputButton driven by the script) and gets none here.
+
+   PRESERVED BEHAVIOUR: BindGrid() runs once on load (the legacy `if (!this.Page.IsPostBack)`)
+   and again on every Show click. Dispose() is not reproduced: a Blazor component owns no
+   child-control tree.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using System.Data
+@using MixERP.Net.Common
+@using MixERP.Net.Core.Modules.Finance.Internal
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.i18n.Resources
+@inject IJSRuntime JS
+
+<style type="text/css">
+    th:first-child {
+        width: 400px;
+    }
+</style>
+
+<h2>@Titles.BalanceSheet</h2>
+
+<div class="ui form segment">
+    <div class="inline fields">
+        <div class="field">
+            <label for="PreviousPeriodDateTextBox">@Titles.PreviousPeriod</label>
+            <DateTextBox ID="PreviousPeriodDateTextBox" Mode="@(FrequencyType.FiscalYearStartDate)"
+                         Catalog="@this.catalog" OfficeId="@this.officeId"
+                         @bind-Text="this.previousPeriod" />
+        </div>
+        <div class="field">
+            <label for="CurrentPeriodDateTextBox">@Titles.CurrentPeriod</label>
+            <DateTextBox ID="CurrentPeriodDateTextBox" Mode="@(FrequencyType.FiscalYearEndDate)"
+                         Catalog="@this.catalog" OfficeId="@this.officeId"
+                         @bind-Text="this.currentPeriod" />
+        </div>
+        <div class="field">
+            <label for="FactorInputText">@Titles.Factor</label>
+            <input type="text" id="FactorInputText" class="integer" value="@this.factor" />
+        </div>
+        <button id="ShowButton" type="button" class="ui green button" @onclick="this.ShowButton_Click">@Titles.Show</button>
+        <input type="button" id="PrintButton" class="ui orange button" value="@Titles.Print" />
+    </div>
+</div>
+
+<div class="auto-overflow-panel">
+    <table id="BalanceSheetGridView" class="ui celled definition table segment nowrap">
+        <thead>
+            <tr>
+                @* CreateBoundFields(), in order. The first and last header texts are empty,
+                   exactly as the original declared them. *@
+                <th class="text left"></th>
+                <th class="text right">@Titles.PreviousPeriod</th>
+                <th class="text right">@Titles.CurrentPeriod</th>
+                <th class="text left">@Titles.AccountId</th>
+                <th class="text left"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (this.table != null)
+            {
+                @foreach (DataRow row in this.table.Rows)
+                {
+                    <tr>
+                        <td>@GridFormat.Text(row, "item")</td>
+                        <td class="text right">@GridFormat.Format(row, "previous_period", "{0:N}")</td>
+                        <td class="text right">@GridFormat.Format(row, "current_period", "{0:N}")</td>
+                        <td>@GridFormat.Text(row, "account_id")</td>
+                        <td>@GridFormat.Text(row, "is_retained_earning")</td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.Finance/js/reports/BalanceSheet.js";
+
+    private ElementValueReader elementValues;
+
+    private string catalog;
+    private int officeId;
+    private int userId;
+
+    private string previousPeriod;
+    private string currentPeriod;
+    private string factor = "1000";
+
+    private DataTable table;
+    private bool bound;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body called the three Create* builders - all markup now - and then
+    ///     BindGrid(), which needs the catalog and is therefore asynchronous.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        this.elementValues = new ElementValueReader(this.JS);
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.userId = login.UserId;
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        //`if (!this.Page.IsPostBack) this.BindGrid();`
+        this.BindGrid();
+    }
+
+    /// <summary>
+    ///     Port of ShowButton_Click -> BindGrid(). The three filter values are re-read from the
+    ///     DOM first, which is what the WebForms postback did for them.
+    /// </summary>
+    private async Task ShowButton_Click()
+    {
+        await this.ReadFiltersAsync();
+
+        this.BindGrid();
+    }
+
+    private async Task ReadFiltersAsync()
+    {
+        string previous = await this.elementValues.GetValueAsync("PreviousPeriodDateTextBox");
+        string current = await this.elementValues.GetValueAsync("CurrentPeriodDateTextBox");
+        string factorValue = await this.elementValues.GetValueAsync("FactorInputText");
+
+        if (previous != null)
+        {
+            this.previousPeriod = previous;
+        }
+
+        if (current != null)
+        {
+            this.currentPeriod = current;
+        }
+
+        if (factorValue != null)
+        {
+            this.factor = factorValue;
+        }
+    }
+
+    /// <summary>
+    ///     Port of BindGrid(), verbatim - the same six arguments in the same order.
+    /// </summary>
+    private void BindGrid()
+    {
+        DateTime previousTerm = Conversion.TryCastDate(this.previousPeriod);
+        DateTime currentTerm = Conversion.TryCastDate(this.currentPeriod);
+        int factorValue = Conversion.TryCastInteger(this.factor);
+
+        this.table = Data.Reports.BalanceSheet.GetBalanceSheet(this.catalog, previousTerm, currentTerm,
+            this.userId, this.officeId, factorValue);
+        this.bound = true;
+    }
+
+    /// <summary>
+    ///     The inline block moved to js/reports/BalanceSheet.js and is loaded on the render
+    ///     AFTER the query - its top-level block reads #BalanceSheetGridView's rows out of the
+    ///     DOM, so loading it on firstRender would leave every link and indent unbuilt.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!this.bound)
+        {
+            return;
+        }
+
+        await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+    }
+}

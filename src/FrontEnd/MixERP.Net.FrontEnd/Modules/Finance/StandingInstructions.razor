@@ -1,0 +1,41 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from StandingInstructions.ascx + .ascx.cs + .ascx.designer.cs.
+
+   CONTENT-FREE BY ORIGIN, verified: the .ascx carried ONLY the license comment and the
+   <%@ Control %> directive (not even a placeholder), the designer declared no fields, and
+   OnControlLoad's body was empty. This screen was reached from the Finance menu and rendered
+   nothing but the master page's chrome; inventing a form here would add behaviour the module
+   never had.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+
+@code {
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body was ALREADY EMPTY (see above) - there is nothing to port into it.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+}

@@ -1,0 +1,50 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from AssignCashier.ascx + .ascx.cs + .ascx.designer.cs.
+
+   REVIEW: behaviour inferred from the original control tree - verify against the intended
+   POS feature. This control is DELIBERATELY content-free, and that reproduces the legacy
+   rendering exactly:
+     * AssignCashier.ascx declared ONE server control, <asp:PlaceHolder ID="ScrudPlaceholder"
+       runat="server" />, and nothing else.
+     * AssignCashier.ascx.designer.cs therefore declared the ScrudPlaceholder field.
+     * AssignCashier.ascx.cs overrode OnControlLoad with an EMPTY body - it NEVER added a
+       Scrud (or anything else) to that placeholder, unlike the CRM/Setup controls that use
+       the same placeholder idiom.
+   An unpopulated asp:PlaceHolder renders NO element and NO content, so the legacy screen was
+   blank. Inventing a <Scrud .../> here would be a guess at an unknown key column, table and
+   view, and would newly expose a POS table through a CRUD form - a behaviour change, not a
+   port. The placeholder idiom is recorded here instead so the feature's owner can supply the
+   real Scrud parameters. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+
+@code {
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control must declare
+    ///     it. The legacy override had an empty body (verified against AssignCashier.ascx.cs):
+    ///     the control's entire server-side behaviour is the base class's logging and the two
+    ///     authorization checks, which MixERPUserControl runs.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+}

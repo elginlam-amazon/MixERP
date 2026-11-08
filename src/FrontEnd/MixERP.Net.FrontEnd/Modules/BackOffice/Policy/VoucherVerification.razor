@@ -1,0 +1,159 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+
+@* Ported from Policy/VoucherVerification.ascx + .ascx.cs + .ascx.designer.cs.
+   OnControlLoad built a Scrud over policy.voucher_verification_policy and added it to
+   <asp:PlaceHolder ID="ScrudPlaceholder">, which is this markup now.
+
+   ⚠ AccessLevel.AdminOnly IS PRESERVED. MixERPAuthorization.CheckAccessLevelAsync enforces it
+   (AdminOnly requires View.IsAdmin) and logs "Access to {Control} is denied to {User} from
+   {IP}." on refusal. This screen decides who may verify, approve, withdraw or reject another user's
+   vouchers, and up to what amount, so losing the gate would let any
+   signed-in user change it.
+
+   ⚠ THE THREE Deny* FLAGS ARE A SECOND, INDEPENDENT GATE AND ARE ALSO PRESERVED. The legacy
+   body computed `bool denyToNonAdmins = !AppUsers.GetCurrent().View.IsAdmin.ToBool();` and set
+   DenyAdd/DenyEdit/DenyDelete from it, so a non-admin who somehow reached the screen still got
+   a read-only form. AppUsers.GetCurrent() returns an EMPTY login inside a Blazor circuit
+   (IsAdmin == false), which would have made the form permanently read-only for everyone - a
+   silent regression - so IsAdmin comes from ICurrentLogin instead. That is also why the Scrud
+   renders only once `loaded` is true: the flags must be known at first render.
+
+   ExcludeEdit="policy_id", PageSize="100" and UseDisplayViewsAsParents="true" are all carried
+   across verbatim.
+
+   THE INLINE <script> BLOCK MOVED, VERBATIM, to wwwroot/js/policy/VoucherVerification.js. Blazor strips a
+   <script> element inside a .razor file, so it is loaded as a file from
+   OnAfterRenderAsync(firstRender). It declares the GLOBAL scrudCustomValidator(), which
+   ScrudFactory's Scrud.js calls BY BARE NAME before a save - it blocks the save when the
+   policy's end date precedes its effective-from date. Dropping it would silently let a policy
+   row be saved with an impossible date range, so the name and the body are preserved exactly.
+
+   The display-field/display-view lookups read
+   DbConfig.GetDbParameter(AppUsers.GetCurrentUserDB(), ...); that catalog is EMPTY inside a
+   Blazor circuit, so it comes from ICurrentLogin in OnInitializedAsync.
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme, IsLandingPage or
+   IsRestrictedMode override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Core.Modules.BackOffice.Internal
+@using MixERP.Net.WebControls.ScrudFactory
+@using MixERP.Net.i18n.Resources
+@inject IJSRuntime JS
+
+@if (this.loaded)
+{
+    <Scrud KeyColumn="policy_id"
+           TableSchema="policy"
+           Table="voucher_verification_policy"
+           ViewSchema="policy"
+           View="voucher_verification_policy_scrud_view"
+           ExcludeEdit="policy_id"
+           PageSize="100"
+           DisplayFields="@this.displayFields"
+           DisplayViews="@this.displayViews"
+           UseDisplayViewsAsParents="true"
+           DenyAdd="@this.denyToNonAdmins"
+           DenyEdit="@this.denyToNonAdmins"
+           DenyDelete="@this.denyToNonAdmins"
+           Text="@Titles.VoucherVerificationPolicy" />
+}
+
+@code {
+    private const string ValidatorScript =
+        "_content/MixERP.Net.Core.Modules.BackOffice/js/policy/VoucherVerification.js";
+
+    /// <summary>
+    ///     The legacy <c>public override AccessLevel AccessLevel</c>, carried across unchanged.
+    ///     <para>
+    ///         <c>MixERPUserControlBase.AccessLevel</c> is an ABSTRACT GET-ONLY property, so it is
+    ///         overridden rather than assigned - which is also what the probe needs:
+    ///         <c>ModuleHost.razor</c> reads the surface off an <c>Activator.CreateInstance</c>
+    ///         instance on which no lifecycle method runs, and a getter answers there.
+    ///     </para>
+    /// </summary>
+    public override AccessLevel AccessLevel
+    {
+        get { return AccessLevel.AdminOnly; }
+    }
+
+    private bool loaded;
+    private bool denyToNonAdmins;
+    private string displayFields;
+    private string displayViews;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY built the Scrud above, which is markup now; everything it
+    ///     computed for that Scrud (the IsAdmin flag and the display-field lookups) needs the
+    ///     login and the catalog, both of which are asynchronous.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        //Was: !AppUsers.GetCurrent().View.IsAdmin.ToBool()
+        this.denyToNonAdmins = !login.IsAdmin;
+
+        this.displayFields = GetDisplayFields(catalog);
+        this.displayViews = GetDisplayViews();
+        this.loaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await ModuleScripts.LoadAsync(this.JS, ValidatorScript);
+    }
+
+    private static string GetDisplayFields(string catalog)
+    {
+        List<string> displayFields = new List<string>();
+        ScrudHelper.AddDisplayField(displayFields, "office.users.user_id",
+            DbConfig.GetDbParameter(catalog, "UserDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "office.offices.office_id",
+            DbConfig.GetDbParameter(catalog, "OfficeDisplayField"));
+        return string.Join(",", displayFields);
+    }
+
+    private static string GetDisplayViews()
+    {
+        List<string> displayViews = new List<string>();
+        ScrudHelper.AddDisplayView(displayViews, "office.users.user_id", "office.user_selector_view");
+        ScrudHelper.AddDisplayView(displayViews, "office.offices.office_id", "office.office_scrud_view");
+        return string.Join(",", displayViews);
+    }
+}

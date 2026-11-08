@@ -1,0 +1,298 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from OTS/OpeningInventory.ascx + .ascx.cs + .ascx.designer.cs - the one-time-setup
+   opening-stock entry screen: a growable grid of item/store/quantity/unit/amount rows, saved in
+   one go through the opening-inventory service.
+
+   ⚠ AccessLevel.AdminOnly IS PRESERVED, and ⚠ ITransaction IS IMPLEMENTED - this is the only
+   ITransaction in the module and it is easy to miss, because the class declares it with no
+   OverridePath beside it. It is what makes MixERPUserControl's
+   CheckTransactionPostingStatusAsync apply: the host's implementation performs the
+   `control is ITransaction` test, so dropping the interface would let a user in restricted
+   transaction mode post opening stock.
+
+   ⚠ THE "ALREADY ENTERED" GUARD IS REAL LOGIC AND IS PRESERVED, including its position. The
+   legacy OnControlLoad built the header and the top panel, THEN checked
+   `DbConfig.GetSwitch(catalog, "AllowMultipleOpeningInventory")` and
+   `Data.OpeningInventory.Exists(catalog, officeId)`, and when an entry existed and the switch
+   was off it added `div.ui.positive.message` with Labels.OpeningInventoryAlreadyEntered and
+   RETURNED - so the grid, the bottom panel and the Save button were never rendered. That is
+   reproduced exactly: header and top panel always, then either the message OR the grid +
+   bottom panel. This is what stops a second opening balance being posted, so it is not a
+   cosmetic branch.
+   Both reads need the catalog and the office id, which are asynchronous, so they run in
+   OnInitializedAsync and the screen renders nothing below the top panel until they have
+   answered (`loaded`).
+
+   ⚠ THE GRID IS A POSITIONAL JAVASCRIPT CONTRACT - DO NOT REORDER OR DROP A COLUMN.
+   js/ots/OpeningInventory.ascx.js builds every data row itself and then addRowToTable() reads
+   it back by INDEX: getColumnText(row, 0)=ItemCode, 1=ItemName, 2=StoreName, 3=Quantity,
+   4=UnitName, 5=Amount, 6=Total, and setColumnText writes 3, 5 and 6 when it merges a duplicate
+   row. The SERVICE then parses the same shape positionally (item[0], item[2], item[3],
+   item[4], item[5] - skipping 1 and 6). So all EIGHT columns are emitted in exactly the order
+   CreateHeaderRow/CreateControlRow added them, headers as <th> carrying their <label for>, and
+   the per-cell css classes ("integer text-right" / "currency text-right") kept verbatim -
+   `tableToJSON` and the formatting helpers both depend on them.
+     The header row was moved into TableRowSection.TableHeader, so it is a real <thead>; the
+     control row keeps its `class="ui footer-row form"` and is the LAST row of the <tbody>,
+     which is what `tbody tr:not(:last-child)` and `tr:last` in the script mean. The
+     `saveButton` guard `tbody tr.length < 2` counts that control row, so the <tbody> must hold
+     the control row and nothing else at first render.
+     ⚠ `class=""` IS EMITTED ON THE CELLS THAT HAD NO CLASS. AddHeaderCell/AddInputTextControlCell
+     called Attributes.Add("class", cssClass) unconditionally, including with "", so the
+     rendered attribute was there and empty. Preserved so the markup is byte-identical.
+     ⚠ The Add button's caption is the LITERAL "Add", not Titles.Add, unlike every other caption
+     on this screen. Upstream localization gap, preserved as found.
+
+   ✅ #ItemIdHidden IS NOW EMITTED - this closes the LAST of the host obligations recorded in
+   Modules/migration-summary.md §6 and §10. StockAdjustmentFactory/ScrudFactory's F4 item popup
+   writes the chosen item id into `#ItemIdHidden`, and the element is owned by the CONSUMER
+   PAGE, not by the control. This screen's script declares
+   `var itemIdHidden = $("#ItemIdHidden");` at the top - against an element the legacy markup
+   never rendered.
+     ⚠ WORTH KNOWING: adding it is INERT here, which is why it is safe. `itemIdHidden` is
+     declared and then NEVER USED again anywhere in that file (unlike Inventory's Entry screens,
+     where the popup genuinely writes through it), so the element switches nothing on; it
+     satisfies the documented contract without newly activating a lookup. The same cannot be
+     said of #StoreIdHidden, #UnitIdHidden, #UnitNameHidden and #OpeningInventoryGridViewHidden,
+     which the script also declares and which have NEVER existed either - and two of those ARE
+     used (loadUnits() reads #UnitIdHidden for the pre-selected unit, and unitSelect.change()
+     writes both unit hidden fields). They are deliberately NOT added: doing so would newly make
+     the unit selection sticky across rows, which is a behaviour change. Raised separately.
+
+   The inline <style> block (the seven #OpeningInventoryGridView column widths) stays a <style>
+   element - Blazor strips <script>, not <style>.
+
+   The controller stays the owner of every interaction: the Add button, the Save button, the
+   item/store/unit ajax binds, the keyboard shortcuts and the total calculation are all its
+   click/blur/change handlers reading the DOM, so none of these elements becomes @@bind or
+   @@onclick. The script is loaded AFTER the first render because its top-level block reads
+   #OpeningInventoryGridView and the selects out of the DOM.
+
+   The login-derived values come from ICurrentLogin: AppUsers.GetCurrentUserDB() and
+   AppUsers.GetCurrent().View.OfficeId feed the switch read, the "already entered" check and the
+   DateTextBox's fiscal-calendar lookup, and all of them return an EMPTY login inside a circuit.
+
+   The #region IDisposable of the original disposed the one DateTextBox it held as a field; the
+   control is a component now and the framework owns its lifetime, so there is nothing to
+   dispose.
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme or IsLandingPage override. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@implements MixERP.Net.Entities.Contracts.ITransaction
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Core.Modules.BackOffice.Internal
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.i18n.Resources
+@inject IJSRuntime JS
+
+<style type="text/css">
+    table input[type=radio] {
+        margin: 4px;
+    }
+
+    #OpeningInventoryGridView th:nth-child(1) {
+        width: 10%;
+    }
+
+    #OpeningInventoryGridView th:nth-child(2) {
+        width: 20%;
+    }
+
+    #OpeningInventoryGridView th:nth-child(3) {
+        width: 15%;
+    }
+
+    #OpeningInventoryGridView th:nth-child(4) {
+        width: 15%;
+    }
+
+    #OpeningInventoryGridView th:nth-child(5) {
+        width: 15%;
+    }
+
+    #OpeningInventoryGridView th:nth-child(6) {
+        width: 15%;
+    }
+
+    #OpeningInventoryGridView th:nth-child(7) {
+        width: 10%;
+    }
+</style>
+
+@* CreateHeader(Placeholder1) *@
+<h2>@Titles.OpeningInventory</h2>
+
+@* CreateTopPanel(Placeholder1) *@
+<div class="ui form">
+    <div class="inline fields">
+        <div class="field">
+            <label for="ValueDateTextBox">@Titles.ValueDate</label>
+            <DateTextBox ID="ValueDateTextBox"
+                         Mode="FrequencyType.Today"
+                         Catalog="@this.catalog"
+                         OfficeId="@this.officeId" />
+        </div>
+        <div class="field">
+            <label for="ReferenceNumberInputText">@Titles.ReferenceNumber</label>
+            <input type="text" id="ReferenceNumberInputText" maxlength="24" />
+        </div>
+    </div>
+</div>
+
+@* ✅ The host-supplied hidden element the item popup's AssociatedControlId names. See the
+   header: it is declared by the controller and is inert, so emitting it closes the documented
+   contract without switching any behaviour on. *@
+<input type="hidden" id="ItemIdHidden" />
+
+@if (this.loaded)
+{
+    @if (this.alreadyEntered)
+    {
+        @* CreateMessage(Placeholder1) - and the original RETURNED here, so nothing below it
+           was rendered. *@
+        <div class="ui positive message">@Labels.OpeningInventoryAlreadyEntered</div>
+    }
+    else
+    {
+        @* CreateGridView(Placeholder1) *@
+        <table class="ui table" id="OpeningInventoryGridView">
+            <thead>
+                <tr>
+                    <th class=""><label for="ItemCodeInputText">@Titles.ItemCode</label></th>
+                    <th class=""><label for="ItemSelect">@Titles.ItemName</label></th>
+                    <th class=""><label for="StoreSelect">@Titles.StoreName</label></th>
+                    <th class="integer text-right"><label for="QuantityInputText">@Titles.Quantity</label></th>
+                    <th class=""><label for="UnitSelect">@Titles.Unit</label></th>
+                    <th class="currency text-right"><label for="AmountInputText">@Titles.Amount</label></th>
+                    <th class="currency text-right"><label for="TotalInputText">@Titles.Total</label></th>
+                    <th class=""><label for="AddRowButton">@Titles.Action</label></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="ui footer-row form">
+                    <td><input type="text" id="ItemCodeInputText" class="" /></td>
+                    <td><select id="ItemSelect"></select></td>
+                    <td><select id="StoreSelect"></select></td>
+                    <td><input type="text" id="QuantityInputText" class="integer text-right" /></td>
+                    <td><select id="UnitSelect"></select></td>
+                    <td><input type="text" id="AmountInputText" class="currency text-right" /></td>
+                    <td><input type="text" id="TotalInputText" class="currency text-right" readonly="readonly" /></td>
+                    @* ⚠ The caption is the literal "Add", not Titles.Add - preserved as found. *@
+                    <td><input type="button" id="AddRowButton" class="small ui blue button" value="Add" /></td>
+                </tr>
+            </tbody>
+        </table>
+
+        @* CreateBottomPanel(Placeholder1). NOTE: the original started from
+           HtmlControlHelper.GetInlineFields() and then OVERWROTE its class with "ui form" and
+           added the width, so the rendered element is a div.ui.form - not inline fields. *@
+        <div class="ui form" style="width:290px;">
+            <div class="field">
+                <label for="StatementReferenceTextArea">@Titles.StatementReference</label>
+                <textarea id="StatementReferenceTextArea" rows="4"></textarea>
+            </div>
+            <input type="button" id="SaveButton" class="small ui button red" value="@Titles.Save" />
+        </div>
+    }
+}
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.BackOffice/js/ots/OpeningInventory.ascx.js";
+
+    /// <summary>
+    ///     The legacy <c>public override AccessLevel AccessLevel</c>, carried across unchanged.
+    ///     <para>
+    ///         <c>MixERPUserControlBase.AccessLevel</c> is an ABSTRACT GET-ONLY property, so it is
+    ///         overridden rather than assigned - which is also what the probe needs:
+    ///         <c>ModuleHost.razor</c> reads the surface off an <c>Activator.CreateInstance</c>
+    ///         instance on which no lifecycle method runs, and a getter answers there.
+    ///     </para>
+    /// </summary>
+    public override AccessLevel AccessLevel
+    {
+        get { return AccessLevel.AdminOnly; }
+    }
+
+    private string catalog;
+    private int officeId;
+    private bool loaded;
+    private bool alreadyEntered;
+    private bool scriptLoaded;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body called the five Create* builders - all markup now - and performed the
+    ///     "already entered" check between them; that check needs the catalog and the office id,
+    ///     which are asynchronous, so it runs in OnInitializedAsync. Nothing was dropped.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it, and here it is
+        //also what applies CheckTransactionPostingStatusAsync to this ITransaction control.
+        await base.OnInitializedAsync();
+
+        MixERP.Net.Framework.Security.LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.officeId = login.OfficeId;
+
+        //Was:
+        //  bool allowMultipleOpeningInventory =
+        //      DbConfig.GetSwitch(AppUsers.GetCurrentUserDB(), "AllowMultipleOpeningInventory");
+        //  bool entryExists = Data.OpeningInventory.Exists(AppUsers.GetCurrentUserDB(),
+        //      AppUsers.GetCurrent().View.OfficeId.ToInt());
+        //  if (entryExists && !allowMultipleOpeningInventory) { CreateMessage(...); return; }
+        bool allowMultipleOpeningInventory = DbConfig.GetSwitch(this.catalog, "AllowMultipleOpeningInventory");
+        bool entryExists = Data.OpeningInventory.Exists(this.catalog, this.officeId);
+
+        this.alreadyEntered = entryExists && !allowMultipleOpeningInventory;
+        this.loaded = true;
+    }
+
+    /// <summary>
+    ///     The controller is loaded on the render AFTER the asynchronous check has answered,
+    ///     never on <c>firstRender</c>: its top-level block reads <c>#OpeningInventoryGridView</c>
+    ///     and the three selects out of the DOM, and on the first render the grid has not been
+    ///     decided on yet. It is also not loaded at all when the "already entered" message is
+    ///     showing, because there is then no grid, no selects and no Save button for it to bind
+    ///     to - which matches the original, where the elements it binds to were never rendered
+    ///     either.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (this.scriptLoaded || !this.loaded || this.alreadyEntered)
+        {
+            return;
+        }
+
+        this.scriptLoaded = true;
+        await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+    }
+}

@@ -1,0 +1,47 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Lead.ascx + .ascx.cs + .ascx.designer.cs (Lead control,
+   reached through the host's /Modules/{*path} route).
+
+   FAITHFULNESS NOTE - this control is content-free BY ORIGIN, not by omission:
+     * Lead.ascx contained ONLY the license comment and the <%@ Control %> directive -
+       no server control, no literal, no markup at all.
+     * Lead.ascx.designer.cs declared NO fields (no placeholder to populate).
+     * Lead.ascx.cs overrode OnControlLoad with an EMPTY body and declared no
+       OverridePath, AccessLevel, MasterPageId, RemoveTheme or IsLandingPage override,
+       and implemented no ITransaction.
+   So the original rendered an empty region, and the whole of its server-side behaviour is
+   the base class's logging + the two authorization checks, which MixERPUserControl runs.
+   Emitting any markup here would ADD a screen the module never had. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+
+@code {
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control must declare
+    ///     it. The legacy override of this control had an empty body (verified against
+    ///     Lead.ascx.cs), and the base raises it from OnInitialized exactly once, as the
+    ///     WebForms Load event did.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+}

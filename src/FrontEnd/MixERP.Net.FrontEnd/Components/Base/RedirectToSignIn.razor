@@ -1,0 +1,35 @@
+@* ---------------------------------------------------------------------------------------------
+   The circuit-side equivalent of the cookie scheme's LoginPath redirect, rendered by
+   Routes.razor's <AuthorizeRouteView><NotAuthorized> for an ANONYMOUS visitor.
+
+   The cookie middleware only redirects HTTP requests; a page reached over an existing circuit
+   never passes through it, so the same RequestLoginPage outcome is produced here by force-loading
+   AuthEndpoints.RequestLoginRoute (which signs the stale cookie out and then redirects to
+   /SignIn?ReturnUrl=...). forceLoad is required: the endpoint is not a routable component.
+   --------------------------------------------------------------------------------------------- *@
+@using MixERP.Net.Common
+@using MixERP.Net.FrontEnd.Services.Authentication
+@inject NavigationManager NavigationManager
+
+@* Nothing is rendered: the browser is leaving this page. *@
+
+@code {
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        string currentPage = PageUtility.GetCurrentPageUrl(this.NavigationManager);
+
+        if (MixERPAuthentication.IsLoginUrl(currentPage))
+        {
+            return;
+        }
+
+        this.NavigationManager.NavigateTo(AuthEndpoints.GetRequestLoginUrl(currentPage), true);
+    }
+}

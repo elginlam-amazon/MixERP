@@ -1,0 +1,97 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Entry/Order.ascx + .ascx.cs + .ascx.designer.cs - the sales-order ENTRY
+   form. OnControlLoad built a StockTransactionForm and added it to
+   <asp:PlaceHolder ID="Placeholder1">; StockTransactionForm is a Blazor component now, so
+   the placeholder plus the property assignments ARE this markup.
+
+   PRESERVED SURFACE: OverridePath = "/Modules/Sales/Order.mix" (from the <%@ Control %>
+   directive, assigned in the CONSTRUCTOR because ModuleHost.razor reads it off an
+   Activator-created probe instance) and ITransaction.
+
+   Catalog / OfficeId come from ICurrentLogin - an empty login inside a circuit otherwise.
+   The .ascx's <script src="..."> element moved to OnAfterRenderAsync. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@implements MixERP.Net.Entities.Contracts.ITransaction
+@using MixERP.Net.Core.Modules.Sales.Internal
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.StockTransactionFactory
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+@if (this.loaded)
+{
+    <StockTransactionForm Book="TranBook.Sales"
+                          SubBook="SubTranBook.Order"
+                          Text="@Titles.SalesOrder"
+                          ShowPriceTypes="true"
+                          ShowShippingInformation="true"
+                          ShowSalesAgents="true"
+                          ShowSalesType="true"
+                          ShowStore="true"
+                          Catalog="@this.catalog"
+                          OfficeId="@this.officeId" />
+}
+
+@code {
+    private bool loaded;
+    private string catalog;
+    private int officeId;
+
+    public Order()
+    {
+        //<%@ Control ... OverridePath="/Modules/Sales/Order.mix" %>
+        this.OverridePath = "/Modules/Sales/Order.mix";
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the StockTransactionForm above, which is markup now; the two
+    ///     login-derived values it also set are asynchronous, so they are read in
+    ///     OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            await ModuleScripts.LoadAsync(this.JS,
+                "_content/MixERP.Net.Core.Modules.Sales/js/entry/Order.js");
+        }
+    }
+}

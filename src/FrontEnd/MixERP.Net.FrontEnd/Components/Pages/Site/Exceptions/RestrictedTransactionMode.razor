@@ -1,0 +1,34 @@
+@* ---------------------------------------------------------------------------------------------
+   Site/Exceptions/RestrictedTransactionMode.aspx (+ .aspx.cs)
+   -> Components/Pages/Site/Exceptions/RestrictedTransactionMode.razor (checklist task 95).
+
+   MasterPageFile="~/BackendMaster.Master" -> @layout BackendLayout; the four <asp:Content> blocks
+   other than the body were EMPTY -> no <SectionContent>.
+
+   Page_Init built the body programmatically into Placeholder1:
+       h1 = Titles.RestrictedTransactionMode
+       HtmlControlHelper.GetDivider()
+       p  = Warnings.RestrictedTransactionMode
+       a  = Titles.BackToPreviousPage, class "ui pink button", href "javascript:history.go(-1);"
+   That markup is Specialist 4's Components/Base/RestrictedTransactionModeContent.razor (which
+   AuthorizationOutlet renders in place for the former Server.Transfer call site), REUSED here so
+   the two paths cannot drift. The back link is now history.back() through IJSRuntime inside that
+   component -- see its header comment.
+   --------------------------------------------------------------------------------------------- *@
+@page "/Site/Exceptions/RestrictedTransactionMode"
+@layout BackendLayout
+@inherits MixERPAuthorizedPageBase
+
+<RestrictedTransactionModeContent />
+
+@code {
+    /// <summary>
+    ///     Page_Init: <c>this.IsLandingPage = true</c> -- this page has no menu entry, so the
+    ///     policy check must not run against it. Set in the constructor because the base
+    ///     activation sequence that reads it runs in OnInitializedAsync.
+    /// </summary>
+    public RestrictedTransactionMode()
+    {
+        this.IsLandingPage = true;
+    }
+}

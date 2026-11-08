@@ -1,0 +1,194 @@
+@* ---------------------------------------------------------------------------------------------
+   Modules/Default.aspx (+ Default.aspx.cs) -> Components/Pages/Modules/ModuleHost.razor
+   (checklist task 87).
+
+   ROUTE: the Application/Routes.cs "Modules/{*path}" MapPageRoute entry, verbatim. A module url
+   looks like /Modules/Sales/DirectSales.mix.
+
+   WHAT THE ORIGINAL DID, and where each piece went:
+     OnPreInit  -> InitializeControl(): LoadControl("~/Modules/{path}.ascx") guarded by
+                   File.Exists(Server.MapPath(...)). There is no .ascx and no virtual-path
+                   provider on modern .NET, so the path is resolved to a COMPONENT TYPE over the
+                   DiscoveryAssemblies set (Services/Modules/ModuleComponentResolver) and rendered
+                   with <DynamicComponent>. An unresolved path renders NOTHING, exactly as the
+                   File.Exists guard did.
+                -> MasterPageFile = "~/" + plugin.MasterPageId: a runtime master-page choice, which
+                   the compile-time @layout attribute cannot express. The page therefore uses the
+                   do-nothing PassThroughLayout and renders the REAL layout itself through
+                   <LayoutView>. With no MasterPageId the default is BackendLayout, which is the
+                   master page Default.aspx declared.
+                -> plugin.RemoveTheme -> Page.Theme = null: the theme stylesheet is no longer
+                   injected by a theme engine but linked by App.razor, so it is disabled through
+                   js interop instead.
+     OnInit     -> plugin.Initialize(), ValidateRequestMode, OverridePath, IsLandingPage.
+                   Initialize() is raised by MixERPUserControlBase itself for every control, so it
+                   is not called twice here; ValidateRequestMode has no framework counterpart (the
+                   control's own ValidDateRequest governs its RenderUserMarkup, see
+                   Base/TransactionCheckListControl.cs), and OverridePath / IsLandingPage must be
+                   applied BEFORE the base activation sequence reads them.
+
+   The control's five surface properties are read from a probe instance, which is how their values
+   can be known before the component is rendered.
+   --------------------------------------------------------------------------------------------- *@
+@page "/Modules/{*path}"
+@layout PassThroughLayout
+@inherits MixERPAuthorizedPageBase
+@using MixERP.Net.FrontEnd.Components.Layout
+@using MixERP.Net.FrontEnd.Services.Modules
+@using Serilog
+@inject IJSRuntime JS
+
+<LayoutView Layout="@this.ModuleLayout">
+    <div class="container">
+        @if (this.ModuleType != null)
+        {
+            <DynamicComponent Type="@this.ModuleType" />
+        }
+    </div>
+</LayoutView>
+
+@code {
+    /// <summary>
+    ///     The catch-all route value — RouteData.Values["path"].
+    /// </summary>
+    [Parameter]
+    public string Path { get; set; }
+
+    private Type ModuleType { get; set; }
+
+    private Type ModuleLayout { get; set; } = typeof(BackendLayout);
+
+    private bool removeTheme;
+
+    protected override async Task OnInitializedAsync()
+    {
+        //InitializeControl() + OnPreInit ran BEFORE OnInit, so the control's properties are applied
+        //before the base activation sequence (login gate, forced log-off, policy check) reads
+        //OverridePath / IsLandingPage.
+        this.InitializeControl();
+
+        await base.OnInitializedAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    ///     Port of InitializeControl() plus the OnPreInit/OnInit property transfer.
+    /// </summary>
+    private void InitializeControl()
+    {
+        if (string.IsNullOrWhiteSpace(this.Path))
+        {
+            return;
+        }
+
+        //"~/Modules/" + path.Replace(".mix", "") + ".ascx"
+        this.ModuleType = ModuleComponentResolver.ResolveModule(this.Path.Replace(".mix", string.Empty));
+
+        if (this.ModuleType == null)
+        {
+            return;
+        }
+
+        MixERPUserControlBase plugin = null;
+
+        try
+        {
+            plugin = Activator.CreateInstance(this.ModuleType) as MixERPUserControlBase;
+        }
+        catch (MissingMethodException ex)
+        {
+            Log.Warning("{Type} could not be inspected for its master page and override path. {Exception}.",
+                this.ModuleType, ex);
+        }
+
+        if (plugin == null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(plugin.MasterPageId))
+            {
+                this.ModuleLayout = GetLayout(plugin.MasterPageId);
+            }
+
+            this.removeTheme = plugin.RemoveTheme;
+
+            if (!string.IsNullOrWhiteSpace(plugin.OverridePath))
+            {
+                this.OverridePath = plugin.OverridePath;
+            }
+
+            //IsLandingPage is declared by MixERP.Net.Framework.Controls.MixERPUserControl, not by
+            //MixERPUserControlBase which only carries the three IControl members. Every
+            //Modules/** control derives from MixERPUserControl, so the probe instance is cast to
+            //it; a control that derives straight from MixERPUserControlBase keeps the page default.
+            MixERP.Net.Framework.Controls.MixERPUserControl hostControl =
+                plugin as MixERP.Net.Framework.Controls.MixERPUserControl;
+
+            if (hostControl != null)
+            {
+                this.IsLandingPage = hostControl.IsLandingPage;
+            }
+        }
+        finally
+        {
+            IDisposable disposable = plugin as IDisposable;
+
+            if (disposable != null)
+            {
+                disposable.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    ///     MasterPageFile = "~/" + MasterPageId. The four master pages became the four layouts of
+    ///     Components/Layout; an unrecognized id keeps the master page Default.aspx declared, which
+    ///     is what setting a non-existent MasterPageFile could never have done silently.
+    /// </summary>
+    private static Type GetLayout(string masterPageId)
+    {
+        if (masterPageId.IndexOf("MixERPBlankMaster", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return typeof(BlankLayout);
+        }
+
+        if (masterPageId.IndexOf("MixERPReportMaster", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return typeof(ReportLayout);
+        }
+
+        if (masterPageId.IndexOf("BackendMaster", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return typeof(BackendLayout);
+        }
+
+        if (masterPageId.IndexOf("MixERPMaster", StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            return typeof(MixERPLayout);
+        }
+
+        Log.Warning("The master page {MasterPageId} has no layout counterpart; the backend layout is used.",
+            masterPageId);
+
+        return typeof(BackendLayout);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender).ConfigureAwait(true);
+
+        if (!firstRender || !this.removeTheme)
+        {
+            return;
+        }
+
+        //Page.Theme = null: the theme stylesheet App_Themes used to inject is now a <link> in
+        //App.razor, so it is disabled for this page instead.
+        IJSObjectReference module = await this.JS
+            .InvokeAsync<IJSObjectReference>("import", "/js/mixerp/page-interop.js").ConfigureAwait(true);
+
+        await module.InvokeVoidAsync("setThemeEnabled", false).ConfigureAwait(true);
+    }
+}

@@ -1,0 +1,126 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Tax/SalesTaxExempts.ascx + .ascx.cs + .ascx.designer.cs.
+   OnControlLoad built a Scrud over core.sales_tax_exempts and added it to
+   <asp:PlaceHolder ID="ScrudPlaceholder">, which is this markup now.
+
+   THE INLINE <script> BLOCK MOVED, VERBATIM, to wwwroot/js/tax/SalesTaxExempts.js. Blazor
+   strips a <script> element inside a .razor file, so it is loaded as a file from
+   OnAfterRenderAsync(firstRender). It declares the GLOBAL scrudCustomValidator(), which
+   ScrudFactory's Scrud.js calls BY BARE NAME before a save - it blocks the save when the
+   valid-till date precedes valid-from, or when the "to" price is not greater than the "from"
+   price. Dropping it would silently let invalid sales-tax exemptions be saved, so the name and
+   the body are preserved exactly.
+
+   The display-field/display-view lookups read
+   DbConfig.GetDbParameter(AppUsers.GetCurrentUserDB(), ...); that catalog is EMPTY inside a
+   Blazor circuit, so it comes from ICurrentLogin in OnInitializedAsync - which is also why the
+   Scrud renders only once `loaded` is true (the display fields decide which column of each
+   parent view is shown).
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme, IsLandingPage or
+   IsRestrictedMode override, no AccessLevel override, and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Core.Modules.BackOffice.Internal
+@using MixERP.Net.WebControls.ScrudFactory
+@using MixERP.Net.i18n.Resources
+@inject IJSRuntime JS
+
+@if (this.loaded)
+{
+    <Scrud KeyColumn="sales_tax_exempt_id"
+           TableSchema="core"
+           Table="sales_tax_exempts"
+           ViewSchema="core"
+           View="sales_tax_exempt_scrud_view"
+           DisplayFields="@this.displayFields"
+           DisplayViews="@this.displayViews"
+           Text="@Titles.SalesTaxExempts" />
+}
+
+@code {
+    private const string ValidatorScript =
+        "_content/MixERP.Net.Core.Modules.BackOffice/js/tax/SalesTaxExempts.js";
+
+    private bool loaded;
+    private string displayFields;
+    private string displayViews;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY built the Scrud above, which is markup now; its display-field
+    ///     lookups need the catalog, which is asynchronous.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.displayFields = GetDisplayFields(catalog);
+        this.displayViews = GetDisplayViews();
+        this.loaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await ModuleScripts.LoadAsync(this.JS, ValidatorScript);
+    }
+
+    private static string GetDisplayFields(string catalog)
+    {
+        List<string> displayFields = new List<string>();
+        ScrudHelper.AddDisplayField(displayFields, "core.tax_master.tax_master_id",
+            DbConfig.GetDbParameter(catalog, "TaxMasterDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.tax_exempt_types.tax_exempt_type_id",
+            DbConfig.GetDbParameter(catalog, "TaxExemptTypeDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.sales_taxes.sales_tax_id",
+            DbConfig.GetDbParameter(catalog, "SalesTaxDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "office.stores.store_id",
+            DbConfig.GetDbParameter(catalog, "StoreDisplayField"));
+        return string.Join(",", displayFields);
+    }
+
+    private static string GetDisplayViews()
+    {
+        List<string> displayViews = new List<string>();
+        ScrudHelper.AddDisplayView(displayViews, "core.tax_master.tax_master_id", "core.tax_master_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.tax_exempt_types.tax_exempt_type_id",
+            "core.tax_exempt_type_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.sales_taxes.sales_tax_id", "core.sales_tax_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "office.stores.store_id", "office.store_scrud_view");
+
+        return string.Join(",", displayViews);
+    }
+}

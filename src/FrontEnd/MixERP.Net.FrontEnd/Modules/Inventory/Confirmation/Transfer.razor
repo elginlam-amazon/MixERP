@@ -1,0 +1,97 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Confirmation/Transfer.ascx + .ascx.cs + .ascx.designer.cs - the stock
+   transfer transaction CHECK LIST (verify / withdraw / print / attach).
+
+   OnControlLoad built a `Checklist` and added it to <asp:PlaceHolder ID="Placeholder1">.
+   `MixERP.Net.FrontEnd.Controls.Checklist` NO LONGER EXISTS: it was a one-property subclass
+   of TransactionChecklistForm whose only job was setting Catalog from
+   AppUsers.GetCurrentUserDB(), which returns an EMPTY catalog inside a Blazor circuit. The
+   markup therefore uses <TransactionChecklistForm> directly and supplies Catalog from
+   ICurrentLogin.
+
+   PRESERVED SURFACE:
+     * the control's own OverridePath = "/Modules/Inventory/Transfer.mix" (from the
+       <%@ Control %> directive), assigned in the CONSTRUCTOR because the host's
+       ModuleHost.razor reads it off an Activator.CreateInstance PROBE INSTANCE on which no
+       lifecycle method ever runs.
+     * the SEPARATE OverridePath the code-behind assigned onto the hosted check list (also
+       "/Modules/Inventory/Transfer.mix") - now a parameter on the element below.
+     * RestrictedTransactionMode = this.IsRestrictedMode, which the base computes during
+       base.OnInitializedAsync().
+
+   The original declared no AccessLevel, MasterPageId, RemoveTheme or IsLandingPage override
+   and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.TransactionCheckListControl
+@using MixERP.Net.WebControls.TransactionChecklist
+@using MixERP.Net.i18n.Resources
+
+@if (this.loaded)
+{
+    <TransactionChecklistForm ViewReportButtonText="@Titles.ViewThisTransfer"
+                              Text="@Titles.StockTransferJournal"
+                              AttachmentBookName="transaction"
+                              OverridePath="/Modules/Inventory/Transfer.mix"
+                              DisplayWithdrawButton="true"
+                              DisplayViewReportButton="true"
+                              DisplayAttachmentButton="true"
+                              ReportPath="~/Modules/Inventory/Reports/InventoryTransferReport.mix"
+                              ViewPath="/Modules/Inventory/Transfer.mix"
+                              AddNewPath="/Modules/Inventory/Entry/Transfer.mix"
+                              UserId="@this.userId"
+                              RestrictedTransactionMode="@this.IsRestrictedMode"
+                              Catalog="@this.catalog" />
+}
+
+@code {
+    private bool loaded;
+    private int userId;
+    private string catalog;
+
+    public Transfer()
+    {
+        //<%@ Control ... OverridePath="/Modules/Inventory/Transfer.mix" %>
+        this.OverridePath = "/Modules/Inventory/Transfer.mix";
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY built the check list above, which is markup now; the user id
+    ///     and the catalog are asynchronous, so they are read in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks AND computes IsRestrictedMode,
+        //which the check list below is given - never skip it, and never read IsRestrictedMode
+        //before it.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.userId = login.UserId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+    }
+}

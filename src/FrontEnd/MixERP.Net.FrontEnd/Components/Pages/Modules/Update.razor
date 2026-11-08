@@ -1,0 +1,193 @@
+@* ---------------------------------------------------------------------------------------------
+   Modules/Update.aspx (+ Update.aspx.cs) -> Components/Pages/Modules/Update.razor
+   (checklist task 89, authorization rule 57, timeout 22).
+
+   The page used ~/BackendMaster.Master -> @layout BackendLayout; its ScriptContentPlaceholder and
+   StyleSheetContentPlaceholder blocks were empty and its BottomScriptContentPlaceholder inline
+   block became wwwroot/js/Pages/Modules/Update.js (a .razor file may not contain a <script>).
+
+   AUTHORIZATION (task 57): admin AND (non-development OR (development AND localhost)). The whole
+   rule, including the "Access to {Page} is denied to {User} from {IP}." log entry, lives in
+   MixERPAuthorization.CanAccessUpdatePageAsync (Specialist 4). The legacy
+   Server.Execute("~/Site/AccessIsDenied.aspx", false) rendered the denial IN PLACE without
+   changing the url; CanAccessUpdatePageAsync records the denial on PageAuthorizationState and the
+   layout's AuthorizationOutlet substitutes <AccessIsDeniedContent /> for this body — the same
+   observable outcome, so this page simply returns early.
+
+   TIMEOUT (task 22): the former <location path="Modules/Update.aspx"><httpRuntime
+   executionTimeout="40000" /> is expressed where the long-running work happens — around the
+   release lookup below. The installation itself runs on the /hubs/update hub (Specialist 9), which
+   owns its own timeout.
+   --------------------------------------------------------------------------------------------- *@
+@page "/Modules/Update"
+@layout BackendLayout
+@inherits MixERPAuthorizedPageBase
+@using MixERP.Net.Updater
+@using MixERP.Net.Updater.Api
+@inject IJSRuntime JS
+
+@if (this.hasAccess)
+{
+    @if (this.showReleasePanel)
+    {
+        <h1 class="ui purple header">@Titles.NewReleaseAvailable</h1>
+
+        <div class="ui warning icon message">
+            <i class="warning circle negative icon"></i>
+            <div class="content">
+                <div class="ui large header">
+                    @Titles.CreateBackupFirst
+                </div>
+                <p>
+                    @Labels.UpdateBackupMessage
+                </p>
+            </div>
+        </div>
+
+        @* <asp:Label ID="ErrorLabel" CssClass="big error" Text="" /> *@
+        <span class="big error">@this.errorLabel</span>
+
+        <table class="ui compact definition purple table segment">
+            <tbody>
+                <tr>
+                    <td>@Titles.ReleaseId</td>
+                    <td>@this.release.Id</td>
+                </tr>
+                <tr>
+                    <td>@Titles.VersionName</td>
+                    <td>@this.release.Name</td>
+                </tr>
+                <tr>
+                    <td>@Titles.TagName</td>
+                    <td>@this.release.TagName</td>
+                </tr>
+                <tr>
+                    <td>@Titles.CreatedOn</td>
+                    <td>@this.release.CreatedAt</td>
+                </tr>
+                <tr>
+                    <td>@Titles.PublishedOn</td>
+                    <td>@this.release.PublishedAt</td>
+                </tr>
+                <tr>
+                    <td>@Titles.DownloadingFrom</td>
+                    <td>
+                        <a href="@this.downloadUrl">@this.downloadUrl</a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>@Titles.Message</td>
+                    <td>@this.release.Body</td>
+                </tr>
+            </tbody>
+        </table>
+
+
+        <a class="ui positive button" href="/Modules/BackOffice/Admin/DatabaseBackup.mix">@Titles.CreateBackupFirst</a>
+
+        <input type="button" id="UpdateButton" value="@Titles.Update" class="ui pink disabled loading button" />
+
+        <h1 class="ui purple header">@Titles.UpdateConsole</h1>
+        <div id="Console" class="ui celled relaxed list segment" style="height: 500px; overflow: auto;"></div>
+    }
+
+    @if (this.showUpToDatePanel)
+    {
+        <h1>@Titles.CheckForUpdates</h1>
+        <div class="ui divider"></div>
+        <p>@Labels.InstanceIsUpToDate</p>
+        <a href="/" class="ui purple button">@Titles.ReturnHome</a>
+    }
+}
+
+@code {
+    /// <summary>
+    ///     The former &lt;httpRuntime executionTimeout="40000" /&gt; of this page, in seconds.
+    /// </summary>
+    private static readonly TimeSpan ExecutionTimeout = TimeSpan.FromSeconds(40000);
+
+    /// <summary>
+    ///     The port of the page's inline script block. It needs #UpdateButton and #Console in the
+    ///     DOM, so it is loaded after the first render.
+    /// </summary>
+    private static readonly string[] PageScripts = { "/js/Pages/Modules/Update.js" };
+
+    private string downloadUrl = string.Empty;
+    private string errorLabel = string.Empty;
+    private Release release = new Release();
+
+    private bool hasAccess;
+
+    //asp:Panel ReleasePanel (visible) / UpToDatePanel (Visible="false").
+    private bool showReleasePanel = true;
+    private bool showUpToDatePanel;
+
+    /// <summary>
+    ///     Page_Init: this.OverridePath = "/Dashboard/Index.aspx", repointed to the new route. Set in
+    ///     the constructor because the base activation sequence reads it from OnInitializedAsync.
+    /// </summary>
+    public Update()
+    {
+        this.OverridePath = "/Dashboard/Index";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync().ConfigureAwait(true);
+
+        //Task 57, including the denial log entry and the in-place AccessIsDenied rendering.
+        this.hasAccess = await this.Authorization.CanAccessUpdatePageAsync(this).ConfigureAwait(true);
+
+        if (!this.hasAccess)
+        {
+            return;
+        }
+
+        try
+        {
+            UpdateManager updater = new UpdateManager();
+
+            //The page's extended execution timeout (task 22) applied where the long call is.
+            this.release = await updater.GetLatestRelease().WaitAsync(ExecutionTimeout).ConfigureAwait(true);
+        }
+        catch
+        {
+            this.showReleasePanel = false;
+            this.showUpToDatePanel = true;
+            return;
+        }
+
+        string keyword = MixERP.Net.Updater.Config.UpdateKeyword ?? string.Empty;
+
+        Asset ass = this.release.Assets == null
+            ? null
+            : this.release.Assets.FirstOrDefault(
+                a => a != null && a.Name != null &&
+                     a.Name.ToUpperInvariant().Contains(keyword.ToUpperInvariant()));
+
+        if (ass != null)
+        {
+            this.downloadUrl = ass.DownloadUrl;
+        }
+
+        if (string.IsNullOrWhiteSpace(this.downloadUrl))
+        {
+            this.errorLabel = "This release does not contain any update.";
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender).ConfigureAwait(true);
+
+        if (!firstRender || !this.hasAccess || !this.showReleasePanel)
+        {
+            return;
+        }
+
+        IJSObjectReference module = await this.JS
+            .InvokeAsync<IJSObjectReference>("import", "/js/mixerp/page-interop.js").ConfigureAwait(true);
+
+        await module.InvokeVoidAsync("loadScripts", (object)PageScripts).ConfigureAwait(true);
+    }
+}

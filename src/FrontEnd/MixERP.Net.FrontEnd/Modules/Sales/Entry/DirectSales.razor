@@ -1,0 +1,110 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Entry/DirectSales.ascx + .ascx.cs + .ascx.designer.cs - the direct-sales
+   ENTRY form. OnControlLoad built a StockTransactionForm and added it to
+   <asp:PlaceHolder ID="Placeholder1">; StockTransactionForm is a Blazor component now, so
+   the placeholder plus the thirteen property assignments ARE this markup.
+
+   PRESERVED SURFACE:
+     * OverridePath = "/Modules/Sales/DirectSales.mix" (from the <%@ Control %> directive).
+       It is assigned in the CONSTRUCTOR because the host's ModuleHost.razor reads it off a
+       PROBE INSTANCE created with Activator.CreateInstance - no lifecycle method runs on
+       that instance, so a value set in OnInitialized would never be seen and the screen's
+       menu authorization would silently change.
+     * ITransaction - the host's MixERPAuthorization.CheckTransactionPostingStatusAsync
+       performs `control is ITransaction` to enforce RestrictedTransactionMode.
+
+   Catalog / OfficeId come from ICurrentLogin: AppUsers.GetCurrentUserDB() /
+   AppUsers.GetCurrent() return an EMPTY login inside a Blazor circuit.
+
+   The .ascx's <script src="..."> element moved to OnAfterRenderAsync - a .razor file may
+   not contain <script>. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@implements MixERP.Net.Entities.Contracts.ITransaction
+@using MixERP.Net.Core.Modules.Sales.Internal
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.StockTransactionFactory
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+@if (this.loaded)
+{
+    <StockTransactionForm Book="TranBook.Sales"
+                          SubBook="SubTranBook.Direct"
+                          Text="@Titles.DirectSales"
+                          ShowPriceTypes="true"
+                          ShowPaymentTerms="true"
+                          ShowShippingInformation="true"
+                          ShowSalesAgents="true"
+                          ShowTransactionType="true"
+                          ShowStore="true"
+                          ShowCostCenter="true"
+                          ShowSalesType="true"
+                          VerifyStock="true"
+                          Catalog="@this.catalog"
+                          OfficeId="@this.officeId" />
+}
+
+@code {
+    private bool loaded;
+    private string catalog;
+    private int officeId;
+
+    public DirectSales()
+    {
+        //<%@ Control ... OverridePath="/Modules/Sales/DirectSales.mix" %>
+        this.OverridePath = "/Modules/Sales/DirectSales.mix";
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the StockTransactionForm above, which is markup now; the two
+    ///     login-derived values it also set are asynchronous, so they are read in
+    ///     OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            await ModuleScripts.LoadAsync(this.JS,
+                "_content/MixERP.Net.Core.Modules.Sales/js/entry/DirectSales.js");
+        }
+    }
+}

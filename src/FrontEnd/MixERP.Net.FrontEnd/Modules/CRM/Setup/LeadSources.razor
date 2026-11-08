@@ -1,0 +1,50 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Setup/LeadSources.ascx + .ascx.cs + .ascx.designer.cs.
+   The code-behind's OnControlLoad built a Scrud and added it to the ascx's
+   <asp:PlaceHolder ID="ScrudPlaceholder">. Scrud is a Blazor component now
+   (MixERP.Net.WebControls.ScrudFactory.Scrud), so the placeholder plus the five
+   property assignments ARE this markup; the component still supplies UserId,
+   UserName, OfficeCode, OfficeId and Catalog from ICurrentLogin itself.
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme
+   or IsLandingPage override, and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.WebControls.ScrudFactory
+@using MixERP.Net.i18n.Resources
+
+<Scrud KeyColumn="lead_source_id"
+       TableSchema="crm"
+       Table="lead_sources"
+       ViewSchema="crm"
+       View="lead_sources"
+       Text="@Titles.LeadSources" />
+
+@code {
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body of this control consisted ONLY of building the Scrud above, which is
+    ///     markup now, so there is nothing left for this hook to do.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+}

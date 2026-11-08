@@ -1,0 +1,124 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Widgets/WorkflowWidget.ascx + .ascx.cs + .ascx.designer.cs - the dashboard
+   widget that counts the transactions sitting in each workflow state.
+
+   The whole widget was built procedurally (CreateWidget / CreateHeader / CreateList with
+   HtmlGenericControl + HtmlControlHelper) into <asp:PlaceHolder ID="Placeholder1">. It is
+   markup now, in the IDENTICAL child order and with the identical ids and css classes the
+   control tree rendered:
+     div#WorkflowWidget.eight.wide.column.widget
+       > div.ui.attached.segment          (HtmlControlHelper.GetSegment("ui attached segment"))
+           > div.ui.left.floated.column > div.ui.header   (the title)
+           > div.ui.right.floated.column > the four icons, in order:
+                 expand disabled icon, move icon, help icon, close icon
+       > div.ui.attached.segment > ul > seven <li>
+   The id and the "widget" class matter: the host's dashboard script finds, drags and closes a
+   widget by them.
+
+   The seven list items are HtmlControlHelper.AddListItem(ul, key, value), which renders
+   `<li>key : value</li>` - that exact "key : value" text, the colon spacing included, is
+   reproduced by calling the SAME helper (its first parameter became a StringBuilder when the
+   library was migrated), so the rendered markup is unchanged. Their ORDER is the original's:
+   flagged, in-verification, auto-approved, approved, rejected, closed, withdrawn.
+
+   ⚠ A WIDGET DOES NOT INHERIT CurrentLogin. MixERPWidget derives from MixERPUserControlBase,
+   not from MixERPUserControl, so the [Inject] ICurrentLogin / IMixERPAuthorization properties
+   are absent - this component injects ICurrentLogin itself. Workflow.GetWorkflowModel took
+   AppUsers.GetCurrentUserDB(), which is EMPTY inside a circuit and would have reported seven
+   zeroes, so the catalog comes from ICurrentLogin.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPWidget
+@using System.Text
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Core.Modules.Finance.Data.Core
+@using MixERP.Net.Entities.Core
+@using MixERP.Net.i18n.Resources
+@inject MixERP.Net.Framework.Security.ICurrentLogin CurrentLogin
+
+<div id="WorkflowWidget" class="eight wide column widget">
+    <div class="ui attached segment">
+        <div class="ui left floated column">
+            <div class="ui header">@Titles.Workflow</div>
+        </div>
+        <div class="ui right floated column">
+            @((MarkupString)HtmlControlHelper.GetIcon("expand disabled icon"))
+            @((MarkupString)HtmlControlHelper.GetIcon("move icon"))
+            @((MarkupString)HtmlControlHelper.GetIcon("help icon"))
+            @((MarkupString)HtmlControlHelper.GetIcon("close icon"))
+        </div>
+    </div>
+    <div class="ui attached segment">
+        <ul>
+            @((MarkupString)this.listItems)
+        </ul>
+    </div>
+</div>
+
+@code {
+    private string listItems = string.Empty;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY called CreateWidget(), which built the markup above; its one
+    ///     non-markup part - the GetWorkflowModel query - needs the catalog, which is
+    ///     asynchronous.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.listItems = GetListItems(catalog);
+    }
+
+    /// <summary>
+    ///     Port of CreateList(): the same query, the same seven items, in the same order.
+    /// </summary>
+    private static string GetListItems(string catalog)
+    {
+        DbGetWorkflowModelResult model = Workflow.GetWorkflowModel(catalog);
+
+        if (model == null)
+        {
+            return string.Empty;
+        }
+
+        StringBuilder list = new StringBuilder();
+
+        HtmlControlHelper.AddListItem(list, Titles.FlaggedTransactions, model.FlaggedTransactions);
+        HtmlControlHelper.AddListItem(list, Titles.InVerificationStack, model.InVerificationStack);
+        HtmlControlHelper.AddListItem(list, Titles.AutomaticallyApprovedByWorkflow, model.AutoApproved);
+        HtmlControlHelper.AddListItem(list, Titles.ApprovedTransactions, model.Approved);
+        HtmlControlHelper.AddListItem(list, Titles.RejectedTransactions, model.Rejected);
+        HtmlControlHelper.AddListItem(list, Titles.ClosedTransactions, model.Closed);
+        HtmlControlHelper.AddListItem(list, Titles.WithdrawnTransactions, model.Withdrawn);
+
+        return list.ToString();
+    }
+}

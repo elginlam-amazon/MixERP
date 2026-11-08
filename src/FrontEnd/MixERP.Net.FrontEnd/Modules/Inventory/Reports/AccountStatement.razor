@@ -1,0 +1,553 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/AccountStatement.ascx + .ascx.cs + .ascx.designer.cs - the item
+   account statement screen. The whole render tree was built procedurally in OnControlLoad
+   (CreateHeader / CreateTopPanel / CreateTabs / CreateFlagPanel) and is markup now, in the
+   identical child order; the <style> block and the <script src> of the .ascx are preserved
+   (the script is appended from OnAfterRenderAsync, since a .razor file may not contain
+   <script>).
+
+   DOM-ID CONTRACT - reports/AccountStatement.js binds every handle by LITERAL id and
+   addresses the grid POSITIONALLY, so these are frozen:
+     #FlagButton #PrintButton #SelectedValuesHidden #StoreIdHidden #ItemCodeInputText
+     #ItemSelect #StoreSelect #FromDateTextBox #ToDateTextBox #StatementGridView
+     #AccountOverViewGrid, the `.print.icon` row icon, and the grid's column order -
+     getSelectedCheckBoxItemIds("2","3") means column 2 is the select checkbox and column 3
+     is TranCode, which is also what the print icon reads (td:nth-child(3)).
+
+   THE SIX FILTER INPUTS ARE JAVASCRIPT-OWNED. #ItemCodeInputText is filled by
+   createCascadingPair() from #ItemSelect, #StoreIdHidden by storeSelect.blur(),
+   #SelectedValuesHidden by getSelectedItems(), and the two date fields by the datepicker.
+   Under WebForms those values reached ShowButton_Click / Flag_Updated on the POSTBACK; a
+   value jQuery writes into an input raises no input event, so they are read back off the
+   DOM at click time through Internal/ElementValueReader - the faithful equivalent of the
+   postback read, same values, same moment, same elements.
+
+   AppUsers.GetCurrent() / GetCurrentUserDB() returned an EMPTY login inside a Blazor
+   circuit, so userId / catalog come from ICurrentLogin.
+
+   `new FlagControl()` is the migrated <Flag> component; its `ID` is now `ElementId` (a
+   component cannot override ID) and its `Updated` event is an EventCallback.
+
+   REVIEW - A PRE-EXISTING BUG, PRESERVED: GetDateField() constructed a calendar icon
+   (<i class="icon calendar pointer" onclick="$('#<id>').datepicker('show');">) inside a
+   `using` block and NEVER ADDED IT to the field, so the icon never rendered and the
+   `ui icon input` wrapper has always been empty of its icon. It is deliberately NOT
+   rendered here: adding it would newly switch on a click handler this screen never had.
+
+   DROPPED WITH NO LOSS: StatementGridViewDataBound() only set
+   HeaderRow.TableSection = TableRowSection.TableHeader, which the migrated MixERPGridView
+   does natively (it emits a real <thead>). The IDisposable pair released WebForms child
+   controls that no longer exist.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using System.Collections.ObjectModel
+@using System.Globalization
+@using MixERP.Net.Common
+@using MixERP.Net.Core.Modules.Inventory.Data.Helpers
+@using MixERP.Net.Core.Modules.Inventory.Data.Reports
+@using MixERP.Net.Core.Modules.Inventory.Internal
+@using MixERP.Net.Entities
+@using MixERP.Net.Entities.Core
+@using MixERP.Net.Entities.Transactions
+@using MixERP.Net.TransactionGovernor
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.WebControls.Flag
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@using PetaPoco
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<style type="text/css">
+    #AccountOverViewGrid td:nth-child(1),
+    #AccountOverViewGrid th:nth-child(1) {
+        width: 200px;
+    }
+</style>
+
+@* CreateHeader(): new HtmlGenericControl("h2") { InnerText = Titles.AccountStatement } *@
+<h2>@Titles.AccountStatement</h2>
+
+@* CreateTopPanel(): div.ui icon buttons bpad16 -> flag button, print button, 2 hidden fields.
+   The two onclick="return false" attributes stay HTML attributes, not @@onclick: they are the
+   client-side gate that stops the buttons submitting, and #FlagButton is additionally the
+   trigger the <Flag> popunder script binds popUnder() to. *@
+<div class="ui icon buttons bpad16">
+    <button id="FlagButton" class="ui button" onclick="return false"><i class='icon flag'></i>@Titles.Flag</button>
+    <button id="PrintButton" class="ui button" onclick="return false"><i class='icon print'></i>@Titles.Print</button>
+    <input type="hidden" id="SelectedValuesHidden" />
+    <input type="hidden" id="StoreIdHidden" />
+</div>
+
+@* CreateTabs(): the tabular menu plus the two tab segments. *@
+<div class="ui top attached tabular menu">
+    <a class="active item" data-tab="first">@Titles.TransactionStatement</a>
+    <a class="item" data-tab="second">@Titles.ItemOverview</a>
+</div>
+
+<div class="ui bottom attached active form tab segment" data-tab="first">
+    @* CreateFormPanel() *@
+    <div class="fields">
+        <div class="field">
+            <label for="ItemCodeInputText">@Titles.ItemCode</label>
+            <input type="text" id="ItemCodeInputText" value="@this.itemCode" />
+        </div>
+        <div class="four wide field">
+            <label for="ItemSelect">@Titles.Select</label>
+            <select id="ItemSelect"></select>
+        </div>
+        <div class="two wide field">
+            <label for="StoreSelect">@Titles.Store</label>
+            <select id="StoreSelect"></select>
+        </div>
+        <div class="field">
+            <label for="FromDateTextBox">@Titles.From</label>
+            <div class="ui icon input">
+                <DateTextBox ID="FromDateTextBox"
+                             Mode="FrequencyType.FiscalYearStartDate"
+                             Catalog="@this.catalog"
+                             OfficeId="@this.officeId"
+                             Text="@this.fromDateText" />
+            </div>
+        </div>
+        <div class="field">
+            <label for="ToDateTextBox">@Titles.To</label>
+            <div class="ui icon input">
+                <DateTextBox ID="ToDateTextBox"
+                             Mode="FrequencyType.FiscalYearEndDate"
+                             Catalog="@this.catalog"
+                             OfficeId="@this.officeId"
+                             Text="@this.toDateText" />
+            </div>
+        </div>
+        <div class="field">
+            <label for="ShowButton">@Titles.Prepare</label>
+            <button type="button" id="ShowButton" class="ui positive button" @onclick="this.ShowButton_Click">@Titles.Show</button>
+        </div>
+    </div>
+
+    @* CreateGridPanel() -> CreateGridView(): the statement grid, explicit columns. *@
+    <div class="auto-overflow-panel">
+        <MixERPGridView ID="StatementGridView"
+                        CssClass="ui celled table nowrap"
+                        AutoGenerateColumns="false"
+                        Columns="@this.columns"
+                        DataSource="@this.statementRows" />
+    </div>
+</div>
+
+@* The second tab. CreateTabs() created it EMPTY (the CreateAccountOverviewPanel call there is
+   commented out in the original); it is filled by AutoInitialize() and by ShowButton_Click,
+   which is what `overviewBuilt` reproduces. CreateAccountOverviewPanel() began with
+   container.Controls.Clear(), i.e. it REPLACES the previous content - re-rendering from the
+   current `overview` value is the same thing. *@
+<div class="ui bottom attached tab segment" data-tab="second">
+    @if (this.overviewBuilt)
+    {
+        @* CreateAccountOverviewHeader(): an <h2> carrying a Literal, blank when no item matched. *@
+        <h2>@this.overviewHeader</h2>
+
+        <table id="AccountOverViewGrid" class="ui definition table">
+            <thead>
+                @* CreateTableHeader(): an empty cell, then Titles.Definition. *@
+                <tr>
+                    <th></th>
+                    <th>@Titles.Definition</th>
+                </tr>
+            </thead>
+            <tbody>
+                @* CreateTableBody(): nothing at all when the item code matches no item_view row. *@
+                @foreach (KeyValuePair<string, string> row in this.overviewRows)
+                {
+                    <tr>
+                        <td>@row.Key</td>
+                        <td>@row.Value</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@* CreateFlagPanel(). OnClientClick is a GATE: the popunder only opens when
+   getSelectedItems() returns true. *@
+@if (this.loaded)
+{
+    <Flag ElementId="FlagPopUnder"
+          AssociatedControlId="FlagButton"
+          OnClientClick="return getSelectedItems();"
+          CssClass="ui form segment initially hidden"
+          Updated="@this.Flag_Updated"
+          Catalog="@this.catalog" />
+}
+
+@code {
+    private const string ScriptUrl =
+        "_content/MixERP.Net.Core.Modules.Inventory/js/reports/AccountStatement.js";
+
+    //Flag_Updated's two frozen arguments, as the original declared them.
+    private const string FlagResource = "account_statement";
+    private const string FlagResourceKey = "transaction_code";
+
+    private bool loaded;
+    private string catalog;
+    private int userId;
+    private int officeId;
+
+    //The former HtmlInputText / DateTextBox server fields. Their INITIAL values are what
+    //AutoInitialize() wrote; afterwards the javascript owns the elements and the authoritative
+    //values are read back off the DOM (see the file header).
+    private string itemCode = string.Empty;
+    private string fromDateText;
+    private string toDateText;
+
+    private ElementValueReader elements;
+
+    private IReadOnlyList<MixERPGridViewColumn> columns;
+    private IEnumerable<DbGetStockAccountStatementResult> statementRows;
+
+    private bool overviewBuilt;
+    private string overviewHeader = string.Empty;
+    private List<KeyValuePair<string, string>> overviewRows = new List<KeyValuePair<string, string>>();
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body called the four Create* builders - all markup now - and then
+    ///     AutoInitialize(), which reads the catalog and queries the database and is therefore
+    ///     asynchronous. All of it lives in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.userId = login.UserId;
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.elements = new ElementValueReader(this.JS);
+        this.columns = this.CreateColumns();
+        this.loaded = true;
+
+        await this.AutoInitializeAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            //The script's top-level block captures #StatementGridView, #ItemSelect and the
+            //rest out of the DOM, so it must run after the first render - never earlier.
+            await ModuleScripts.LoadAsync(this.JS, ScriptUrl);
+        }
+    }
+
+    #region AutoInitialize
+
+    /// <summary>
+    ///     Port of AutoInitialize(). Reads ItemCode (or resolves it from ItemId), From and To
+    ///     off the query string and, when an item code was supplied, binds the grid and builds
+    ///     the overview panel.
+    ///     <para>
+    ///         NOTE, faithfully preserved: BindGridView() bails out when the store id is 0, and
+    ///         #StoreIdHidden is always empty at this point (the javascript fills it from
+    ///         #StoreSelect only after the user picks a store), so on first load the grid is
+    ///         NOT bound while the overview panel IS built. That is the original behaviour and
+    ///         it is not "fixed" here.
+    ///     </para>
+    /// </summary>
+    private async Task AutoInitializeAsync()
+    {
+        string queryItemCode = ModuleQuery.Get(this.Navigation, "ItemCode");
+        int itemId = Conversion.TryCastInteger(ModuleQuery.Get(this.Navigation, "ItemId"));
+        DateTime from = Conversion.TryCastDate(ModuleQuery.Get(this.Navigation, "From"));
+        DateTime to = Conversion.TryCastDate(ModuleQuery.Get(this.Navigation, "To"));
+
+        if (!string.IsNullOrWhiteSpace(queryItemCode))
+        {
+            this.itemCode = queryItemCode;
+        }
+        else
+        {
+            if (itemId > 0)
+            {
+                this.itemCode = Items.GetItemCodeByItemId(this.catalog, itemId);
+            }
+            else
+            {
+                return;
+            }
+        }
+
+        if (from != DateTime.MinValue)
+        {
+            this.fromDateText = from.Date.ToShortDateString();
+        }
+
+        if (to != DateTime.MinValue)
+        {
+            this.toDateText = to.Date.ToShortDateString();
+        }
+
+        await this.BindGridViewAsync();
+        this.BuildAccountOverviewPanel();
+    }
+
+    #endregion AutoInitialize
+
+    #region Form
+
+    /// <summary>Port of ShowButton_Click.</summary>
+    private async Task ShowButton_Click()
+    {
+        await this.BindGridViewAsync();
+        this.BuildAccountOverviewPanel();
+    }
+
+    /// <summary>
+    ///     Port of BindGridView(). The item code, store id and both dates are read off the DOM
+    ///     because the module's javascript owns those elements (see the file header) - that is
+    ///     this screen's postback-value recovery.
+    /// </summary>
+    private async Task BindGridViewAsync()
+    {
+        string postedItemCode = await this.elements.GetValueAsync("ItemCodeInputText");
+
+        if (!string.IsNullOrWhiteSpace(postedItemCode))
+        {
+            this.itemCode = postedItemCode;
+        }
+
+        string postedFrom = await this.elements.GetValueAsync("FromDateTextBox");
+        string postedTo = await this.elements.GetValueAsync("ToDateTextBox");
+
+        if (!string.IsNullOrWhiteSpace(postedFrom))
+        {
+            this.fromDateText = postedFrom;
+        }
+
+        if (!string.IsNullOrWhiteSpace(postedTo))
+        {
+            this.toDateText = postedTo;
+        }
+
+        DateTime from = Conversion.TryCastDate(this.fromDateText);
+        DateTime to = Conversion.TryCastDate(this.toDateText);
+        int storeId = Conversion.TryCastInteger(await this.elements.GetValueAsync("StoreIdHidden"));
+
+        if (string.IsNullOrWhiteSpace(this.itemCode))
+        {
+            return;
+        }
+
+        if (storeId.Equals(0))
+        {
+            return;
+        }
+
+        this.statementRows = StockItems.GetAccountStatement(this.catalog, from, to,
+            this.userId, this.itemCode, storeId);
+    }
+
+    #endregion Form
+
+    #region Grid columns
+
+    /// <summary>
+    ///     Port of CreateColumns() + AddTemplateFields(). THE ORDER IS A JAVASCRIPT CONTRACT:
+    ///     getSelectedCheckBoxItemIds("2", "3", statementGridView) means the select checkbox is
+    ///     column 2 and TranCode is column 3, and the print icon reads td:nth-child(3) of its
+    ///     own row. The two trailing FlagBg / FlagFg columns carry an EMPTY header, exactly as
+    ///     the original did - createFlaggedRows() reads them to colour the rows.
+    /// </summary>
+    private IReadOnlyList<MixERPGridViewColumn> CreateColumns()
+    {
+        List<MixERPGridViewColumn> list = new List<MixERPGridViewColumn>();
+
+        //ActionTemplate: an <i class="icon print" onclick="showPreview(this);">. The onclick
+        //stays an HTML attribute - the handler walks the DOM up to its row and reads the
+        //transaction code out of it, state that only exists client-side.
+        //The cell templates below are built with the render-tree builder rather than Razor's
+        //@@<...> template syntax, which is not available inside an object initializer in a
+        //@@code block.
+        list.Add(new MixERPGridViewColumn
+        {
+            HeaderText = string.Empty,
+            Template = row => (RenderFragment)(builder => builder.AddMarkupContent(0,
+                "<i class=\"icon print\" onclick=\"showPreview(this);\"></i>"))
+        });
+
+        //GridViewHelper.GridViewSelectTemplate: the Semantic-UI toggle checkbox.
+        list.Add(new MixERPGridViewColumn
+        {
+            HeaderText = Titles.Select,
+            Template = row => (RenderFragment)(builder => builder.AddMarkupContent(0,
+                "<div class=\"ui toggle checkbox\"><input type=\"checkbox\" /><label></label></div>"))
+        });
+
+        list.Add(new MixERPGridViewColumn("TranCode", Titles.TranCode, null));
+
+        //The former dataFormatString "{0:d}" - a template is used rather than
+        //DataType = typeof(DateTime), because MixERPGridView's DateTime path formats with "D"
+        //(long date) and this column was explicitly short date.
+        list.Add(new MixERPGridViewColumn
+        {
+            DataField = "ValueDate",
+            HeaderText = Titles.ValueDate,
+            Template = row => (RenderFragment)(builder => builder.AddContent(0,
+                ((DbGetStockAccountStatementResult)row).ValueDate.ToString("d", CultureInfo.CurrentCulture)))
+        });
+
+        //The three "{0:N}" + alignRight columns. Templates again, because MixERPGridView's
+        //Decimal path leaves a zero value UNFORMATTED while "{0:N}" rendered it as 0.00.
+        list.Add(this.GetAmountColumn("Debit", Titles.Debit,
+            row => ((DbGetStockAccountStatementResult)row).Debit));
+        list.Add(this.GetAmountColumn("Credit", Titles.Credit,
+            row => ((DbGetStockAccountStatementResult)row).Credit));
+        list.Add(this.GetAmountColumn("Balance", Titles.Balance,
+            row => ((DbGetStockAccountStatementResult)row).Balance));
+
+        list.Add(new MixERPGridViewColumn("StatementReference", Titles.StatementReference, null));
+        list.Add(new MixERPGridViewColumn("Book", Titles.Book, null));
+        list.Add(new MixERPGridViewColumn("ItemCode", Titles.ItemCode, null));
+        list.Add(new MixERPGridViewColumn("ItemName", Titles.ItemName, null));
+        list.Add(new MixERPGridViewColumn("FlagBg", string.Empty, null));
+        list.Add(new MixERPGridViewColumn("FlagFg", string.Empty, null));
+
+        return list;
+    }
+
+    private MixERPGridViewColumn GetAmountColumn(string dataField, string headerText,
+        Func<object, decimal> value)
+    {
+        return new MixERPGridViewColumn
+        {
+            DataField = dataField,
+            HeaderText = headerText,
+            //alignRight: true -> HeaderCssClass + ItemCssClass "text right".
+            CssClass = "text right",
+            HeaderCssClass = "text right",
+            Template = row => (RenderFragment)(builder => builder.AddContent(0,
+                value(row).ToString("N", CultureInfo.CurrentCulture)))
+        };
+    }
+
+    #endregion Grid columns
+
+    #region Flag
+
+    /// <summary>
+    ///     Port of Flag_Updated. The selected transaction codes come from
+    ///     #SelectedValuesHidden, which getSelectedItems() fills client-side.
+    /// </summary>
+    private async Task Flag_Updated(FlagUpdatedEventArgs e)
+    {
+        int flagTypeId = e.FlagId;
+
+        Flags.CreateFlag(this.catalog, this.userId, flagTypeId, FlagResource, FlagResourceKey,
+            await this.GetSelectedValuesAsync());
+
+        await this.BindGridViewAsync();
+        this.BuildAccountOverviewPanel();
+    }
+
+    /// <summary>Port of GetSelectedValues().</summary>
+    private async Task<Collection<string>> GetSelectedValuesAsync()
+    {
+        string selectedValues = await this.elements.GetValueAsync("SelectedValuesHidden");
+
+        if (string.IsNullOrWhiteSpace(selectedValues))
+        {
+            return new Collection<string>();
+        }
+
+        Collection<string> values = new Collection<string>();
+
+        foreach (string value in selectedValues.Split(','))
+        {
+            values.Add(value);
+        }
+
+        return values;
+    }
+
+    #endregion Flag
+
+    #region Account Overview Panel
+
+    /// <summary>
+    ///     Port of CreateAccountOverviewPanel() / CreateAccountOverviewHeader() /
+    ///     CreateAccountOverviewTable() / CreateTableBody() / AddBodyRow(). The ten definition
+    ///     rows are added in the original order.
+    /// </summary>
+    private void BuildAccountOverviewPanel()
+    {
+        //container.Controls.Clear() - the panel REPLACES its previous content.
+        this.overviewBuilt = true;
+        this.overviewHeader = string.Empty;
+        this.overviewRows = new List<KeyValuePair<string, string>>();
+
+        if (string.IsNullOrWhiteSpace(this.itemCode))
+        {
+            //The original's guard was `if (this.itemCodeInputText == null) return;` - the
+            //no-item-code outcome. The header and the table header still render, as they did.
+            return;
+        }
+
+        ItemView view =
+            Factory.Get<ItemView>(this.catalog, "SELECT * FROM core.item_view WHERE item_code=@0",
+                this.itemCode).FirstOrDefault();
+
+        if (view == null)
+        {
+            return;
+        }
+
+        this.overviewHeader = view.ItemName;
+        this.AddBodyRow(Titles.ItemCode, view.ItemCode);
+        this.AddBodyRow(Titles.ItemName, view.ItemName);
+        this.AddBodyRow(Titles.ItemGroup, view.ItemGroup);
+        this.AddBodyRow(Titles.ItemType, view.ItemType);
+        this.AddBodyRow(Titles.Brand, view.Brand);
+        this.AddBodyRow(Titles.PreferredSupplier, view.PreferredSupplier);
+        this.AddBodyRow(Titles.LeadTime, view.LeadTimeInDays.ToString());
+        this.AddBodyRow(Titles.UnitName, view.Unit);
+        this.AddBodyRow(Titles.BaseUnitName, view.BaseUnit);
+        this.AddBodyRow(Titles.ReorderUnitName, view.ReorderUnit);
+    }
+
+    private void AddBodyRow(string text, string definition)
+    {
+        this.overviewRows.Add(new KeyValuePair<string, string>(text, definition));
+    }
+
+    #endregion Account Overview Panel
+}

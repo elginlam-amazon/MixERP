@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<bundle xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://vswebessentials.com/schemas/v1/bundle.xsd">
+  <settings>
+    <!--Determines if the bundle file should be automatically optimized after creation/update.-->
+    <minify>true</minify>
+    <!--Determin whether to generate/re-generate this bundle on building the solution.-->
+    <runOnBuild>false</runOnBuild>
+    <!--Specifies a custom subfolder to save files to. By default, compiled output will be placed in the same folder and nested under the original file.-->
+    <outputDirectory />
+  </settings>
+  <!--The order of the <file> elements determines the order of the files in the bundle.-->
+  <files>
+    <!--Libraries Start -->
+
+    <file>/js/jquery-1.9.1.js</file>
+    <file>/js/angular/angular.min.js</file>
+    <file>/js/jquery.address.js</file>
+    <file>/js/jquery-ui.js</file>
+    <file>/js/shortcut.js</file>
+    <file>/js/colorbox/jquery.colorbox.js</file>
+    <file>/js/jqueryNumber/jquery.number.js</file>
+    <file>/js/date.js</file>
+    <file>/js/chartjs/Chart.min.js</file>
+    <file>/js/chartjs/legend.js</file>
+    <file>/js/notify-combined.min.js</file>
+    <file>/js/semantic-ui/semantic.js</file>
+    <file>/js/lib/signalr/signalr.js</file>
+    <file>/js/vakata-jstree/dist/jstree.min.js</file>
+    <file>/js/sprintf/sprintf.min.js</file>
+    <file>/js/mixerp/mixerp-core.js</file>
+
+    <!--Libraries End -->
+    
+    <file>/js/mixerp/master-page/declaration.js</file>
+    <file>/js/mixerp/master-page/js-tree.js</file>
+    <file>/js/mixerp/master-page/keyboard.js</file>
+    <file>/js/mixerp/master-page/layout.js</file>
+    <file>/js/mixerp/master-page/locale.js</file>
+    <file>/js/mixerp/master-page/scrud.js</file>
+    <file>/js/mixerp/master-page/sortable.js</file>
+    <file>/js/mixerp/master-page/semantic.js</file>
+    <file>/js/mixerp/master-page/menu.js</file>
+    <file>/js/mixerp/master-page/notification.js</file>
+  </files>
+</bundle>

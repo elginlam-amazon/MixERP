@@ -1,0 +1,163 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Widgets/CurrentOfficeSalesByMonthWidget.ascx + .ascx.cs + .ascx.designer.cs -
+   the dashboard LINE chart of the CURRENT OFFICE's sales per month.
+
+   Same shape as SalesByOfficeWidget, with two differences that are preserved exactly:
+     * the query is the office-scoped overload, GetSalesByOffice(catalog, officeId);
+     * the chart type is 'line' and the fifth `prepareChart` argument is false.
+
+   The hidden table is LOAD-BEARING: the host's mixerp-core.js `prepareChart` reads the
+   chart labels from #CurrentOfficeSalesByMonthWidget's table header row, the series from the
+   remaining rows (first cell = series title), and then removes the table. The
+   <asp:GridView> is therefore ported as the markup it rendered - the same id, the same
+   `hidden` class, the same inline display:none the code-behind added and the same twelve
+   month headers in order. DataSource/DataBind() become the @foreach.
+
+   The catalog and office id come from ICurrentLogin: AppUsers.GetCurrent() /
+   GetCurrentUserDB() return an EMPTY login inside a Blazor circuit, and a widget deriving
+   from MixERPWidget does not inherit the CurrentLogin property (that is declared by
+   MixERPUserControl), so ICurrentLogin is injected here.
+
+   PRESERVED SURFACE: the explicit `AccessLevel => AccessLevel.PolicyBased` override. It
+   happens to equal the base value, but it is the control's declared policy and the host's
+   CheckAccessLevelAsync reads it, so it is carried over rather than dropped.
+
+   The inline $(document).ready(prepareChart(...)) block moved VERBATIM to
+   wwwroot/js/widgets/CurrentOfficeSalesByMonthWidget.js. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPWidget
+@using MixERP.Net.Core.Modules.Sales.Internal
+@using MixERP.Net.Entities.Transactions
+@using MixERP.Net.Framework.Security
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject ICurrentLogin CurrentLogin
+@inject IJSRuntime JS
+
+<div class="eight wide column widget" id="CurrentOfficeSalesByMonthWidget">
+    <div class="ui attached segment">
+        <div class="ui left floated column">
+            <div class="ui header">
+                @Titles.SalesByMonthInThousands
+            </div>
+        </div>
+        <div class="right floated column">
+            <i class="expand disabled icon"></i>
+            <i class="move icon"></i>
+            <i class="help icon"></i>
+            <i class="close icon"></i>
+        </div>
+    </div>
+    <div class="ui attached segment">
+        <table id="SalesByMonthGridView" class="hidden" style="display:none;">
+            <thead>
+                <tr>
+                    <th scope="col">OfficeCode</th>
+                    <th scope="col">Jan</th>
+                    <th scope="col">Feb</th>
+                    <th scope="col">Mar</th>
+                    <th scope="col">Apr</th>
+                    <th scope="col">May</th>
+                    <th scope="col">Jun</th>
+                    <th scope="col">Jul</th>
+                    <th scope="col">Aug</th>
+                    <th scope="col">Sep</th>
+                    <th scope="col">Oct</th>
+                    <th scope="col">Nov</th>
+                    <th scope="col">Dec</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (DbGetSalesByOfficesResult row in this.rows)
+                {
+                    <tr>
+                        <td>@row.Office</td>
+                        <td>@row.Jan</td>
+                        <td>@row.Feb</td>
+                        <td>@row.Mar</td>
+                        <td>@row.Apr</td>
+                        <td>@row.May</td>
+                        <td>@row.Jun</td>
+                        <td>@row.Jul</td>
+                        <td>@row.Aug</td>
+                        <td>@row.Sep</td>
+                        <td>@row.Oct</td>
+                        <td>@row.Nov</td>
+                        <td>@row.Dec</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <canvas id="curr-office-sales-by-month-canvas" width="500" height="180"></canvas>
+        <div id="curr-office-sales-by-month-legend"></div>
+    </div>
+</div>
+
+@code {
+    private IEnumerable<DbGetSalesByOfficesResult> rows = new List<DbGetSalesByOfficesResult>();
+    private bool scriptsLoaded;
+
+    /// <summary>
+    ///     Carried over verbatim from the code-behind.
+    /// </summary>
+    public override AccessLevel AccessLevel
+    {
+        get { return AccessLevel.PolicyBased; }
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body set the Literal text (markup now) and bound the grid; the office id
+    ///     and catalog the binding needs are asynchronous, so the query moved to
+    ///     OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.rows = Data.Reports.SalesByMonth.GetSalesByOffice(catalog, login.OfficeId);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (this.scriptsLoaded)
+        {
+            return;
+        }
+
+        //The chart script reads the rendered table, so it must not run before the rows are in
+        //the DOM - which is the render AFTER the asynchronous query completed.
+        this.scriptsLoaded = true;
+
+        await ModuleScripts.LoadAsync(this.JS,
+            "_content/MixERP.Net.Core.Modules.Sales/js/widgets/CurrentOfficeSalesByMonthWidget.js");
+    }
+}

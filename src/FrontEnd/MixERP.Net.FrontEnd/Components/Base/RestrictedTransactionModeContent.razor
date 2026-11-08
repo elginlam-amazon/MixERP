@@ -1,0 +1,32 @@
+@* ---------------------------------------------------------------------------------------------
+   The body the legacy Site/Exceptions/RestrictedTransactionMode.aspx rendered (h1 + divider +
+   p + "ui pink button" back link), extracted into a component so it can be rendered IN PLACE by
+   AuthorizationOutlet for the
+   Server.Transfer("~/Site/Exceptions/RestrictedTransactionMode.aspx") call site (checklist task
+   56) AND reused verbatim by the routable page (task 95).
+
+   THE BACK LINK (updated by Specialist 8 for task 95). The original href was
+   "javascript:history.go(-1);". A javascript: url is a CSP-hostile legacy form, so the navigation
+   is now performed through IJSRuntime (history.back(), which is history.go(-1)); href="#" plus
+   @onclick:preventDefault keeps the anchor looking and behaving exactly as before. The class
+   ("ui pink button") and the text (Titles.BackToPreviousPage) are unchanged, and because this
+   component is rendered inside the globally interactive <Routes>, the handler is live on both the
+   in-place denial path and the routed page.
+   --------------------------------------------------------------------------------------------- *@
+@using MixERP.Net.i18n.Resources
+@inject IJSRuntime JSRuntime
+
+<h1>@Titles.RestrictedTransactionMode</h1>
+<div class="ui divider"></div>
+<p>@Warnings.RestrictedTransactionMode</p>
+<a class="ui pink button" href="#" @onclick="this.GoBackAsync" @onclick:preventDefault>@Titles.BackToPreviousPage</a>
+
+@code {
+    /// <summary>
+    ///     history.go(-1) of the original anchor.
+    /// </summary>
+    private async Task GoBackAsync()
+    {
+        await this.JSRuntime.InvokeVoidAsync("history.back").ConfigureAwait(true);
+    }
+}
