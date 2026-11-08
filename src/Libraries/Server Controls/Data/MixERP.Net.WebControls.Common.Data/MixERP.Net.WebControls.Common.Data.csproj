@@ -69,7 +69,7 @@
       <Project>{D5A09C22-8F48-4FB2-A14D-C62C8C8FCEC0}</Project>
       <Name>MixERP.Net.Common</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\..\Logic\MixERP.Net.DbFactory\MixERP.Net.DbFactory.csproj">
+    <ProjectReference Include="..\..\..\Logic\MixERP.Net.DbFactory\MixERP.Net.DBFactory.csproj">
       <Project>{8FD9661C-2473-4581-8722-18B08D4DB252}</Project>
       <Name>MixERP.Net.DbFactory</Name>
     </ProjectReference>

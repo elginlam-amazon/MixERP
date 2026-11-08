@@ -20,30 +20,31 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.i18n;
 using Serilog;
 using System;
-using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Web;
-using System.Web.UI;
-using System.Web.UI.WebControls;
-using Image = System.Drawing.Image;
+using MixERP.Net.Common.Helpers;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
 
 namespace MixERP.Net.Common
 {
     public static class Conversion
     {
-        public static byte[] ConvertImageToByteArray(Image imageToConvert, ImageFormat formatOfImage)
+        public static byte[] ConvertImageToByteArray(Image imageToConvert, IImageFormat formatOfImage)
         {
             if (imageToConvert == null)
             {
                 return null;
             }
 
+            IImageEncoder encoder = ImageHelper.GetEncoder(formatOfImage) ??
+                                    ImageHelper.GetEncoder(ImageHelper.GetSourceFormat(imageToConvert));
+
             using (MemoryStream ms = new MemoryStream())
             {
-                imageToConvert.Save(ms, formatOfImage);
+                imageToConvert.Save(ms, encoder);
                 return ms.ToArray();
             }
         }
@@ -74,7 +75,7 @@ namespace MixERP.Net.Common
                 return null;
             }
 
-            using (SHA512CryptoServiceProvider provider = new SHA512CryptoServiceProvider())
+            using (SHA512 provider = SHA512.Create())
             {
                 return BitConverter.ToString(provider.ComputeHash(Encoding.UTF8.GetBytes(password + salt))).Replace("-", "").ToLower(CultureInfo.InvariantCulture);
             }
@@ -102,11 +103,16 @@ namespace MixERP.Net.Common
             {
                 return null;
             }
-            string physicalApplicationPath = HttpContext.Current.Request.PhysicalApplicationPath;
+            string physicalApplicationPath = MixERPConfiguration.ContentRootPath;
 
             if (string.IsNullOrWhiteSpace(physicalApplicationPath))
             {
                 return null;
+            }
+
+            if (!physicalApplicationPath.EndsWith(Path.DirectorySeparatorChar.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
+            {
+                physicalApplicationPath += Path.DirectorySeparatorChar;
             }
 
             return @"~/" + fullServerPath.Replace(physicalApplicationPath, String.Empty).Replace(@"\", "/");
@@ -114,14 +120,12 @@ namespace MixERP.Net.Common
 
         public static string ResolveUrl(string url)
         {
-            Page page = HttpContext.Current.Handler as Page;
-
-            if (page == null)
+            if (string.IsNullOrWhiteSpace(url))
             {
                 return url;
             }
 
-            return (page).ResolveUrl(url);
+            return PageUtility.ResolveUrl(url);
         }
 
         public static bool TryCastBoolean(object value)
@@ -161,7 +165,9 @@ namespace MixERP.Net.Common
 
             using (var ms = new MemoryStream())
             {
-                image.Save(ms, ImageFormat.Jpeg);
+                //Preserve the source format instead of forcing JPEG, so PNG transparency
+                //and GIF animation survive the round trip.
+                image.Save(ms, ImageHelper.GetEncoder(ImageHelper.GetSourceFormat(image)));
                 return ms.ToArray();
             }
         }
@@ -388,20 +394,30 @@ namespace MixERP.Net.Common
             return string.Empty;
         }
 
-        public static Unit TryCastUnit(object value)
+        /// <summary>
+        ///     Casts a value to a CSS length.
+        ///     <para>
+        ///         SIGNATURE CHANGE: the return type was <c>System.Web.UI.WebControls.Unit</c>,
+        ///         which does not exist on modern .NET; it is now the framework-neutral
+        ///         <see cref="CssUnit" /> struct, which keeps the value-type semantics and the
+        ///         <c>ToString()</c> output ("10px", "50%", …) consumers rely on. The parse
+        ///         behaviour is unchanged, including throwing on unparseable input.
+        ///     </para>
+        /// </summary>
+        public static CssUnit TryCastUnit(object value)
         {
             if (value == null)
             {
-                return new Unit();
+                return new CssUnit();
             }
 
-            if (value is Unit)
+            if (value is CssUnit)
             {
-                return (Unit) value;
+                return (CssUnit) value;
             }
 
 
-            return Unit.Parse(value.ToString(), CultureInfo.DefaultThreadCurrentCulture);
+            return CssUnit.Parse(value.ToString(), CultureInfo.DefaultThreadCurrentCulture);
         }
 
         public static DateTime? TryCastNullableDate(object value)

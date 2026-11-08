@@ -18,11 +18,15 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Bmp;
+using SixLabors.ImageSharp.Formats.Gif;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Processing;
 
 namespace MixERP.Net.Common.Helpers
 {
@@ -41,56 +45,74 @@ namespace MixERP.Net.Common.Helpers
             }
         }
 
-        public static ImageCodecInfo GetEncoder(ImageFormat format)
+        /// <summary>
+        /// Returns the encoder registered for the supplied image format. Replaces the
+        /// System.Drawing ImageCodecInfo lookup, which is Windows-only and removed here.
+        /// </summary>
+        public static IImageEncoder GetEncoder(IImageFormat format)
         {
             if (format == null)
             {
                 return null;
             }
 
-            ImageCodecInfo[] codecs = ImageCodecInfo.GetImageDecoders();
-
-            foreach (ImageCodecInfo codec in codecs)
+            try
             {
-                if (codec.FormatID == format.Guid)
-                {
-                    return codec;
-                }
+                return Configuration.Default.ImageFormatsManager.GetEncoder(format);
             }
-            return null;
+            catch (NotSupportedException)
+            {
+                //No encoder registered for this format, mirroring the original null return.
+                return null;
+            }
         }
 
-        public static string GetFileExtension(ImageFormat format)
+        /// <summary>
+        /// Returns the primary file extension of the supplied format, upper-cased and dot
+        /// prefixed (for example ".JPG"), exactly as the System.Drawing version did.
+        /// </summary>
+        public static string GetFileExtension(IImageFormat format)
         {
-            return ImageCodecInfo.GetImageEncoders()
-                .First(x => x.FormatID == format.Guid)
-                .FilenameExtension
-                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .First()
-                .Trim('*')
-                .ToUpperInvariant();
+            if (format == null)
+            {
+                return null;
+            }
+
+            string extension = format.FileExtensions.FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                return null;
+            }
+
+            if (!extension.StartsWith(".", StringComparison.Ordinal))
+            {
+                extension = "." + extension;
+            }
+
+            return extension.ToUpperInvariant();
         }
 
-        public static ImageFormat GetImageFormat(String path)
+        public static IImageFormat GetImageFormat(String path)
         {
             switch (Path.GetExtension(path))
             {
-                case ".bmp": return ImageFormat.Bmp;
-                case ".gif": return ImageFormat.Gif;
-                case ".jpg": return ImageFormat.Jpeg;
-                case ".png": return ImageFormat.Png;
+                case ".bmp": return BmpFormat.Instance;
+                case ".gif": return GifFormat.Instance;
+                case ".jpg": return JpegFormat.Instance;
+                case ".png": return PngFormat.Instance;
             }
-            return ImageFormat.Jpeg;
+            return JpegFormat.Instance;
         }
 
         public static byte[] GetResizedImage(Image image, int width, int height)
         {
-            Size thumbnailSize = new Size(width, height);
-
             if (image == null)
             {
                 return null;
             }
+
+            Size thumbnailSize = new Size(width, height);
 
             if (thumbnailSize.Width.Equals(0))
             {
@@ -102,35 +124,52 @@ namespace MixERP.Net.Common.Helpers
                 thumbnailSize.Height = image.Size.Height;
             }
 
+            //The original pipeline scaled the source with CalculateScalingRatio (which always
+            //covers the thumbnail box) and drew it onto a thumbnail-sized canvas, cropping the
+            //overflow - and for portrait overflow it biased the crop towards the top of the
+            //image. ResizeMode.Crop with an anchor reproduces that behaviour, and the
+            //HighQualityBicubic/HighQuality hints map onto the bicubic resampler.
             float scalingRatio = CalculateScalingRatio(image.Size, thumbnailSize);
 
             int scaledWidth = (int)Math.Round(image.Size.Width * scalingRatio);
             int scaledHeight = (int)Math.Round(image.Size.Height * scalingRatio);
-            int scaledLeft = (thumbnailSize.Width - scaledWidth) / 2;
-            int scaledTop = (thumbnailSize.Height - scaledHeight) / 2;
 
-            // For portrait mode, adjust the vertical top of the crop area so that we get more of
-            // the top area
+            AnchorPositionMode anchor = AnchorPositionMode.Center;
+
             if (scaledWidth < scaledHeight && scaledHeight > thumbnailSize.Height)
             {
-                scaledTop = (thumbnailSize.Height - scaledHeight) / 4;
+                anchor = AnchorPositionMode.Top;
             }
 
-            Rectangle cropArea = new Rectangle(scaledLeft, scaledTop, scaledWidth, scaledHeight);
-
-            using (Bitmap thumbnail = new Bitmap(thumbnailSize.Width, thumbnailSize.Height, PixelFormat.Format32bppPArgb))
+            ResizeOptions options = new ResizeOptions
             {
-                using (Graphics thumbnailGraphics = Graphics.FromImage(thumbnail))
-                {
-                    thumbnailGraphics.CompositingQuality = CompositingQuality.HighQuality;
-                    thumbnailGraphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                    thumbnailGraphics.SmoothingMode = SmoothingMode.HighQuality;
-                    thumbnailGraphics.Clear(Color.Transparent);
-                    thumbnailGraphics.DrawImage(image, cropArea);
-                }
+                Size = thumbnailSize,
+                Mode = ResizeMode.Crop,
+                Position = anchor,
+                Sampler = KnownResamplers.Bicubic
+            };
 
-                return Conversion.TryCastByteArray(thumbnail);
+            //Clone so the caller's image (and its frames/metadata) is left untouched, exactly
+            //as the original did by rendering onto a separate Bitmap.
+            using (Image thumbnail = image.Clone(x => x.Resize(options)))
+            {
+                return Conversion.ConvertImageToByteArray(thumbnail, GetSourceFormat(image));
             }
+        }
+
+        /// <summary>
+        /// Resolves the format the image was decoded from so that re-encoding preserves the
+        /// source format. Encoding everything as JPEG would destroy PNG transparency and
+        /// GIF animation.
+        /// </summary>
+        internal static IImageFormat GetSourceFormat(Image image)
+        {
+            if (image == null)
+            {
+                return JpegFormat.Instance;
+            }
+
+            return image.Metadata.DecodedImageFormat ?? JpegFormat.Instance;
         }
 
         private static float CalculateScalingRatio(Size originalSize, Size targetSize)

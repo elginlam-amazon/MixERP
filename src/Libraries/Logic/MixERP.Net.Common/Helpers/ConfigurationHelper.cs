@@ -17,15 +17,35 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using Serilog;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Configuration;
-using System.Web.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 
 namespace MixERP.Net.Common.Helpers
 {
     public static class ConfigurationHelper
     {
+        /// <summary>
+        ///     One-time initialization of the configuration seam. Every dependent host application
+        ///     must call this during startup composition. Delegates to
+        ///     <see cref="MixERPConfiguration.Initialize(IConfiguration, string, IHttpContextAccessor)" />.
+        /// </summary>
+        public static void Initialize(IConfiguration configuration, string contentRootPath)
+        {
+            MixERPConfiguration.Initialize(configuration, contentRootPath);
+        }
+
+        /// <summary>
+        ///     One-time initialization of the configuration seam, including the HTTP context accessor
+        ///     used by the session and request helpers.
+        /// </summary>
+        public static void Initialize(IConfiguration configuration, string contentRootPath, IHttpContextAccessor httpContextAccessor)
+        {
+            MixERPConfiguration.Initialize(configuration, contentRootPath, httpContextAccessor);
+        }
+
         public static string GetConfigurationValue(string configFileName, string sectionName)
         {
             if (configFileName == null)
@@ -33,22 +53,14 @@ namespace MixERP.Net.Common.Helpers
                 return string.Empty;
             }
 
-            string path = HostingEnvironment.MapPath(ConfigurationManager.AppSettings[configFileName]);
+            string path = MixERPConfiguration.MapPath(MixERPConfiguration.GetAppSetting(configFileName));
 
-            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap {ExeConfigFilename = path};
-            Configuration config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap,
-                ConfigurationUserLevel.None);
-            AppSettingsSection section = config.GetSection("appSettings") as AppSettingsSection;
-
-            if (section != null)
+            if (string.IsNullOrWhiteSpace(path))
             {
-                if (section.Settings[sectionName] != null)
-                {
-                    return section.Settings[sectionName].Value;
-                }
+                return string.Empty;
             }
 
-            return string.Empty;
+            return MixERPConfiguration.GetExternalConfigValue(path, sectionName);
         }
 
         public static string GetDbServerParameter(string key)
@@ -69,7 +81,7 @@ namespace MixERP.Net.Common.Helpers
 
         public static string GetResourceDirectory()
         {
-            return HostingEnvironment.MapPath(ConfigurationManager.AppSettings["ResourceDirectory"]);
+            return MixERPConfiguration.MapPath(MixERPConfiguration.GetAppSetting("ResourceDirectory"));
         }
 
         public static string GetStockTransactionFactoryParameter(string key)
@@ -90,18 +102,16 @@ namespace MixERP.Net.Common.Helpers
 
         public static string SetConfigurationValues(string configFileName, string sectionName, string value)
         {
-            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap {ExeConfigFilename = configFileName};
-            var config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap, ConfigurationUserLevel.None);
-            AppSettingsSection section = config.GetSection("appSettings") as AppSettingsSection;
+            //configFileName is the path of the target *.config file, as in the original implementation.
+            string path = ResolveConfigFilePath(configFileName);
 
-            if (section != null)
+            if (!MixERPConfiguration.SetExternalConfigValue(path, sectionName, value))
             {
-                if (section.Settings[sectionName] != null)
-                {
-                    section.Settings[sectionName].Value = value;
-                }
+                //The original System.Configuration implementation surfaced an IO failure from
+                //config.Save(...). Swallowing the result would turn a missing file, an absent
+                //key or a mis-resolved path into a silent no-op the caller believes succeeded.
+                Log.Warning("Could not persist configuration value {Key} to {Path}.", sectionName, path);
             }
-            config.Save(ConfigurationSaveMode.Modified);
 
             return string.Empty;
         }
@@ -109,30 +119,32 @@ namespace MixERP.Net.Common.Helpers
         public static void SetConfigurationValues(string configFileName,
             Collection<KeyValuePair<string, string>> sections)
         {
-            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap {ExeConfigFilename = configFileName};
-            var config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap, ConfigurationUserLevel.None);
-            AppSettingsSection appsetting = config.GetSection("appSettings") as AppSettingsSection;
-
-            if (appsetting == null)
+            if (sections == null || sections.Count == 0)
             {
                 return;
             }
 
-            if (sections != null && sections.Count > 0)
+            string path = ResolveConfigFilePath(configFileName);
+
+            if (!MixERPConfiguration.SetExternalConfigValues(path, sections))
             {
-                foreach (var section in sections)
-                {
-                    if (section.Key != null)
-                    {
-                        if (appsetting.Settings[section.Key] != null)
-                        {
-                            appsetting.Settings[section.Key].Value = section.Value;
-                        }
-                    }
-                }
+                Log.Warning("Could not persist {Count} configuration value(s) to {Path}.", sections.Count, path);
+            }
+        }
+
+        private static string ResolveConfigFilePath(string configFileName)
+        {
+            if (string.IsNullOrWhiteSpace(configFileName))
+            {
+                return null;
             }
 
-            config.Save(ConfigurationSaveMode.Modified);
+            if (System.IO.Path.IsPathRooted(configFileName) && System.IO.File.Exists(configFileName))
+            {
+                return configFileName;
+            }
+
+            return MixERPConfiguration.MapPath(configFileName);
         }
     }
 }

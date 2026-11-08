@@ -18,7 +18,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System.IO;
-using Microsoft.VisualBasic.FileIO;
 
 namespace MixERP.Net.Common.Helpers
 {
@@ -43,7 +42,26 @@ namespace MixERP.Net.Common.Helpers
 
         public static void CopyDirectory(string source, string destination)
         {
-            FileSystem.CopyDirectory(source, destination, true);
+            //Plain System.IO replacement for Microsoft.VisualBasic.FileIO.FileSystem.CopyDirectory(source, destination, true):
+            //recursive copy, creating missing destination directories and overwriting existing files.
+            DirectoryInfo sourceDirectory = new DirectoryInfo(source);
+
+            if (!sourceDirectory.Exists)
+            {
+                throw new DirectoryNotFoundException("Source directory does not exist: " + source);
+            }
+
+            Directory.CreateDirectory(destination);
+
+            foreach (FileInfo file in sourceDirectory.GetFiles())
+            {
+                file.CopyTo(Path.Combine(destination, file.Name), true);
+            }
+
+            foreach (DirectoryInfo subDirectory in sourceDirectory.GetDirectories())
+            {
+                CopyDirectory(subDirectory.FullName, Path.Combine(destination, subDirectory.Name));
+            }
         }
     }
 }

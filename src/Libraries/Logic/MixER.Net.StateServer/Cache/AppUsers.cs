@@ -22,8 +22,6 @@ using PetaPoco;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Runtime.Caching;
-using System.Web;
 
 namespace MixERP.Net.ApplicationState.Cache
 {
@@ -31,7 +29,7 @@ namespace MixERP.Net.ApplicationState.Cache
     {
         public static void SetCurrentLogin()
         {
-            long globalLoginId = long.Parse(HttpContext.Current.User.Identity.Name);
+            long globalLoginId = long.Parse(AppState.CurrentUserName, CultureInfo.InvariantCulture);
             SetCurrentLogin(globalLoginId);
         }
 
@@ -41,7 +39,7 @@ namespace MixERP.Net.ApplicationState.Cache
             {
                 string key = globalLoginId.ToString(CultureInfo.InvariantCulture);
 
-                if (MemoryCache.Default[key] == null)
+                if (CacheFactory.GetFromDefaultCacheByKey(key) == null)
                 {
                     MetaLogin metaLogin = GetMetaLogin(globalLoginId);
                     Dictionary<string, object> dictionary = GetDictionary(metaLogin);
@@ -56,9 +54,9 @@ namespace MixERP.Net.ApplicationState.Cache
         {
             long globalLoginId = 0;
 
-            if (HttpContext.Current.User != null)
+            if (AppState.CurrentUser != null)
             {
-                long.TryParse(HttpContext.Current.User.Identity.Name, out globalLoginId);
+                long.TryParse(AppState.CurrentUserName, NumberStyles.Integer, CultureInfo.InvariantCulture, out globalLoginId);
             }
 
             return GetCurrent(globalLoginId);

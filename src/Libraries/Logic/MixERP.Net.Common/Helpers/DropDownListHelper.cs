@@ -18,7 +18,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
-using System.Web.UI.WebControls;
+using MixERP.Net.Common.Models;
 
 namespace MixERP.Net.Common.Helpers
 {
@@ -27,16 +27,20 @@ namespace MixERP.Net.Common.Helpers
         /// <summary>
         /// Selects the item in the list control that contains the specified value, if it exists.
         /// </summary>
-        /// <param name="dropDownList"></param>
+        /// <param name="dropDownList">
+        ///     SIGNATURE CHANGE: the WebForms <c>ListControl</c> became
+        ///     <see cref="SelectList" />, the framework-neutral select/option model a Blazor
+        ///     <c>&lt;select&gt;</c> binds against. The bool return semantics are unchanged.
+        /// </param>
         /// <param name="selectedValue">The value of the item in the list control to select</param>
         /// <returns>Returns true if the value exists in the list control, false otherwise</returns>
-        public static bool SetSelectedValue(ListControl dropDownList, String selectedValue)
+        public static bool SetSelectedValue(SelectList dropDownList, String selectedValue)
         {
             if (dropDownList != null)
             {
                 dropDownList.ClearSelection();
 
-                ListItem selectedListItem = dropDownList.Items.FindByValue(selectedValue);
+                SelectListItem selectedListItem = dropDownList.FindByValue(selectedValue);
 
                 if (selectedListItem != null)
                 {
