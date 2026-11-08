@@ -1,4 +1,4 @@
-﻿
+﻿using System;
 using MixERP.Net.Framework;
 
 namespace MixERP.Net.CurrencyConversion.OpenExchangeRates
@@ -7,6 +7,11 @@ namespace MixERP.Net.CurrencyConversion.OpenExchangeRates
     {
         public OpenExchangeRatesException(string message)
             : base(message)
+        {
+        }
+
+        public OpenExchangeRatesException(string message, Exception innerException)
+            : base(message, innerException)
         {
         }
     }

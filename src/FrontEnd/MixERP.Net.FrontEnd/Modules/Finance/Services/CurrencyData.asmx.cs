@@ -28,6 +28,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Web.Script.Services;
 using System.Web.Services;
 using System.Web.UI.WebControls;
@@ -47,8 +49,46 @@ namespace MixERP.Net.Core.Modules.Finance.Services
             return Currencies.GetExchangeCurrencies(AppUsers.GetCurrentUserDB(), officeId);
         }
 
+        /// <summary>
+        ///     Fetches the exchange rates from the named provider.
+        ///     <para>
+        ///         <c>ICurrencyConverter.GetResult()</c> became
+        ///         <c>GetResultAsync(CancellationToken)</c> because the providers call an
+        ///         external HTTP API. Classic ASMX predates the task-based pattern and does NOT
+        ///         support a <c>Task</c>-returning <c>[WebMethod]</c> — it would serialize the
+        ///         Task object itself instead of awaiting it, silently breaking
+        ///         UpdateExchangeRates.js. The Begin/End pair below is the asynchronous shape
+        ///         ASMX does understand, so the request thread is released while the outbound
+        ///         call is in flight and nothing blocks on the task.
+        ///     </para>
+        ///     <para>
+        ///         When this project is migrated off WebForms/ASMX, this pair collapses back
+        ///         into a single <c>async Task&lt;IEnumerable&lt;CurrencyConversionResult&gt;&gt;</c>
+        ///         controller action on the same route.
+        ///     </para>
+        /// </summary>
         [WebMethod]
-        public IEnumerable<CurrencyConversionResult> GetExchangeRates(string moduleName)
+        public IAsyncResult BeginGetExchangeRates(string moduleName, AsyncCallback callback,
+            object state)
+        {
+            return ToAsyncResult(this.GetExchangeRatesAsync(moduleName), callback, state);
+        }
+
+        [WebMethod]
+        public IEnumerable<CurrencyConversionResult> EndGetExchangeRates(IAsyncResult asyncResult)
+        {
+            Task<IEnumerable<CurrencyConversionResult>> task =
+                (Task<IEnumerable<CurrencyConversionResult>>) asyncResult;
+
+            // The APM contract guarantees ASMX only calls End* once the IAsyncResult has
+            // completed, so reading the result here does not block a thread. The awaiter is
+            // used rather than .Result so a failure rethrows the provider's original
+            // exception instead of wrapping it in an AggregateException.
+            return task.GetAwaiter().GetResult();
+        }
+
+        private async Task<IEnumerable<CurrencyConversionResult>> GetExchangeRatesAsync(
+            string moduleName)
         {
             if (string.IsNullOrWhiteSpace(moduleName))
             {
@@ -63,7 +103,7 @@ namespace MixERP.Net.Core.Modules.Finance.Services
             }
 
             object instance = Activator.CreateInstance(type);
-            ICurrencyConverter converter = (ICurrencyConverter) instance;
+            ICurrencyConverter converter = instance as ICurrencyConverter;
 
             if (converter == null)
             {
@@ -75,7 +115,43 @@ namespace MixERP.Net.Core.Modules.Finance.Services
 
             converter.BaseCurrency = AppUsers.GetCurrent().View.CurrencyCode;
             converter.CurrencyCodes = currencies.ToList();
-            return converter.GetResult();
+
+            return await converter.GetResultAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        ///     Bridges a <see cref="Task{TResult}" /> onto the APM
+        ///     <see cref="IAsyncResult" /> contract ASMX requires, preserving the caller's
+        ///     <paramref name="state" /> and invoking <paramref name="callback" /> on
+        ///     completion.
+        /// </summary>
+        private static IAsyncResult ToAsyncResult<T>(Task<T> task, AsyncCallback callback,
+            object state)
+        {
+            TaskCompletionSource<T> source = new TaskCompletionSource<T>(state);
+
+            task.ContinueWith(completed =>
+            {
+                if (completed.IsFaulted)
+                {
+                    source.TrySetException(completed.Exception.InnerExceptions);
+                }
+                else if (completed.IsCanceled)
+                {
+                    source.TrySetCanceled();
+                }
+                else
+                {
+                    source.TrySetResult(completed.Result);
+                }
+
+                if (callback != null)
+                {
+                    callback(source.Task);
+                }
+            }, TaskScheduler.Default);
+
+            return source.Task;
         }
 
         [WebMethod]

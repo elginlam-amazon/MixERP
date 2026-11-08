@@ -51,7 +51,7 @@ namespace MixERP.Net.Utility.SqlBundler
             bool optional = false;
             bool sample = false;
 
-            if (args[0] == null)
+            if (args == null || args.Length < 1 || args[0] == null)
             {
                 return;
             }
@@ -63,7 +63,7 @@ namespace MixERP.Net.Utility.SqlBundler
                 return;
             }
 
-            if (args[1] == null)
+            if (args.Length < 2 || args[1] == null)
             {
                 return;
             }

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace MixERP.Net.CurrencyConversion.Currencylayer
@@ -36,7 +37,7 @@ namespace MixERP.Net.CurrencyConversion.Currencylayer
 
             var queryString = string.Join("&",
                 keys.Select(
-                    k => string.Format("{0}={1}", k.Name, k.Value))
+                    k => string.Format("{0}={1}", k.Name, Uri.EscapeDataString(k.Value ?? string.Empty)))
                     .ToArray());
 
             return baseUrl + "?" + queryString;
@@ -47,7 +48,7 @@ namespace MixERP.Net.CurrencyConversion.Currencylayer
             List<QueryString> keys = new List<QueryString>();
 
             keys.Add(new QueryString(this.AccessKeyName, this.AccessKey));
-            keys.Add(new QueryString(this.CurrenciesKey, string.Join(",", this.Currencies)));
+            keys.Add(new QueryString(this.CurrenciesKey, string.Join(",", this.Currencies ?? new List<string>())));
             keys.Add(new QueryString(this.SourceKey, this.Source));
             keys.Add(new QueryString(this.FormatKey, this.DefaultFormat));
 

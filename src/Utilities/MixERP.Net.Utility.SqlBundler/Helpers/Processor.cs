@@ -48,7 +48,7 @@ namespace MixERP.Net.Utility.SqlBundler.Helpers
 
                 Console.WriteLine(@"Adding {0} to bundle", fileName);
                 script.Append("-->-->-- ");
-                script.Append(Path.GetFullPath(fileName).Replace(root, "").Replace("\\", "/"));
+                script.Append(Path.GetFullPath(fileName).Replace(root, "").Replace('\\', '/'));
                 script.Append(" --<--<--");
 
                 script.Append(Environment.NewLine);

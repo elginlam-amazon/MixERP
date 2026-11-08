@@ -2,12 +2,14 @@
 using System.Globalization;
 using MixERP.Net.Common;
 using MixERP.Net.Framework.Contracts.Currency;
+using Newtonsoft.Json.Linq;
 
 namespace MixERP.Net.CurrencyConversion.Currencylayer
 {
     internal sealed class Parser
     {
-        internal Parser(dynamic response, string source, bool removeSourceCurrencyFromResult, string resultSubKey, int decimalPlaces)
+        internal Parser(JObject response, string source, bool removeSourceCurrencyFromResult, string resultSubKey,
+            int decimalPlaces)
         {
             this.Response = response;
             this.Source = source;
@@ -16,7 +18,7 @@ namespace MixERP.Net.CurrencyConversion.Currencylayer
             this.DecimalPlaces = decimalPlaces;
         }
 
-        internal dynamic Response { get; private set; }
+        internal JObject Response { get; private set; }
         internal string Source { get; private set; }
         internal bool RemoveSourceCurrencyFromResult { get; private set; }
         internal string ResultSubKey { get; private set; }
@@ -26,30 +28,35 @@ namespace MixERP.Net.CurrencyConversion.Currencylayer
         {
             List<CurrencyConversionResult> result = new List<CurrencyConversionResult>();
 
-            bool removeSource = this.RemoveSourceCurrencyFromResult;
-            dynamic success = this.Response.success;
-
-            if (!Conversion.TryCastBoolean(success))
+            if (this.Response == null)
             {
-                dynamic error = this.Response["error"];
-                string errorCode = error["code"];
-                string errorInfo = error["info"];
+                return result;
+            }
+
+            bool removeSource = this.RemoveSourceCurrencyFromResult;
+            JToken success = this.Response["success"];
+
+            if (!Conversion.TryCastBoolean(success == null ? null : success.ToString()))
+            {
+                JToken error = this.Response["error"];
+                string errorCode = error == null ? string.Empty : (string)error["code"];
+                string errorInfo = error == null ? string.Empty : (string)error["info"];
 
                 throw new CurrencylayerException(errorCode + " " + errorInfo);
             }
 
-
-            dynamic response = this.Response[this.ResultSubKey];
+            JObject response = this.Response[this.ResultSubKey] as JObject;
 
             if (response == null)
             {
                 return result;
             }
 
-            foreach (dynamic item in response)
+            foreach (JProperty item in response.Properties())
             {
                 string name = item.Name;
-                decimal value = decimal.Round(Conversion.TryCastDecimal(item.Value, CultureInfo.InvariantCulture),
+                decimal value = decimal.Round(
+                    Conversion.TryCastDecimal(item.Value.ToString(), CultureInfo.InvariantCulture),
                     this.DecimalPlaces);
 
                 if (removeSource)
