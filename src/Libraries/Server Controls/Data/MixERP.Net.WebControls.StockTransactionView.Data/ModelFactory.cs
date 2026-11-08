@@ -71,50 +71,51 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory.Data
                 {
                     command.Connection = connection;
                     command.Connection.Open();
-                    NpgsqlDataReader reader = command.ExecuteReader(CommandBehavior.CloseConnection);
-
-                    if (!reader.HasRows)
+                    using (NpgsqlDataReader reader = command.ExecuteReader(CommandBehavior.CloseConnection))
                     {
-                        return new MergeModel();
-                    }
-
-                    while (reader.Read())
-                    {
-                        if (rowIndex.Equals(0))
+                        if (!reader.HasRows)
                         {
-                            model.ValueDate = Conversion.TryCastDate(Reader(reader,"value_date"));
-                            model.PartyCode = Conversion.TryCastString(Reader(reader,"party_code"));
-                            model.PriceTypeId = Conversion.TryCastInteger(Reader(reader,"price_type_id"));
-                            model.ReferenceNumber = Conversion.TryCastString(Reader(reader,"reference_number"));
-                            model.NonTaxableSales = Conversion.TryCastBoolean(Reader(reader, "non_taxable"));
-                            model.ShippingCompanyId = Conversion.TryCastInteger(Reader(reader,"shipper_id"));
-                            model.SalesPersonId = Conversion.TryCastInteger(Reader(reader,"salesperson_id"));
-                            model.StoreId = Conversion.TryCastInteger(Reader(reader,"store_id"));
-                            model.ShippingAddressCode = Conversion.TryCastString(Reader(reader,"shipping_address_code"));
-                            model.StatementReference = Conversion.TryCastString(Reader(reader,"statement_reference"));
+                            return new MergeModel();
                         }
 
-                        ProductDetail product = new ProductDetail();
+                        while (reader.Read())
+                        {
+                            if (rowIndex.Equals(0))
+                            {
+                                model.ValueDate = Conversion.TryCastDate(Reader(reader,"value_date"));
+                                model.PartyCode = Conversion.TryCastString(Reader(reader,"party_code"));
+                                model.PriceTypeId = Conversion.TryCastInteger(Reader(reader,"price_type_id"));
+                                model.ReferenceNumber = Conversion.TryCastString(Reader(reader,"reference_number"));
+                                model.NonTaxableSales = Conversion.TryCastBoolean(Reader(reader, "non_taxable"));
+                                model.ShippingCompanyId = Conversion.TryCastInteger(Reader(reader,"shipper_id"));
+                                model.SalesPersonId = Conversion.TryCastInteger(Reader(reader,"salesperson_id"));
+                                model.StoreId = Conversion.TryCastInteger(Reader(reader,"store_id"));
+                                model.ShippingAddressCode = Conversion.TryCastString(Reader(reader,"shipping_address_code"));
+                                model.StatementReference = Conversion.TryCastString(Reader(reader,"statement_reference"));
+                            }
 
-                        product.ItemCode = Conversion.TryCastString(Reader(reader,"item_code"));
-                        product.ItemName = Conversion.TryCastString(Reader(reader,"item_name"));
-                        product.Unit = Conversion.TryCastString(Reader(reader,"unit_name"));
+                            ProductDetail product = new ProductDetail();
 
-                        product.Quantity = Conversion.TryCastInteger(Reader(reader,"quantity"));
-                        product.Price = Conversion.TryCastDecimal(Reader(reader,"price"));
-                        product.Amount = product.Quantity * product.Price;
+                            product.ItemCode = Conversion.TryCastString(Reader(reader,"item_code"));
+                            product.ItemName = Conversion.TryCastString(Reader(reader,"item_name"));
+                            product.Unit = Conversion.TryCastString(Reader(reader,"unit_name"));
 
-                        product.Discount = Conversion.TryCastDecimal(Reader(reader,"discount"));
-                        product.ShippingCharge = Conversion.TryCastDecimal(Reader(reader,"shipping_charge"));
-                        product.Subtotal = product.Amount - product.Discount - product.ShippingCharge;
+                            product.Quantity = Conversion.TryCastInteger(Reader(reader,"quantity"));
+                            product.Price = Conversion.TryCastDecimal(Reader(reader,"price"));
+                            product.Amount = product.Quantity * product.Price;
 
-                        product.TaxCode = Conversion.TryCastString(Reader(reader,"tax_code"));
-                        product.Tax = Conversion.TryCastDecimal(Reader(reader,"tax"));
-                        product.Total = product.Subtotal + product.Tax;
+                            product.Discount = Conversion.TryCastDecimal(Reader(reader,"discount"));
+                            product.ShippingCharge = Conversion.TryCastDecimal(Reader(reader,"shipping_charge"));
+                            product.Subtotal = product.Amount - product.Discount - product.ShippingCharge;
 
-                        model.AddViewToCollection(product);
+                            product.TaxCode = Conversion.TryCastString(Reader(reader,"tax_code"));
+                            product.Tax = Conversion.TryCastDecimal(Reader(reader,"tax"));
+                            product.Total = product.Subtotal + product.Tax;
 
-                        rowIndex++;
+                            model.AddViewToCollection(product);
+
+                            rowIndex++;
+                        }
                     }
                 }
             }

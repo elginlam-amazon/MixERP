@@ -79,16 +79,16 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory.Data
                         AND transactions.non_gl_stock_master.non_gl_stock_master_id IN(" + string.Join(",", parameters) + ");";
 
             //Create a PostgreSQL command object from the SQL string.
-            using (NpgsqlCommand command = new NpgsqlCommand(sql))
-            {
-                //Iterate through the IDs and add PostgreSQL parameters.
-                for (int i = 0; i < ids.Count; i++)
-                {
-                    command.Parameters.AddWithValue("@Id" + Conversion.TryCastString(i), ids[i]);
-                }
+            //The command is returned to the caller, which owns its lifetime and disposal.
+            NpgsqlCommand command = new NpgsqlCommand(sql);
 
-                return command;
+            //Iterate through the IDs and add PostgreSQL parameters.
+            for (int i = 0; i < ids.Count; i++)
+            {
+                command.Parameters.AddWithValue("@Id" + Conversion.TryCastString(i), ids[i]);
             }
+
+            return command;
         }
     }
 }

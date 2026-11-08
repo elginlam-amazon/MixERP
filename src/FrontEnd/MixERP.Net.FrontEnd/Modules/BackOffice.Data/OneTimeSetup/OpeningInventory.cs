@@ -22,6 +22,7 @@ using MixERP.Net.DbFactory;
 using MixERP.Net.Entities.Transactions;
 using MixERP.Net.i18n.Resources;
 using Npgsql;
+using NpgsqlTypes;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -52,7 +53,14 @@ namespace MixERP.Net.Core.Modules.BackOffice.Data.OneTimeSetup
                 command.Parameters.AddWithValue("@OfficeId", officeId);
                 command.Parameters.AddWithValue("@UserId", userId);
                 command.Parameters.AddWithValue("@LoginId", loginId);
-                command.Parameters.AddWithValue("@ValueDate", valueDate);
+
+                // Npgsql 6+ infers the PostgreSQL type from DateTime.Kind: Utc maps to
+                // "timestamptz" (whose ::date cast is evaluated in the session TimeZone and can
+                // shift the calendar date) and Local can throw. The target parameter is cast to
+                // ::date, so bind it explicitly as a date to preserve the Npgsql 2.x behavior for
+                // every DateTime.Kind a caller may supply.
+                command.Parameters.Add(new NpgsqlParameter("@ValueDate", NpgsqlDbType.Date) { Value = valueDate.Date });
+
                 command.Parameters.AddWithValue("@ReferenceNumber", referenceNumber);
                 command.Parameters.AddWithValue("@StatementReference", statementReference);
 
