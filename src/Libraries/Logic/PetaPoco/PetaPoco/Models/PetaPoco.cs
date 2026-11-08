@@ -2110,6 +2110,24 @@ namespace PetaPoco
                     converter = delegate(object src) { return new DateTime(((DateTime)src).Ticks, DateTimeKind.Utc); };
                 }
 
+                // Npgsql 6+ maps PostgreSQL "date" to DateOnly and "time" to TimeOnly, where
+                // Npgsql 2.x produced DateTime/TimeSpan. The MixERP POCOs still declare those
+                // columns as DateTime/TimeSpan, and neither DateOnly nor TimeOnly implements
+                // IConvertible, so the generic Convert.ChangeType fallback below would throw
+                // InvalidCastException at read time. Convert them explicitly to preserve the
+                // pre-upgrade behaviour (a date reads back as midnight local time, as before).
+                if (converter == null && srcType == typeof(DateOnly)
+                        && (dstType == typeof(DateTime) || Nullable.GetUnderlyingType(dstType) == typeof(DateTime)))
+                {
+                    converter = delegate(object src) { return ((DateOnly)src).ToDateTime(TimeOnly.MinValue); };
+                }
+
+                if (converter == null && srcType == typeof(TimeOnly)
+                        && (dstType == typeof(TimeSpan) || Nullable.GetUnderlyingType(dstType) == typeof(TimeSpan)))
+                {
+                    converter = delegate(object src) { return ((TimeOnly)src).ToTimeSpan(); };
+                }
+
                 // Forced type conversion including integral types -> enum
                 if (converter == null)
                 {

@@ -19,6 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.DbFactory;
 using Npgsql;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
@@ -65,7 +66,22 @@ namespace MixERP.Net.WebControls.ReportEngine.Data
                 {
                     foreach (KeyValuePair<string, object> p in parameters)
                     {
-                        command.Parameters.AddWithValue(p.Key, p.Value);
+                        // Caller-supplied report parameters may carry a CLR null, which
+                        // Npgsql 6+ rejects in AddWithValue. DBNull.Value keeps the original
+                        // Npgsql 2.x behaviour of sending SQL NULL for the parameter.
+                        object value = p.Value ?? DBNull.Value;
+
+                        // Npgsql 6+ maps DateTime by Kind: a Kind=Local value is rejected for
+                        // "timestamp without time zone" (Npgsql 2.x accepted it). Coercing to
+                        // Unspecified keeps the legacy "timestamp" mapping. PostgreSQL implicitly
+                        // casts between date and timestamp, so date-typed report parameters need
+                        // no further conversion.
+                        if (value is DateTime dateTime && dateTime.Kind == DateTimeKind.Local)
+                        {
+                            value = DateTime.SpecifyKind(dateTime, DateTimeKind.Unspecified);
+                        }
+
+                        command.Parameters.AddWithValue(p.Key, value);
                     }
                 }
 
