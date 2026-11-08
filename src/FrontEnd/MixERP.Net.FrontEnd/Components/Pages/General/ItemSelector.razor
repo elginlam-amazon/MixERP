@@ -1,0 +1,102 @@
+@* ---------------------------------------------------------------------------------------------
+   General/ItemSelector.aspx (+ ItemSelector.aspx.cs) -> Components/Pages/General/ItemSelector.razor
+   (checklist task 86).
+
+   Page_Init built a MixERP.Net.WebControls.ScrudFactory.ScrudItemSelector and set ten of its
+   twelve properties; the migrated control is a Blazor component, so those ten assignments are the
+   parameter list below, VERBATIM (the property names are frozen on the control side).
+
+   The page was a standalone WebForms document with no master page; its <asp:ScriptManager> is
+   gone (no counterpart, no replacement needed) and its inline <style> block became
+   wwwroot/css/pages/item-selector.css. Scrud.js opens this page inside a colorbox, so the route
+   and the "ResourceClassName" / "Assembly" query string names are part of its contract.
+   --------------------------------------------------------------------------------------------- *@
+@page "/General/ItemSelector"
+@layout BlankLayout
+@inherits MixERPAuthorizedPageBase
+@using System.Reflection
+@using MixERP.Net.Framework
+@using MixERP.Net.WebControls.ScrudFactory
+@using Serilog
+
+<PageTitle>Scrud Item Selector</PageTitle>
+
+<HeadContent>
+    <link href="/css/pages/item-selector.css" rel="stylesheet" />
+</HeadContent>
+
+<div id="ItemSelectorPage">
+    <ScrudItemSelector TopPanelCssClass="vpad16"
+                       TopPanelTableCssClass="valignmiddle"
+                       ButtonCssClass="ui positive button"
+                       GridViewCssClass="ui celled table segment"
+                       GridViewPagerCssClass="ui menu"
+                       GridViewRowCssClass=""
+                       GridViewAlternateRowCssClass="alt"
+                       ResourceClassName="@this.GetResourceClassName()"
+                       Catalog="@this.Catalog" />
+</div>
+
+@code {
+    /// <summary>
+    ///     The "ResourceClassName" query string value — Request.QueryString["ResourceClassName"].
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "ResourceClassName")]
+    public string ResourceClassName { get; set; }
+
+    /// <summary>
+    ///     The "Assembly" query string value — Request.QueryString["Assembly"].
+    /// </summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "Assembly")]
+    public string AssemblyName { get; set; }
+
+    private string Catalog { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync().ConfigureAwait(true);
+
+        //selector.Catalog = AppUsers.GetCurrentUserDB(), read circuit-safely.
+        this.Catalog = await this.CurrentLogin.GetCatalogAsync().ConfigureAwait(true);
+
+        Assembly assembly = this.GetAssembly();
+
+        Log.Verbose("{Page} resolved the resource assembly {Assembly}.", this,
+            assembly == null ? "<none>" : assembly.GetName().Name);
+    }
+
+    /// <summary>
+    ///     Port of GetResourceClassName(): the query string value, or an empty string. An empty
+    ///     value makes the control fall back to its DbConfig scrud parameter, as before.
+    /// </summary>
+    private string GetResourceClassName()
+    {
+        if (!string.IsNullOrWhiteSpace(this.ResourceClassName))
+        {
+            return this.ResourceClassName;
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary>
+    ///     Port of GetAssembly() / GetAssemblyByName(name). The ONLY change is the lookup source:
+    ///     <c>AppDomain.CurrentDomain.GetAssemblies()</c> does not see the dynamically loaded module
+    ///     assemblies on modern .NET, so the registered discovery set is queried instead
+    ///     (Specialist 3's note: DiscoveryAssemblies.GetAssemblies(), fed by the explicit
+    ///     registrations plus RegisterFrom(AppContext.BaseDirectory)). The null-when-not-found
+    ///     behaviour of SingleOrDefault is preserved.
+    /// </summary>
+    private Assembly GetAssembly()
+    {
+        if (string.IsNullOrWhiteSpace(this.AssemblyName))
+        {
+            return typeof(ItemSelector).Assembly;
+        }
+
+        return DiscoveryAssemblies.GetAssemblies()
+            .SingleOrDefault(assembly => assembly.GetName().Name == this.AssemblyName);
+    }
+}

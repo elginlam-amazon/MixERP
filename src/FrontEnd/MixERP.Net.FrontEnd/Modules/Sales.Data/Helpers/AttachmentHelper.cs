@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using System;
 using MixERP.Net.Entities.Core;
 using Npgsql;
 using System.Collections.Generic;
@@ -28,6 +29,7 @@ namespace MixERP.Net.Core.Modules.Sales.Data.Data
 {
     public static class AttachmentHelper
     {
+        [System.CLSCompliant(false)]
         public static IEnumerable<NpgsqlParameter> AddAttachmentParameter(Collection<Attachment> attachments)
         {
             Collection<NpgsqlParameter> collection = new Collection<NpgsqlParameter>();
@@ -36,10 +38,10 @@ namespace MixERP.Net.Core.Modules.Sales.Data.Data
             {
                 for (int i = 0; i < attachments.Count; i++)
                 {
-                    collection.Add(new NpgsqlParameter("@Comment" + i, attachments[i].Comment));
-                    collection.Add(new NpgsqlParameter("@FilePath" + i, attachments[i].FilePath));
-                    collection.Add(new NpgsqlParameter("@OriginalFileName" + i, attachments[i].OriginalFileName));
-                    collection.Add(new NpgsqlParameter("@Extension" + i, Path.GetExtension(attachments[i].OriginalFileName)));
+                    collection.Add(new NpgsqlParameter("@Comment" + i, attachments[i].Comment ?? (object)DBNull.Value));
+                    collection.Add(new NpgsqlParameter("@FilePath" + i, attachments[i].FilePath ?? (object)DBNull.Value));
+                    collection.Add(new NpgsqlParameter("@OriginalFileName" + i, attachments[i].OriginalFileName ?? (object)DBNull.Value));
+                    collection.Add(new NpgsqlParameter("@Extension" + i, attachments[i].OriginalFileName == null ? (object)DBNull.Value : Path.GetExtension(attachments[i].OriginalFileName)));
                 }
             }
 

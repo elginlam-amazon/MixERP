@@ -1,0 +1,148 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/AccountStatementReport.ascx + .ascx.cs + .ascx.designer.cs - the
+   printable item account statement, opened by Reports/AccountStatement's Print button as
+   AccountStatementReport.mix?ItemCode=..&StoreId=..&From=..&To=..
+
+   The .ascx was the directive ONLY (no placeholder): the code-behind added the report
+   straight onto this.Controls, which is this component's own markup now.
+
+   `WebReport` NO LONGER EXISTS (it was a one-property Report subclass that set Catalog from
+   AppUsers.GetCurrentUserDB(), which is EMPTY inside a circuit), so <Report> is hosted
+   directly with Catalog from ICurrentLogin.
+
+   UNLIKE its five sibling reports this one pushes TWO DIFFERENT parameter collections, each
+   exactly once - parameter1 carries @@ItemCode alone and parameter2 carries the five-entry
+   set (@@From, @@To, @@UserId, @@ItemCode, @@StoreId) - and both are preserved in that order.
+   RunningTotalText = Titles.RunningTotal is preserved too; it is the only Inventory report
+   that sets it.
+
+   @@UserId came from AppUsers.GetCurrent().View.UserId, which is 0 inside a Blazor circuit,
+   so it is read through ICurrentLogin; it is still formatted with
+   CultureInfo.InvariantCulture, as are @@StoreId's digits, exactly as the original did.
+
+   AutoInitialize IS DELIBERATELY FALSE, with InitializeReport() called from OnAfterRender
+   once the @@ref exists. The original pushed its parameters in BEFORE setting
+   AutoInitialize = true; the migrated Report component honours AutoInitialize from
+   OnParametersSet, which runs BEFORE a parent can reach the child through @@ref - so
+   AutoInitialize="true" here would initialize with an EMPTY parameter collection and the
+   report would render blank.
+
+   PRESERVED SURFACE: RemoveTheme = true and MasterPageId = "MixERPReportMaster.Master",
+   assigned in the CONSTRUCTOR because ModuleHost.razor reads them off an Activator-created
+   probe instance on which no lifecycle method runs.
+
+   NOTE on the query string: the original read `this.Page.Request["ItemCode"]`, which
+   searched query string, then form, then cookies. This screen is only ever reached by the
+   GET url above (showWindow(...) from reports/AccountStatement.js), so the query string was
+   the only one of the three collections ever populated - which is what ModuleQuery reads. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using System.Collections.ObjectModel
+@using System.Globalization
+@using MixERP.Net.Common
+@using MixERP.Net.Core.Modules.Inventory.Internal
+@using MixERP.Net.WebControls.ReportEngine
+@using MixERP.Net.i18n.Resources
+@inject NavigationManager Navigation
+
+@if (this.loaded)
+{
+    <Report @ref="this.report"
+            AutoInitialize="false"
+            Catalog="@this.catalog"
+            RunningTotalText="@Titles.RunningTotal"
+            Path="@ReportFilePath" />
+}
+
+@code {
+    private const string ReportFilePath = "~/Modules/Inventory/Reports/Source/Inventory.AccountStatement.xml";
+
+    private Report report;
+    private bool loaded;
+    private bool initializePending;
+    private string catalog;
+    private int userId;
+
+    public AccountStatementReport()
+    {
+        //<%@ Control ... RemoveTheme="true" MasterPageId="MixERPReportMaster.Master" %>
+        this.RemoveTheme = true;
+        this.MasterPageId = "MixERPReportMaster.Master";
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the report above, which is markup now, and read the four query
+    ///     string values plus the user id - the parameter push happens in OnAfterRender, where
+    ///     the @@ref it goes through exists.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.userId = login.UserId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+        this.initializePending = true;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+
+        if (!this.initializePending || this.report == null)
+        {
+            return;
+        }
+
+        this.initializePending = false;
+
+        string itemCode = ModuleQuery.Get(this.Navigation, "ItemCode");
+        DateTime from = Conversion.TryCastDate(ModuleQuery.Get(this.Navigation, "From"));
+        DateTime to = Conversion.TryCastDate(ModuleQuery.Get(this.Navigation, "To"));
+        int storeId = Conversion.TryCastInteger(ModuleQuery.Get(this.Navigation, "StoreId"));
+
+        Collection<KeyValuePair<string, object>> parameter1 = new Collection<KeyValuePair<string, object>>();
+        parameter1.Add(new KeyValuePair<string, object>("@ItemCode", itemCode));
+
+        Collection<KeyValuePair<string, object>> parameter2 = new Collection<KeyValuePair<string, object>>();
+        parameter2.Add(new KeyValuePair<string, object>("@From", from));
+        parameter2.Add(new KeyValuePair<string, object>("@To", to));
+        parameter2.Add(new KeyValuePair<string, object>("@UserId",
+            this.userId.ToString(CultureInfo.InvariantCulture)));
+        parameter2.Add(new KeyValuePair<string, object>("@ItemCode", itemCode));
+        parameter2.Add(new KeyValuePair<string, object>("@StoreId",
+            storeId.ToString(CultureInfo.InvariantCulture)));
+
+        this.report.ParameterCollection.Clear();
+        this.report.AddParameterToCollection(parameter1);
+        this.report.AddParameterToCollection(parameter2);
+        this.report.InitializeReport();
+        this.StateHasChanged();
+    }
+}

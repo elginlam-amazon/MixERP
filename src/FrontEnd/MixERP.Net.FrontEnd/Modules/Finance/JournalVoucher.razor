@@ -1,0 +1,102 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from JournalVoucher.ascx + .ascx.cs + .ascx.designer.cs - the journal voucher LIST
+   (the transaction view with its own date/status filters, add/flag/print toolbar).
+
+   OnControlLoad built a `TransactionView` and added it to this.Controls through
+   <asp:PlaceHolder ID="Placeholder1">; the migrated
+   MixERP.Net.WebControls.TransactionViewFactory.TransactionView is a Blazor component, so it
+   is markup now. Every one of the 13 values the code-behind set is carried across, including
+   the typo'd parameter name DateFromFromFrequencyType (frozen by the control) and the
+   RELATIVE AddNewPath "Entry/JournalVoucher.mix", which resolves against the current
+   /Modules/Finance/ directory exactly as it did before.
+
+   The five login-derived values (PostedBy, OfficeName, UserId, OfficeId, Catalog) came from
+   AppUsers.GetCurrent()/GetCurrentUserDB(), which return an EMPTY login inside a Blazor
+   circuit; they come from ICurrentLogin in OnInitializedAsync, which is also why the view
+   renders only once `loaded` is true - with an empty catalog it would query no database.
+
+   REVIEW - RESOLVED, BEHAVIOUR DELIBERATELY UNCHANGED: the .ascx ended with
+   <script src=".../js/JournalVoucher.ascx.js">, and that file HAS NEVER EXISTED in the
+   repository (verified at 22b73404; only js/entry/JournalVoucher.js does, which belongs to
+   Entry/JournalVoucher). The reference was a 404 before this migration. It is therefore NOT
+   carried over as a script load and NOT repointed at js/entry/JournalVoucher.js - repointing
+   it would newly EXECUTE an entry-screen controller on a list screen, which is a behaviour
+   change, not a fix. Nothing is lost: there is no file to load.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.TransactionViewFactory
+@using MixERP.Net.i18n.Resources
+
+@if (this.loaded)
+{
+    <TransactionView DisplayAddButton="true"
+                     DisplayFlagButton="true"
+                     DisplayPrintButton="true"
+                     AddNewPath="Entry/JournalVoucher.mix"
+                     GridViewCssClass="ui table nowrap"
+                     Text="@Titles.JournalVoucher"
+                     DateFromFromFrequencyType="@(FrequencyType.FiscalYearStartDate)"
+                     DateToFrequencyType="@(FrequencyType.FiscalYearEndDate)"
+                     Book="Journal"
+                     PostedBy="@this.postedBy"
+                     OfficeName="@this.officeName"
+                     Status="Approved"
+                     UserId="@this.userId"
+                     OfficeId="@this.officeId"
+                     Catalog="@this.catalog" />
+}
+
+@code {
+    private bool loaded;
+    private string postedBy;
+    private string officeName;
+    private int userId;
+    private int officeId;
+    private string catalog;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY built the TransactionView above, which is markup now; its five
+    ///     login-derived values are asynchronous, so they are read in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.postedBy = login.UserName;
+        this.officeName = login.OfficeName;
+        this.userId = login.UserId;
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+    }
+}

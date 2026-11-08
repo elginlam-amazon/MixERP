@@ -19,176 +19,230 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Globalization;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using System.Net;
+using System.Text;
 
 namespace MixERP.Net.Common.Helpers
 {
+    /// <summary>
+    ///     Semantic-UI markup factory.
+    ///     <para>
+    ///         On .NET Framework these members produced <c>HtmlGenericControl</c> /
+    ///         <c>Literal</c> instances that were added into a WebForms control tree. That tree
+    ///         does not exist on modern .NET, so every member now returns the SAME rendered
+    ///         HTML as a <see cref="string" />: the tag, the Semantic-UI CSS class and the
+    ///         nesting are byte-for-byte what WebForms rendered.
+    ///     </para>
+    ///     <para>
+    ///         In a Razor component render the result with
+    ///         <c>@((MarkupString)HtmlControlHelper.GetSegment())</c>. Container-producing
+    ///         members (segment, field, fields, form, modal, …) have an additional overload
+    ///         taking the inner HTML so a control tree built by <c>Controls.Add</c> becomes
+    ///         nested composition instead; the original parameter lists are unchanged.
+    ///     </para>
+    ///     <para>
+    ///         Text values are HTML-encoded, exactly as <c>HtmlGenericControl.InnerText</c> and
+    ///         attribute values were encoded by WebForms.
+    ///     </para>
+    /// </summary>
     public static class HtmlControlHelper
     {
-        public static HtmlGenericControl GetDivider()
-        {
-            using (HtmlGenericControl divider = new HtmlGenericControl("div"))
-            {
-                divider.Attributes.Add("class", "ui divider");
+        #region Markup primitives
 
-                return divider;
+        /// <summary>
+        ///     Renders an element with a class attribute and the supplied (already-HTML) inner markup,
+        ///     reproducing <c>HtmlGenericControl</c> rendering.
+        /// </summary>
+        private static string GetElement(string tag, string cssClass, string innerHtml, string id)
+        {
+            StringBuilder markup = new StringBuilder();
+
+            markup.Append("<").Append(tag);
+
+            if (!string.IsNullOrWhiteSpace(id))
+            {
+                markup.Append(" id=\"").Append(WebUtility.HtmlEncode(id)).Append("\"");
             }
+
+            if (cssClass != null)
+            {
+                markup.Append(" class=\"").Append(WebUtility.HtmlEncode(cssClass)).Append("\"");
+            }
+
+            markup.Append(">");
+
+            if (!string.IsNullOrEmpty(innerHtml))
+            {
+                markup.Append(innerHtml);
+            }
+
+            markup.Append("</").Append(tag).Append(">");
+
+            return markup.ToString();
         }
 
-        public static HtmlGenericControl GetModalHeader(string text = "", string icon = "")
+        /// <summary>
+        ///     Encodes a text value the way <c>HtmlGenericControl.InnerText</c> did.
+        /// </summary>
+        private static string EncodeText(string text)
         {
-            using (HtmlGenericControl header = new HtmlGenericControl("div"))
-            {
-                header.Attributes.Add("class", "header");
-
-
-                if (!string.IsNullOrWhiteSpace(icon))
-                {
-                    using (HtmlGenericControl headerIcon = GetIcon(icon))
-                    {
-                        header.Controls.Add(headerIcon);
-                    }
-                }
-
-                using (Literal literal = new Literal())
-                {
-                    literal.Text = text;
-                    header.Controls.Add(literal);
-                }
-
-                return header;
-            }
+            return text == null ? string.Empty : WebUtility.HtmlEncode(text);
         }
 
-        public static HtmlGenericControl GetField()
-        {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", "field");
+        #endregion Markup primitives
 
-                return field;
-            }
+        public static string GetDivider()
+        {
+            return GetElement("div", "ui divider", null, null);
         }
 
-        public static HtmlGenericControl GetField(string cssClass)
+        public static string GetModalHeader(string text = "", string icon = "")
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", cssClass);
+            StringBuilder inner = new StringBuilder();
 
-                return field;
+            if (!string.IsNullOrWhiteSpace(icon))
+            {
+                inner.Append(GetIcon(icon));
             }
+
+            //The original added a Literal carrying the header text after the icon. A Literal
+            //renders its Text RAW, so encoding here is a deliberate behaviour change: it is the
+            //correct XSS posture for the text overload. Callers that genuinely passed markup
+            //(&nbsp;, <b>..</b>, a nested icon span) must move to GetModalHeaderHtml below.
+            inner.Append(EncodeText(text));
+
+            return GetElement("div", "header", inner.ToString(), null);
         }
 
-        public static HtmlGenericControl GetFields()
+        /// <summary>
+        ///     Same markup as <see cref="GetModalHeader" /> but emits <paramref name="innerHtml" />
+        ///     VERBATIM, reproducing the raw rendering of the original
+        ///     <c>System.Web.UI.WebControls.Literal</c>. Use this only for trusted markup —
+        ///     prefer <see cref="GetModalHeader" />, which encodes.
+        /// </summary>
+        public static string GetModalHeaderHtml(string innerHtml = "", string icon = "")
         {
-            using (HtmlGenericControl fields = new HtmlGenericControl("div"))
-            {
-                fields.Attributes.Add("class", "fields");
+            StringBuilder inner = new StringBuilder();
 
-                return fields;
+            if (!string.IsNullOrWhiteSpace(icon))
+            {
+                inner.Append(GetIcon(icon));
             }
+
+            inner.Append(innerHtml);
+
+            return GetElement("div", "header", inner.ToString(), null);
         }
 
-        public static HtmlGenericControl GetFields(string cssClass)
+        public static string GetField()
         {
-            using (HtmlGenericControl fields = new HtmlGenericControl("div"))
-            {
-                fields.Attributes.Add("class", cssClass);
-
-                return fields;
-            }
+            return GetElement("div", "field", null, null);
         }
 
-        public static HtmlGenericControl GetForm()
+        public static string GetField(string cssClass)
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", "ui form");
-
-                return field;
-            }
+            return GetElement("div", cssClass, null, null);
         }
 
-        public static HtmlGenericControl GetFormSegment()
+        /// <summary>
+        ///     Composing overload: a "field" div wrapping the supplied inner markup.
+        /// </summary>
+        public static string GetField(string cssClass, string innerHtml)
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", "ui form segment");
-
-                return field;
-            }
+            return GetElement("div", cssClass, innerHtml, null);
         }
 
-        public static HtmlGenericControl GetFormSegment(string cssClass)
+        public static string GetFields()
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", cssClass);
-
-                return field;
-            }
+            return GetElement("div", "fields", null, null);
         }
 
-        public static HtmlGenericControl GetIcon(string cssClass)
+        public static string GetFields(string cssClass)
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("i"))
-            {
-                field.Attributes.Add("class", cssClass);
-
-                return field;
-            }
+            return GetElement("div", cssClass, null, null);
         }
 
-        public static HtmlGenericControl GetInlineFields()
+        /// <summary>
+        ///     Composing overload: a "fields" div wrapping the supplied inner markup.
+        /// </summary>
+        public static string GetFields(string cssClass, string innerHtml)
         {
-            using (HtmlGenericControl fields = new HtmlGenericControl("div"))
-            {
-                fields.Attributes.Add("class", "inline fields");
-
-                return fields;
-            }
+            return GetElement("div", cssClass, innerHtml, null);
         }
 
-        public static HtmlGenericControl GetLabel(string text)
+        public static string GetForm()
         {
-            using (HtmlGenericControl label = new HtmlGenericControl("label"))
-            {
-                label.InnerText = text;
-                return label;
-            }
+            return GetElement("div", "ui form", null, null);
         }
 
-        public static HtmlGenericControl GetLabel(string text, string targetControlId)
+        /// <summary>
+        ///     Composing overload: a "ui form" div wrapping the supplied inner markup.
+        /// </summary>
+        public static string GetForm(string innerHtml)
         {
-            using (HtmlGenericControl label = new HtmlGenericControl("label"))
-            {
-                label.Attributes.Add("for", targetControlId);
-                label.InnerText = text;
-                return label;
-            }
+            return GetElement("div", "ui form", innerHtml, null);
         }
 
-        public static HtmlGenericControl GetPageHeader(string text)
+        public static string GetFormSegment()
         {
-            using (HtmlGenericControl header = new HtmlGenericControl("div"))
-            {
-                using (HtmlGenericControl h1 = new HtmlGenericControl("h1"))
-                {
-                    h1.Attributes.Add("class", "ui purple header");
-                    h1.InnerText = text;
+            return GetElement("div", "ui form segment", null, null);
+        }
 
-                    header.Controls.Add(h1);
-                }
+        public static string GetFormSegment(string cssClass)
+        {
+            return GetElement("div", cssClass, null, null);
+        }
 
-                using (HtmlGenericControl divider = GetDivider())
-                {
-                    header.Controls.Add(divider);
-                }
+        /// <summary>
+        ///     Composing overload: a form-segment div wrapping the supplied inner markup.
+        /// </summary>
+        public static string GetFormSegment(string cssClass, string innerHtml)
+        {
+            return GetElement("div", cssClass, innerHtml, null);
+        }
 
-                return header;
-            }
+        public static string GetIcon(string cssClass)
+        {
+            return GetElement("i", cssClass, null, null);
+        }
+
+        public static string GetInlineFields()
+        {
+            return GetElement("div", "inline fields", null, null);
+        }
+
+        /// <summary>
+        ///     Composing overload: an "inline fields" div wrapping the supplied inner markup.
+        /// </summary>
+        public static string GetInlineFields(string innerHtml)
+        {
+            return GetElement("div", "inline fields", innerHtml, null);
+        }
+
+        public static string GetLabel(string text)
+        {
+            return GetElement("label", null, EncodeText(text), null);
+        }
+
+        public static string GetLabel(string text, string targetControlId)
+        {
+            StringBuilder markup = new StringBuilder();
+
+            markup.Append("<label for=\"").Append(WebUtility.HtmlEncode(targetControlId)).Append("\">");
+            markup.Append(EncodeText(text));
+            markup.Append("</label>");
+
+            return markup.ToString();
+        }
+
+        public static string GetPageHeader(string text)
+        {
+            StringBuilder inner = new StringBuilder();
+
+            inner.Append(GetElement("h1", "ui purple header", EncodeText(text), null));
+            inner.Append(GetDivider());
+
+            return GetElement("div", null, inner.ToString(), null);
         }
 
         public static string GetLabelHtml(string text)
@@ -201,78 +255,92 @@ namespace MixERP.Net.Common.Helpers
             return String.Format(CultureInfo.InvariantCulture, "<label for='{1}'>{0}</label>", text, targetControlId);
         }
 
-        public static HtmlGenericControl GetLeftIconInput()
+        public static string GetLeftIconInput()
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", "ui left icon input");
-
-                return field;
-            }
+            return GetElement("div", "ui left icon input", null, null);
         }
 
-        public static HtmlGenericControl GetModal()
+        /// <summary>
+        ///     Composing overload: the Semantic-UI left-icon input wrapper around the supplied
+        ///     icon + input markup.
+        /// </summary>
+        public static string GetLeftIconInput(string innerHtml)
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", "ui modal");
-
-                return field;
-            }
+            return GetElement("div", "ui left icon input", innerHtml, null);
         }
 
-        public static HtmlGenericControl GetModal(string cssClass, string id = "")
+        public static string GetModal()
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", cssClass);
-
-                if (!string.IsNullOrWhiteSpace(id))
-                {
-                    field.ID = id;
-                }
-
-                return field;
-            }
+            return GetElement("div", "ui modal", null, null);
         }
 
-        public static HtmlGenericControl GetSegment()
+        public static string GetModal(string cssClass, string id = "")
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", "ui segment");
-
-                return field;
-            }
+            return GetElement("div", cssClass, null, id);
         }
 
-        public static HtmlGenericControl GetSegment(string cssClass)
+        /// <summary>
+        ///     Composing overload: a modal div wrapping the supplied inner markup.
+        /// </summary>
+        public static string GetModal(string cssClass, string id, string innerHtml)
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", cssClass);
-
-                return field;
-            }
+            return GetElement("div", cssClass, innerHtml, id);
         }
 
-        public static void AddListItem(HtmlGenericControl container, string key, object value)
+        public static string GetSegment()
         {
-            using (HtmlGenericControl li = new HtmlGenericControl("li"))
-            {
-                li.InnerText = key + " : " + value;
-                container.Controls.Add(li);
-            }
+            return GetElement("div", "ui segment", null, null);
         }
 
-        public static HtmlGenericControl GetToggleCheckBox()
+        public static string GetSegment(string cssClass)
         {
-            using (HtmlGenericControl toggleCheckBox = new HtmlGenericControl("div"))
-            {
-                toggleCheckBox.Attributes.Add("class", "ui toggle checkbox");
+            return GetElement("div", cssClass, null, null);
+        }
 
-                return toggleCheckBox;
+        /// <summary>
+        ///     Composing overload: a segment div wrapping the supplied inner markup.
+        /// </summary>
+        public static string GetSegment(string cssClass, string innerHtml)
+        {
+            return GetElement("div", cssClass, innerHtml, null);
+        }
+
+        /// <summary>
+        ///     Appends a <c>&lt;li&gt;{key} : {value}&lt;/li&gt;</c> item to <paramref name="container" />
+        ///     and returns that item's markup.
+        ///     <para>
+        ///         SIGNATURE CHANGE: the first parameter was an <c>HtmlGenericControl</c> whose
+        ///         <c>Controls</c> collection was mutated. A markup-producing library cannot mutate a
+        ///         control, so the accumulator is now a <see cref="StringBuilder" /> — the call site
+        ///         keeps its shape (<c>AddListItem(list, key, value)</c> in a loop) and the rendered
+        ///         <c>&lt;li&gt;</c> text is unchanged. Passing null returns the markup without
+        ///         accumulating.
+        ///     </para>
+        /// </summary>
+        public static string AddListItem(StringBuilder container, string key, object value)
+        {
+            string item = GetElement("li", null, EncodeText(key + " : " + value), null);
+
+            if (container != null)
+            {
+                container.Append(item);
             }
+
+            return item;
+        }
+
+        public static string GetToggleCheckBox()
+        {
+            return GetElement("div", "ui toggle checkbox", null, null);
+        }
+
+        /// <summary>
+        ///     Composing overload: the Semantic-UI toggle-checkbox wrapper around the supplied
+        ///     checkbox + label markup.
+        /// </summary>
+        public static string GetToggleCheckBox(string innerHtml)
+        {
+            return GetElement("div", "ui toggle checkbox", innerHtml, null);
         }
     }
 }

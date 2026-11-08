@@ -1,0 +1,350 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Adjustment.ascx + .ascx.cs + .ascx.designer.cs - the stock adjustment ENTRY
+   screen. (It is the module-root file, not an Entry/ one - the AddNewPath of
+   Confirmation/Adjustment points at /Modules/Inventory/Entry/Adjustment.mix, which has never
+   existed; that is an upstream matter, recorded in this module's migration summary.)
+
+   The ENTIRE render tree was built procedurally in OnControlLoad - CreateHeader,
+   CreateTopFormSegment, CreateGridView, CreateBottomPanel - into
+   <asp:PlaceHolder ID="Placeholder1">. It is markup now, in the identical child order, with
+   the same element ids, classes and attributes the HtmlControlHelper / HtmlGenericControl
+   calls produced (GetFields() -> div.fields, GetField() -> div.field,
+   GetForm() -> div."ui form").
+
+   ===== THE #StoreHidden / ShowButton PAIRING - THE ONE REAL SUBTLETY =====
+   ShowButton had BOTH an OnClientClick gate and a server-side Click handler:
+
+     OnClientClick = "return ShowButton_ClientClick();"   (in Adjustment.js)
+     Click         = ShowButton_Click                      (reads storeHiddenField.Value)
+
+   ShowButton_ClientClick() copies the #StoreSelect selection into #StoreHidden and returns
+   false when nothing is selected, which under WebForms both POPULATED the hidden field and
+   suppressed the postback. The literal onclick attribute is kept, because populating
+   #StoreHidden is its substantive job - but a literal `return false` cannot cancel a Blazor
+   @@onclick handler. It does not need to: ShowButton_Click's OWN first act was
+   `if (storeId.Equals(0)) return;`, so a no-store click rebinds nothing either way. The
+   outcome is identical; the gate is no longer the thing enforcing it.
+
+   #StoreHidden is written by javascript, so its value is read back off the DOM at click time
+   through Internal/ElementValueReader - the faithful equivalent of the WebForms postback
+   read (same element, same value, same moment). See that file's header.
+
+   ===== Grid_RowCreated, PRESERVED =====
+   The handler ran `cell.Text = Titles.Get(cell.Text)` over cells 0..Cells.Count-3 of EVERY
+   created row - header and data alike - skipping blank / &nbsp; cells. The closing-stock
+   result has six columns, so that is cells 0-3 (ItemId, ItemCode, ItemName, UnitId). It is
+   reproduced below as explicit columns whose header text AND cell value both go through the
+   same Localize() helper, with the same emptiness guard (the original's IsEmptyCell).
+
+   THE GRID IS A POSITIONAL JAVASCRIPT CONTRACT: Adjustment.js appends an "actual" and a
+   "difference" input to every row and then reads td:nth-child(2)=ItemCode, (3)=ItemName,
+   (5)=UnitName, (8)=the difference input, with td:nth-last-child(3)=Quantity. So all six
+   columns are emitted in the data source's own order, under the id "grid" and the css class
+   "ui striped collapsing table form".
+
+   SCRIPT TIMING: the inline <script> block moved VERBATIM to wwwroot/js/Adjustment.js and is
+   appended on the render that FOLLOWS the closing-stock query, never on firstRender -
+   createControls() reads the rendered rows out of the DOM.
+
+   PRESERVED SURFACE: ITransaction, which the host's CheckTransactionPostingStatusAsync reads
+   to enforce RestrictedTransactionMode. The original declared no OverridePath, AccessLevel,
+   MasterPageId, RemoveTheme or IsLandingPage override.
+
+   AppUsers.GetCurrent() / GetCurrentUserDB() return an EMPTY login inside a Blazor circuit,
+   so Catalog and OfficeId come from ICurrentLogin.
+
+   DROPPED WITH NO LOSS: the IDisposable pair released the WebForms DateTextBox / HiddenField
+   / Button / MixERPGridView child-control instances and detached their handlers. A Blazor
+   component owns no child-control tree, so there is nothing to release. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@implements MixERP.Net.Entities.Contracts.ITransaction
+@using MixERP.Net.Common
+@using MixERP.Net.Core.Modules.Inventory.Data.Reports
+@using MixERP.Net.Core.Modules.Inventory.Internal
+@using MixERP.Net.Entities
+@using MixERP.Net.Entities.Transactions
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+@* CreateHeader(): new HtmlGenericControl("h2") { InnerText = Titles.StockAdjustment } *@
+<h2>@Titles.StockAdjustment</h2>
+
+@* CreateTopFormSegment(): div."ui form segment" > div."fields" > the four fields. *@
+<div class="ui form segment">
+    <div class="fields">
+        <div class="field">
+            <label for="ValueDateTextBox">@Titles.ValueDate</label>
+            @if (this.loaded)
+            {
+                <DateTextBox ID="ValueDateTextBox"
+                             Mode="FrequencyType.Today"
+                             Catalog="@this.catalog"
+                             OfficeId="@this.officeId" />
+            }
+        </div>
+        <div class="field">
+            <label for="ReferenceNumberInputText">@Titles.ReferenceNumber</label>
+            <input type="text" id="ReferenceNumberInputText" />
+        </div>
+        <div class="four wide column field">
+            <label for="StoreSelect">@Titles.SelectStore</label>
+            @* Both are filled client-side: loadStores() binds the select from the item-data
+               endpoint, and ShowButton_ClientClick() writes the selection into #StoreHidden. *@
+            <select id="StoreSelect" tabindex="0"></select>
+            <input type="hidden" id="StoreHidden" />
+        </div>
+        <div class="field">
+            <label for="ShowButton">@Titles.ListItems</label>
+            @* The ported OnClientClick is invoked from the @@onclick handler itself - see the
+               header. A literal onclick attribute cannot sit beside @@onclick (RZ10008), and
+               a literal `return false` could not have cancelled the handler anyway. *@
+            <button type="button" id="ShowButton" tabindex="0" class="ui small positive button"
+                    @onclick="this.ShowButton_Click">@Titles.Show</button>
+        </div>
+    </div>
+</div>
+
+@* CreateGridView(): the closing-stock grid. *@
+<MixERPGridView ID="grid"
+                CssClass="ui striped collapsing table form"
+                AutoGenerateColumns="false"
+                Columns="@this.columns"
+                DataSource="@this.rows" />
+
+@* CreateBottomPanel(): the error div, then the bottom form with the statement reference and
+   the save button. *@
+<div id="ErrorDiv" class="big error vpad16"></div>
+
+<div class="ui form" style="width:300px;">
+    <div class="field">
+        <label for="StatementReferenceTextArea">@Titles.StatementReference</label>
+        <textarea id="StatementReferenceTextArea" rows="4"></textarea>
+    </div>
+    @* HtmlInputButton -> <input type="button">. #SaveButton is bound by Adjustment.js, which
+       collects the grid rows and posts them, so it stays a plain client-side button. *@
+    <input type="button" id="SaveButton" value="@Titles.Save" class="ui red button" />
+</div>
+
+@code {
+    private const string ScriptUrl =
+        "_content/MixERP.Net.Core.Modules.Inventory/js/Adjustment.js";
+
+    //Grid_RowCreated localized cells 0 .. Cells.Count - 3. The closing-stock result has six
+    //columns, so that is the first FOUR.
+    private const int LocalizedColumnCount = 4;
+
+    private bool loaded;
+    private string catalog;
+    private int officeId;
+
+    private ElementValueReader elements;
+    private IReadOnlyList<MixERPGridViewColumn> columns;
+    private IEnumerable<DbListClosingStockResult> rows;
+
+    //The script must be appended on the render AFTER the grid has rows - see the header.
+    private bool scriptPending;
+    private bool scriptLoaded;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY called the four Create* builders, every one of which is markup
+    ///     now; the two login-derived values the value-date box needs are asynchronous, so they
+    ///     are read in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.columns = this.CreateColumns();
+        this.elements = new ElementValueReader(this.JS);
+        this.loaded = true;
+
+        //The legacy screen rendered an EMPTY grid until Show was clicked (the data source was
+        //only assigned in ShowButton_Click), and so does this one. The script still has to run
+        //once so that loadStores() populates #StoreSelect and the Save handler is bound.
+        this.scriptPending = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!this.scriptPending || this.scriptLoaded)
+        {
+            return;
+        }
+
+        this.scriptLoaded = true;
+        await ModuleScripts.LoadAsync(this.JS, ScriptUrl);
+    }
+
+    /// <summary>
+    ///     Port of ShowButton_Click, WITH its OnClientClick gate.
+    ///     <para>
+    ///         The legacy button carried BOTH <c>OnClientClick =
+    ///         "return ShowButton_ClientClick();"</c> and this server-side handler.
+    ///         <c>ShowButton_ClientClick()</c> (in Adjustment.js, unchanged) copies the
+    ///         #StoreSelect selection into #StoreHidden and returns false when nothing is
+    ///         selected, which under WebForms suppressed the postback. A literal <c>onclick</c>
+    ///         attribute may not sit beside <c>@@onclick</c> in Razor - and a literal
+    ///         <c>return false</c> could not cancel a Blazor handler anyway - so the gate is
+    ///         INVOKED FROM HERE instead, first thing, and its false result still stops the
+    ///         rebind. Same function, same order, same outcome, and #StoreHidden is still
+    ///         populated by it.
+    ///     </para>
+    /// </summary>
+    private async Task ShowButton_Click()
+    {
+        bool proceed = await this.InvokeClientClickGateAsync();
+
+        if (!proceed)
+        {
+            return;
+        }
+
+        int storeId = Conversion.TryCastInteger(await this.elements.GetValueAsync("StoreHidden"));
+
+        if (storeId.Equals(0))
+        {
+            return;
+        }
+
+        this.rows = StockItems.ListClosingStock(this.catalog, storeId);
+
+        //createControls() appends the two inputs to the rows it finds in the DOM, so it has to
+        //run again now that the grid has been re-rendered with a new row set.
+        this.scriptLoaded = false;
+        this.scriptPending = true;
+    }
+
+    /// <summary>
+    ///     Calls the <c>ShowButton_ClientClick()</c> global of Adjustment.js. If the script is
+    ///     not loaded yet the gate cannot have populated #StoreHidden either, so the click is
+    ///     allowed through and the <c>storeId == 0</c> guard below takes over - which is the
+    ///     same no-op the legacy gate produced.
+    /// </summary>
+    private async Task<bool> InvokeClientClickGateAsync()
+    {
+        try
+        {
+            return await this.JS.InvokeAsync<bool>("ShowButton_ClientClick");
+        }
+        catch (JSException ex)
+        {
+            Serilog.Log.Warning("Could not run the stock adjustment store gate. {Exception}.", ex);
+            return true;
+        }
+    }
+
+    /// <summary>
+    ///     The six closing-stock columns, in the data source's own order - which is a
+    ///     javascript contract (see the header). The first four carry the Grid_RowCreated
+    ///     localization on both the header and the cell.
+    /// </summary>
+    private IReadOnlyList<MixERPGridViewColumn> CreateColumns()
+    {
+        string[] fields = { "ItemId", "ItemCode", "ItemName", "UnitId", "UnitName", "Quantity" };
+
+        List<MixERPGridViewColumn> list = new List<MixERPGridViewColumn>();
+
+        for (int i = 0; i < fields.Length; i++)
+        {
+            string field = fields[i];
+
+            if (i < LocalizedColumnCount)
+            {
+                list.Add(new MixERPGridViewColumn
+                {
+                    DataField = field,
+                    //A GridView's auto-generated header text was the data field name, which
+                    //Grid_RowCreated then localized.
+                    HeaderText = Localize(field),
+                    //A cell template is built with the render-tree builder rather than Razor's
+                    //@@<...> template syntax, which is not available inside an object
+                    //initializer in a @@code block.
+                    Template = row => (RenderFragment)(builder =>
+                        builder.AddContent(0, Localize(GetFieldValue(row, field))))
+                });
+            }
+            else
+            {
+                list.Add(new MixERPGridViewColumn(field, field, null));
+            }
+        }
+
+        return list;
+    }
+
+    private static string GetFieldValue(object row, string field)
+    {
+        DbListClosingStockResult item = row as DbListClosingStockResult;
+
+        if (item == null)
+        {
+            return string.Empty;
+        }
+
+        switch (field)
+        {
+            case "ItemId":
+                return Conversion.TryCastString(item.ItemId);
+            case "ItemCode":
+                return item.ItemCode;
+            case "ItemName":
+                return item.ItemName;
+            case "UnitId":
+                return Conversion.TryCastString(item.UnitId);
+            default:
+                return string.Empty;
+        }
+    }
+
+    /// <summary>
+    ///     Port of Grid_RowCreated + IsEmptyCell: a blank or <c>&amp;nbsp;</c> cell was left
+    ///     alone, everything else went through <c>Titles.Get</c>.
+    /// </summary>
+    private static string Localize(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return text;
+        }
+
+        if (text.ToUpperInvariant().Equals("&NBSP;"))
+        {
+            return text;
+        }
+
+        return Titles.Get(text);
+    }
+}

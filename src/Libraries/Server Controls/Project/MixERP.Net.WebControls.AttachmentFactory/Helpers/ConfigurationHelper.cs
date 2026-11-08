@@ -5,7 +5,10 @@ namespace MixERP.Net.WebControls.AttachmentFactory.Helpers
 {
     public static class ConfigurationHelper
     {
-        private const string configFile = "AttachmentFactoryConfigFileLocation";
+        //The former private const "AttachmentFactoryConfigFileLocation" is removed: it was
+        //already dead in the original (a grep over the solution finds no reader) and it named
+        //an appSetting pointing at a legacy external *.config file. All four methods below read
+        //their values from the database through DbConfig.GetAttachmentParameter instead.
 
         public static string GetAllowedExtensions(string catalog)
         {

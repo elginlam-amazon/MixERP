@@ -1,0 +1,338 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Admin/DatabaseBackup.ascx + .ascx.cs + .ascx.designer.cs - the database-backup
+   console: name a backup, run it, watch pg_dump's output stream in, and browse the backups
+   already on disk.
+
+   ⚠ AccessLevel.AdminOnly IS PRESERVED. MixERPAuthorization.CheckAccessLevelAsync enforces it
+   and logs "Access to {Control} is denied to {User} from {IP}." on refusal. Note that it is
+   NOT the only gate on the actual backup: Hubs/DbHub.IsValidRequestAsync independently
+   requires globalLoginId > 0 AND IsAdmin AND Elevated on the hub connection, so this screen
+   being reachable does not by itself permit a dump. Both gates are preserved.
+
+   STRUCTURE. Everything was built procedurally into <asp:PlaceHolder ID="Placeholder1"> by
+   CreateHeader -> CreateFormSegment -> CreateGridModal, and it is markup now in that exact
+   order, with the ids, classes, inline styles and child order the control tree rendered:
+
+     h1                                              (Titles.BackupDatabase)
+     div.ui.form.segment                             (HtmlControlHelper.GetFormSegment())
+       > div.inline.fields                           (HtmlControlHelper.GetInlineFields())
+           > div.field > label[for=BackupNameInputText] + input#BackupNameInputText
+           > input#BackupButton.ui.red.button.disabled.loading
+           > input.ui.green.button[onclick='$("#BackupModal").modal("show");']
+       > h2.ui.blue.header.initially.hidden          (Titles.BackupConsole)
+       > div#Messages[style="overflow:auto;"] > div.ui.celled.list
+     div#BackupModal.ui.large.modal
+       > i.close.icon
+       > div.header > i.database.icon + the title text
+       > div.content > the backups table
+       > div.actions > div.ui.black.button
+
+   EVERY ONE OF THOSE IS A JAVASCRIPT CONTRACT, which is why none is simplified:
+     * #BackupButton STARTS WITH "disabled loading" ON PURPOSE. js/admin/DatabaseBackup.ascx.js's
+       connectionListener() is what strips those two classes AND attaches the click handler, so
+       the button is inert until the SignalR connection is up. That is the screen's whole
+       readiness signal. The click handler also stays the script's - NOT an @@onclick - because
+       it reads the backup name out of the DOM, re-adds the classes and invokes the hub.
+     * the VIEW BACKUPS button keeps its `onclick` as an HTML ATTRIBUTE (not @@onclick): it is a
+       pure client-side Semantic-UI modal call, there is no server handler on it, and so there
+       is no RZ10008 conflict.
+     * #Messages and `.ui.celled.list` are where AddItem() appends every pg_dump line, and
+       InitializeMessage() sizes #Messages and adds "ui segment" to it; the h2's
+       "initially hidden" class is removed by the click handler when a run starts.
+     * `.ui.blue.header` is how the script finds that h2 - so the class list is byte-identical.
+
+   ⚠ THE BACKUP-NAME DEFAULT IS SERVER-COMPUTED AND IS PRESERVED EXACTLY, including its
+   condition: `server.Validate()` ran first and the name was filled ONLY when
+   `server.IsValid` - so on a misconfigured DbServer.config the box is EMPTY, which is the
+   screen's way of showing that the backup cannot work. The format is
+   "{DatabaseName}.{OfficeId}.{UserName}.{DateTime.Now.ToFileTime()}" in the INVARIANT culture.
+   `@@bind` is used so a name the user edits is still the one the script reads; the script reads
+   the element itself, so both work.
+
+   ⚠ Server.MapPath / ResolveUrl REPLACED. BindGridView() resolved the backup directory with
+   System.Web.Hosting.HostingEnvironment.MapPath and built each download link with
+   this.ResolveUrl(...). Those became MixERPConfiguration.MapPath (the documented content-root
+   equivalent) and PageUtility.ResolveUrl. The DatabaseBackupDirectory value itself still comes
+   from Resource/Configs/DbServer.config through ConfigurationHelper.GetDbServerParameter, so
+   the directory is unchanged.
+
+   ⚠ THE GRID RELIES ON HtmlEncode = false. `new MixERPGridView(false)` (htmlEncode: false) is
+   what let the Name column render as a real ANCHOR - BindGridView() puts
+   "<a href='...' target='_blank'>name</a>" INTO the Name string. The migrated MixERPGridView
+   exposes that constructor argument as HtmlEncode="false", which is set here; without it the
+   download links would render as visible markup text and be unclickable. `CssClass += "relaxed"`
+   is preserved too, and the component's own Initialize() port prepends "ui striped table ", so
+   the class list is still "ui striped table relaxed".
+
+   ⚠ Grid_RowDataBound LOCALIZED EVERY HEADER - `0 .. Count` (all four, unlike MenuAccess's
+   0..Count-2). Reproduced with four explicit columns carrying Titles.Get(...) headers, in the
+   BackupFile PROPERTY DECLARATION order, which is the order a GridView auto-generated columns
+   in and therefore the order the user saw: CreatedOn, LastAccessedOn, LastWrittenOn, Name.
+   ⚠ That is NOT the order the loop ASSIGNS them in (Name first), and it puts the clickable
+   download link LAST - an easy thing to "tidy" and get wrong, so it is pinned here and the
+   nested BackupFile class keeps its original member order for the same reason.
+
+   The catalog comes from ICurrentLogin: AppUsers.GetCurrentUserDB() is the DATABASE NAME being
+   backed up and AppUsers.GetCurrent().View is the office/user stamped into the default backup
+   name - both return an EMPTY login inside a circuit, which would have produced a backup name
+   with no database in it and a PostgreSQLServer that fails validation.
+
+   The whole #region IDisposable of the original - which detached RowDataBound and disposed the
+   grid - has no counterpart: that was a server control in a control tree, and there is no tree.
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme or IsLandingPage override
+   and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using System.Collections.ObjectModel
+@using System.Globalization
+@using System.IO
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Common.Models
+@using MixERP.Net.Core.Modules.BackOffice.Internal
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.i18n.Resources
+@inject IJSRuntime JS
+
+<h1>@Titles.BackupDatabase</h1>
+
+<div class="ui form segment">
+    <div class="inline fields">
+        <div class="field">
+            <label for="BackupNameInputText">@Titles.EnterBackupName</label>
+            <input type="text" id="BackupNameInputText" @bind="this.backupName" />
+        </div>
+        @* "disabled loading" is deliberate - connectionListener() in the controller script
+           removes both classes and attaches the click handler once the hub is connected. *@
+        <input type="button" id="BackupButton" class="ui red button disabled loading" value="@Titles.BackupNow" />
+        @* A pure client-side modal call with no server handler, so it stays an HTML attribute. *@
+        <input type="button" class="ui green button" onclick="$(&quot;#BackupModal&quot;).modal(&quot;show&quot;);" value="@Titles.ViewBackups" />
+    </div>
+    <h2 class="ui blue header initially hidden">@Titles.BackupConsole</h2>
+    <div style="overflow:auto;" id="Messages">
+        <div class="ui celled list"></div>
+    </div>
+</div>
+
+<div class="ui large modal" id="BackupModal">
+    <i class="close icon"></i>
+    <div class="header">
+        @* BASELINE PARITY: the original CreateModalHeader added an <i class="database icon"> to
+           this header and THEN assigned header.InnerText = Titles.DatabaseBackups. The
+           HtmlGenericControl.InnerText setter CLEARS Controls, so the icon was destroyed and
+           never reached the browser. The icon is therefore deliberately NOT rendered here - the
+           header is the title text alone, exactly as the legacy screen showed it. (This is the
+           only occurrence of the pattern in all 194 ported controls; it is recorded in the
+           oddity list of Modules/migration-summary.md.) *@
+        @Titles.DatabaseBackups
+    </div>
+    <div class="content">
+        <MixERPGridView CssClass="relaxed"
+                        HtmlEncode="false"
+                        AutoGenerateColumns="false"
+                        Columns="@this.columns"
+                        DataSource="@this.files" />
+    </div>
+    <div class="actions">
+        <div class="ui black button">@Titles.Close</div>
+    </div>
+</div>
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.BackOffice/js/admin/DatabaseBackup.ascx.js";
+
+    /// <summary>
+    ///     The legacy <c>public override AccessLevel AccessLevel</c>, carried across unchanged.
+    ///     <para>
+    ///         <c>MixERPUserControlBase.AccessLevel</c> is an ABSTRACT GET-ONLY property, so it is
+    ///         overridden rather than assigned - which is also what the probe needs:
+    ///         <c>ModuleHost.razor</c> reads the surface off an <c>Activator.CreateInstance</c>
+    ///         instance on which no lifecycle method runs, and a getter answers there.
+    ///     </para>
+    /// </summary>
+    public override AccessLevel AccessLevel
+    {
+        get { return AccessLevel.AdminOnly; }
+    }
+
+    private string backupName = string.Empty;
+    private Collection<BackupFile> files = new Collection<BackupFile>();
+    private IReadOnlyList<MixERPGridViewColumn> columns;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body called CreateHeader / CreateFormSegment / CreateGridModal - all
+    ///     markup now - and the two non-markup parts it reached (the default backup name, which
+    ///     needs the login, and BindGridView(), which needs the catalog-derived server model)
+    ///     are asynchronous and live in OnInitializedAsync. Nothing was dropped.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        MixERP.Net.Framework.Security.LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        //The readonly field of the original, built here because DatabaseName needs the catalog.
+        PostgreSQLServer server = GetServer(catalog);
+
+        this.columns = GetColumns();
+        this.backupName = GetDefaultBackupName(server, login);
+        this.BindGridView(server);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        //The controller reads #BackupButton, #Messages, .ui.celled.list, .ui.blue.header and
+        //#BackupNameInputText out of the DOM at load time, so it runs after the first render.
+        await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+    }
+
+    /// <summary>
+    ///     The <c>readonly PostgreSQLServer server</c> field initializer of the original, with
+    ///     <c>AppUsers.GetCurrentUserDB()</c> replaced by the circuit-safe catalog. Every other
+    ///     value still comes from <c>Resource/Configs/DbServer.config</c> through
+    ///     <c>ConfigurationHelper.GetDbServerParameter</c>.
+    /// </summary>
+    private static PostgreSQLServer GetServer(string catalog)
+    {
+        return new PostgreSQLServer
+        {
+            BinDirectory = ConfigurationHelper.GetDbServerParameter("PostgreSQLBinDirectory"),
+            DatabaseBackupDirectory = ConfigurationHelper.GetDbServerParameter("DatabaseBackupDirectory"),
+            DatabaseName = catalog,
+            HostName = ConfigurationHelper.GetDbServerParameter("Server"),
+            PortNumber = Conversion.TryCastInteger(ConfigurationHelper.GetDbServerParameter("Port")),
+            UserId = ConfigurationHelper.GetDbServerParameter("UserId"),
+            Password = ConfigurationHelper.GetDbServerParameter("Password")
+        };
+    }
+
+    /// <summary>
+    ///     Port of <c>CreateBackupNameField</c>'s value: <c>server.Validate()</c> and then the
+    ///     name ONLY when <c>server.IsValid</c>, in the invariant culture. An invalid server
+    ///     leaves the box EMPTY, which is the original behaviour and the screen's own
+    ///     "misconfigured" signal.
+    /// </summary>
+    private static string GetDefaultBackupName(PostgreSQLServer server,
+        MixERP.Net.Framework.Security.LoginInfo login)
+    {
+        server.Validate();
+
+        if (!server.IsValid)
+        {
+            return string.Empty;
+        }
+
+        return string.Format(CultureInfo.InvariantCulture, "{0}.{1}.{2}.{3}",
+            server.DatabaseName, login.OfficeId, login.UserName, DateTime.Now.ToFileTime());
+    }
+
+    /// <summary>
+    ///     Port of <c>BindGridView()</c>, step for step: the mapped backup directory, the
+    ///     <c>Directory.Exists</c> guard, the <c>*.zip</c> enumeration, the anchor-in-the-Name
+    ///     trick and the three timestamps.
+    /// </summary>
+    private void BindGridView(PostgreSQLServer server)
+    {
+        //Was System.Web.Hosting.HostingEnvironment.MapPath(server.DatabaseBackupDirectory).
+        string backupDirectory = MixERPConfiguration.MapPath(server.DatabaseBackupDirectory);
+
+        if (backupDirectory == null)
+        {
+            return;
+        }
+
+        if (!Directory.Exists(backupDirectory))
+        {
+            return;
+        }
+
+        DirectoryInfo directory = new DirectoryInfo(backupDirectory);
+        Collection<BackupFile> files = new Collection<BackupFile>();
+
+        foreach (FileInfo fileInfo in directory.GetFiles("*.zip"))
+        {
+            if (fileInfo != null)
+            {
+                BackupFile file = new BackupFile();
+
+                //Was this.ResolveUrl(...) - the Control.ResolveUrl of a WebForms control.
+                string downloadPath =
+                    PageUtility.ResolveUrl(Path.Combine(server.DatabaseBackupDirectory, fileInfo.Name));
+
+                //The Name carries MARKUP, which is why the grid runs with HtmlEncode="false".
+                file.Name = string.Format(CultureInfo.InvariantCulture,
+                    "<a href='{0}' target='_blank'>{1}</a>", downloadPath, fileInfo.Name);
+                file.CreatedOn = fileInfo.CreationTime;
+                file.LastWrittenOn = fileInfo.LastWriteTime;
+                file.LastAccessedOn = fileInfo.LastAccessTime;
+
+                files.Add(file);
+            }
+        }
+
+        this.files = files;
+    }
+
+    /// <summary>
+    ///     Port of <c>Grid_RowDataBound</c>'s header branch, which localized EVERY header
+    ///     (<c>0 .. Count</c>), combined with the column set a GridView auto-generated from
+    ///     <see cref="BackupFile" /> - i.e. the PROPERTY DECLARATION ORDER, which is what the
+    ///     user saw.
+    /// </summary>
+    private static IReadOnlyList<MixERPGridViewColumn> GetColumns()
+    {
+        return new List<MixERPGridViewColumn>
+        {
+            new MixERPGridViewColumn("CreatedOn", Titles.Get("CreatedOn"), typeof(DateTime)),
+            new MixERPGridViewColumn("LastAccessedOn", Titles.Get("LastAccessedOn"), typeof(DateTime)),
+            new MixERPGridViewColumn("LastWrittenOn", Titles.Get("LastWrittenOn"), typeof(DateTime)),
+            new MixERPGridViewColumn("Name", Titles.Get("Name"), typeof(string))
+        };
+    }
+
+    /// <summary>
+    ///     The original's nested <c>internal class BackupFile</c>, unchanged - including the
+    ///     PROPERTY ORDER, which decided the grid's column order.
+    /// </summary>
+    internal class BackupFile
+    {
+        public DateTime CreatedOn { get; set; }
+        public DateTime LastAccessedOn { get; set; }
+        public DateTime LastWrittenOn { get; set; }
+        public string Name { get; set; }
+    }
+}

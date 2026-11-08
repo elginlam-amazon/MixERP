@@ -1,0 +1,109 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/InventoryAdvice.ascx + .ascx.cs + .ascx.designer.cs - the inventory advice, opened per transaction code from the Account Statement grid's print icon. The .ascx was the directive ONLY (no placeholder): the code-behind
+   added the report straight onto this.Controls, which is this component's own markup now.
+
+   `WebReport` NO LONGER EXISTS (it was a one-property Report subclass that set Catalog from
+   AppUsers.GetCurrentUserDB(), which is EMPTY inside a circuit), so <Report> is hosted
+   directly with Catalog from ICurrentLogin.
+
+   AutoInitialize IS DELIBERATELY FALSE, with InitializeReport() called from OnAfterRender
+   once the @@ref exists. The original pushed its parameters in BEFORE setting
+   AutoInitialize = true; the migrated Report component honours AutoInitialize from
+   OnParametersSet, which runs BEFORE a parent can reach the child through @@ref - so
+   AutoInitialize="true" here would initialize with an EMPTY parameter collection and the
+   report would render blank.
+
+   ODDITY OF THE ORIGINAL, PRESERVED VERBATIM: the single-entry parameter list is handed to
+   AddParameterToCollection TWICE, so the report's collection carries it twice. That is what
+   Inventory.Advice.xml was fed, so it is not "cleaned up".
+
+   PRESERVED SURFACE: MasterPageId = "MixERPReportMaster.Master" and RemoveTheme = true,
+   assigned in the CONSTRUCTOR because ModuleHost.razor reads them off an Activator-created
+   probe instance on which no lifecycle method runs. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using System.Collections.ObjectModel
+@using MixERP.Net.Core.Modules.Inventory.Internal
+@using MixERP.Net.WebControls.ReportEngine
+@inject NavigationManager Navigation
+
+@if (this.loaded)
+{
+    <Report @ref="this.report" AutoInitialize="false" Catalog="@this.catalog" Path="@ReportFilePath" />
+}
+
+@code {
+    private const string ReportFilePath = "~/Modules/Inventory/Reports/Source/Inventory.Advice.xml";
+
+    private Report report;
+    private bool loaded;
+    private bool initializePending;
+    private string catalog;
+
+    public InventoryAdvice()
+    {
+        //<%@ Control ... MasterPageId="MixERPReportMaster.Master" RemoveTheme="true" %>
+        this.MasterPageId = "MixERPReportMaster.Master";
+        this.RemoveTheme = true;
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the report above, which is markup now, and read the TranId -
+    ///     which happens in OnAfterRender, where the @@ref the parameters are pushed through
+    ///     exists.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+        this.initializePending = true;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+
+        if (!this.initializePending || this.report == null)
+        {
+            return;
+        }
+
+        this.initializePending = false;
+
+        Collection<KeyValuePair<string, object>> list = new Collection<KeyValuePair<string, object>>();
+        list.Add(new KeyValuePair<string, object>("@TranCode",
+            ModuleQuery.Get(this.Navigation, "TranCode")));
+
+        this.report.ParameterCollection.Clear();
+        this.report.AddParameterToCollection(list);
+        this.report.AddParameterToCollection(list);
+        this.report.InitializeReport();
+        this.StateHasChanged();
+    }
+}

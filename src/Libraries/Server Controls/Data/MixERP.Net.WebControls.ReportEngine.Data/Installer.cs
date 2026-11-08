@@ -19,6 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.DbFactory;
 using Npgsql;
+using System;
 
 namespace MixERP.Net.WebControls.ReportEngine.Data
 {
@@ -32,11 +33,13 @@ namespace MixERP.Net.WebControls.ReportEngine.Data
 
             using (NpgsqlCommand command = new NpgsqlCommand(sql))
             {
-                command.Parameters.AddWithValue("@MenuCode", menuCode);
-                command.Parameters.AddWithValue("@MenuText", menuText);
-                command.Parameters.AddWithValue("@Path", path);
+                // Npgsql 6+ rejects a CLR null passed to AddWithValue; DBNull.Value preserves
+                // the original "send SQL NULL" semantics of Npgsql 2.x for these nullable strings.
+                command.Parameters.AddWithValue("@MenuCode", (object)menuCode ?? DBNull.Value);
+                command.Parameters.AddWithValue("@MenuText", (object)menuText ?? DBNull.Value);
+                command.Parameters.AddWithValue("@Path", (object)path ?? DBNull.Value);
                 command.Parameters.AddWithValue("@Level", level);
-                command.Parameters.AddWithValue("@ParentMenuCode", parentMenuCode);
+                command.Parameters.AddWithValue("@ParentMenuCode", (object)parentMenuCode ?? DBNull.Value);
 
                 DbOperation.ExecuteNonQuery(catalog, command);
             }

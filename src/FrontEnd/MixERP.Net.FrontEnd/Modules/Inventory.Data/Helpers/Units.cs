@@ -19,6 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.DbFactory;
 using Npgsql;
+using System;
 using System.Data;
 
 namespace MixERP.Net.Core.Modules.Inventory.Data.Helpers
@@ -30,7 +31,7 @@ namespace MixERP.Net.Core.Modules.Inventory.Data.Helpers
             const string sql = "SELECT * FROM core.get_associated_units_from_item_code(@ItemCode) ORDER BY unit_id;";
             using (NpgsqlCommand command = new NpgsqlCommand(sql))
             {
-                command.Parameters.AddWithValue("@ItemCode", itemCode);
+                command.Parameters.AddWithValue("@ItemCode", (object)itemCode ?? DBNull.Value);
 
                 return DbOperation.GetDataTable(catalog, command);
             }
@@ -41,7 +42,7 @@ namespace MixERP.Net.Core.Modules.Inventory.Data.Helpers
             const string sql = "SELECT 1 FROM core.units WHERE core.units.unit_name=@UnitName;";
             using (NpgsqlCommand command = new NpgsqlCommand(sql))
             {
-                command.Parameters.AddWithValue("@UnitName", unitName);
+                command.Parameters.AddWithValue("@UnitName", (object)unitName ?? DBNull.Value);
 
                 var value = DbOperation.GetScalarValue(catalog, command);
                 if (value != null)

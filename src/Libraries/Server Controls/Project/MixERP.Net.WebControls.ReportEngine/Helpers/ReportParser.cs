@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using MixERP.Net.ApplicationState;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.Framework;
@@ -28,7 +29,6 @@ using System.Data;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Web;
 
 namespace MixERP.Net.WebControls.ReportEngine.Helpers
 {
@@ -74,7 +74,8 @@ namespace MixERP.Net.WebControls.ReportEngine.Helpers
 
         private static string GetDictionaryValue(string key)
         {
-            string globalLoginId = HttpContext.Current.User.Identity.Name;
+            // Was HttpContext.Current.User.Identity.Name on .NET Framework.
+            string globalLoginId = AppState.CurrentUserName;
 
             if (!string.IsNullOrWhiteSpace(globalLoginId))
             {

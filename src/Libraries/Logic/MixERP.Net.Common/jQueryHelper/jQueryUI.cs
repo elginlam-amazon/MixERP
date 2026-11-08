@@ -22,8 +22,7 @@ using MixERP.Net.i18n;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Web;
-using System.Web.UI;
+using Microsoft.JSInterop;
 
 namespace MixERP.Net.Common.jQueryHelper
 {
@@ -33,13 +32,21 @@ namespace MixERP.Net.Common.jQueryHelper
         ////////////////////////////////////////////////////////////////////////////////////////////////////
         /// <summary>Add jQueryUI datepicker control.</summary>
         ///
-        /// <param name="p">        The page instance.</param>
+        /// <param name="p">        The JS interop runtime of the current circuit.</param>
         /// <param name="controlId">Target control id to bind jQuery UI datepicker to.</param>
         /// <param name="minDate">  The minimum date.</param>
         /// <param name="maxDate">  The maximum date.</param>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        public static void AddjQueryUIDatePicker(Page p, string controlId, DateTime? minDate, DateTime? maxDate)
+        /// <remarks>
+        ///     SIGNATURE CHANGE: <c>Page</c> → <see cref="IJSRuntime" />. The generated datepicker
+        ///     init script is unchanged; only the injection mechanism moved from
+        ///     <c>ClientScript</c>/<c>HttpContext.Current.Handler</c> to JS interop. Callers that
+        ///     want the script without running it can use
+        ///     <see cref="GetjQueryUIDatePickerScript(string, DateTime?, DateTime?)" />.
+        /// </remarks>
+        [System.CLSCompliant(false)]
+        public static void AddjQueryUIDatePicker(IJSRuntime p, string controlId, DateTime? minDate, DateTime? maxDate)
         {
             if (string.IsNullOrWhiteSpace(controlId))
             {
@@ -48,12 +55,28 @@ namespace MixERP.Net.Common.jQueryHelper
 
             if (p == null)
             {
-                p = HttpContext.Current.Handler as Page;
+                return;
             }
 
             string script = GetDatePickerScript(controlId, minDate, maxDate);
 
             PageUtility.RegisterJavascript("datePicker_" + controlId + RandomNumber().ToString(CultureInfo.InvariantCulture), script, p, true);
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Gets the jQueryUI datepicker init script for a control, so a caller holding its own
+        ///     JS interop reference can execute it itself.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public static string GetjQueryUIDatePickerScript(string controlId, DateTime? minDate, DateTime? maxDate)
+        {
+            if (string.IsNullOrWhiteSpace(controlId))
+            {
+                return string.Empty;
+            }
+
+            return GetDatePickerScript(controlId, minDate, maxDate);
         }
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////

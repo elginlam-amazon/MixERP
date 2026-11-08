@@ -18,6 +18,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.DbFactory;
+using System;
 using Npgsql;
 
 namespace MixERP.Net.TransactionGovernor.Data.Verification
@@ -47,7 +48,7 @@ namespace MixERP.Net.TransactionGovernor.Data.Verification
             {
                 command.Parameters.AddWithValue("@Status", status);
                 command.Parameters.AddWithValue("@UserId", userId);
-                command.Parameters.AddWithValue("@Reason", reason);
+                command.Parameters.AddWithValue("@Reason", (object)reason ?? DBNull.Value);
                 command.Parameters.AddWithValue("@TransactionMasterId", transactionMasterId);
 
                 return DbOperation.ExecuteNonQuery(catalog, command);

@@ -19,6 +19,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Entities.Models.Transactions;
 using Npgsql;
+using NpgsqlTypes;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -27,6 +29,7 @@ namespace MixERP.Net.Core.Modules.Sales.Data
 {
     public static class StockMasterDetailHelper
     {
+        [System.CLSCompliant(false)]
         public static IEnumerable<NpgsqlParameter> AddStockMasterDetailParameter(Collection<StockDetail> details)
         {
             Collection<NpgsqlParameter> collection = new Collection<NpgsqlParameter>();
@@ -35,15 +38,18 @@ namespace MixERP.Net.Core.Modules.Sales.Data
             {
                 for (int i = 0; i < details.Count; i++)
                 {
-                    collection.Add(new NpgsqlParameter("@StoreId" + i, details[i].StoreId));
-                    collection.Add(new NpgsqlParameter("@ItemCode" + i, details[i].ItemCode));
-                    collection.Add(new NpgsqlParameter("@Quantity" + i, details[i].Quantity));
-                    collection.Add(new NpgsqlParameter("@UnitName" + i, details[i].UnitName));
-                    collection.Add(new NpgsqlParameter("@Price" + i, details[i].Price));
-                    collection.Add(new NpgsqlParameter("@Discount" + i, details[i].Discount));
-                    collection.Add(new NpgsqlParameter("@ShippingCharge" + i, details[i].ShippingCharge));
-                    collection.Add(new NpgsqlParameter("@TaxForm" + i, details[i].TaxForm));
-                    collection.Add(new NpgsqlParameter("@Tax" + i, details[i].Tax));
+                    // Npgsql 6+ no longer infers a PostgreSQL type for a boxed CLR value passed to
+                    // the NpgsqlParameter(name, value) constructor (and rejects a CLR null), so
+                    // every ROW(...) member is bound with its explicit NpgsqlDbType.
+                    collection.Add(new NpgsqlParameter("@StoreId" + i, NpgsqlDbType.Integer) { Value = details[i].StoreId });
+                    collection.Add(new NpgsqlParameter("@ItemCode" + i, NpgsqlDbType.Varchar) { Value = (object)details[i].ItemCode ?? DBNull.Value });
+                    collection.Add(new NpgsqlParameter("@Quantity" + i, NpgsqlDbType.Integer) { Value = details[i].Quantity });
+                    collection.Add(new NpgsqlParameter("@UnitName" + i, NpgsqlDbType.Varchar) { Value = (object)details[i].UnitName ?? DBNull.Value });
+                    collection.Add(new NpgsqlParameter("@Price" + i, NpgsqlDbType.Numeric) { Value = details[i].Price });
+                    collection.Add(new NpgsqlParameter("@Discount" + i, NpgsqlDbType.Numeric) { Value = details[i].Discount });
+                    collection.Add(new NpgsqlParameter("@ShippingCharge" + i, NpgsqlDbType.Numeric) { Value = details[i].ShippingCharge });
+                    collection.Add(new NpgsqlParameter("@TaxForm" + i, NpgsqlDbType.Varchar) { Value = (object)details[i].TaxForm ?? DBNull.Value });
+                    collection.Add(new NpgsqlParameter("@Tax" + i, NpgsqlDbType.Numeric) { Value = details[i].Tax });
                 }
             }
 

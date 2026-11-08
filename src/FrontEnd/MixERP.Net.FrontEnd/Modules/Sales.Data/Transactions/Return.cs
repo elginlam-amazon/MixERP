@@ -23,6 +23,7 @@ using MixERP.Net.DbFactory;
 using MixERP.Net.Entities.Core;
 using MixERP.Net.Entities.Models.Transactions;
 using Npgsql;
+using NpgsqlTypes;
 using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -45,12 +46,16 @@ namespace MixERP.Net.Core.Modules.Sales.Data.Transactions
                 command.Parameters.AddWithValue("@OfficeId", officeId);
                 command.Parameters.AddWithValue("@UserId", userId);
                 command.Parameters.AddWithValue("@LoginId", loginId);
-                command.Parameters.AddWithValue("@ValueDate", valueDate);
+
+                //Npgsql 6+ maps the PostgreSQL "date" type to DateOnly, so a DateTime must be
+                //bound with an explicit NpgsqlDbType.Date for the function argument to resolve.
+                command.Parameters.Add(new NpgsqlParameter("@ValueDate", NpgsqlDbType.Date) { Value = valueDate.Date });
+
                 command.Parameters.AddWithValue("@StoreId", storeId);
-                command.Parameters.AddWithValue("@PartyCode", partyCode);
+                command.Parameters.AddWithValue("@PartyCode", partyCode ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("@PriceTypeId", priceTypeId);
-                command.Parameters.AddWithValue("@ReferenceNumber", referenceNumber);
-                command.Parameters.AddWithValue("@StatementReference", statementReference);
+                command.Parameters.AddWithValue("@ReferenceNumber", referenceNumber ?? (object)DBNull.Value);
+                command.Parameters.AddWithValue("@StatementReference", statementReference ?? (object)DBNull.Value);
 
                 command.Parameters.AddRange(StockMasterDetailHelper.AddStockMasterDetailParameter(details).ToArray());
                 command.Parameters.AddRange(AttachmentHelper.AddAttachmentParameter(attachments).ToArray());

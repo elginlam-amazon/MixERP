@@ -1,0 +1,158 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+*@
+
+@* Ported from TransferAcknowledgement.ascx - the stock transfer ACKNOWLEDGEMENT (receive)
+   list screen.
+
+   UPSTREAM SHAPE, PRESERVED: this .ascx had NO code-behind of its own. Its directive
+   declared CodeBehind="TransferRequest.ascx.cs"
+   Inherits="MixERP.Net.Core.Modules.Inventory.TransferRequest", i.e. it SHARED the
+   TransferRequest code-behind (its own .ascx.designer.cs declared an empty partial class
+   that nothing bound to). That shared half is Internal/TransferRequestViewBase, which this
+   component inherits.
+
+   THIS SCREEN'S OWN SURFACE, which is all that differed:
+     * the heading Titles.StockTransferAcknowledgement;
+     * a three-button toolbar - Flag, RECEIVE, Print;
+     * filter defaults Authorized = "true", Delivered = "true", Received = "false" (i.e.
+       deliveries that are on their way but not yet received);
+     * its own inline <script>, moved VERBATIM to wwwroot/js/TransferAcknowledgement.js.
+
+   SCRIPT ORDER IS LOAD-BEARING HERE AND IS PRESERVED. This screen's script sets
+   window.checkListUrlOverride and window.reportUrlOverride, which TransferRequest.js reads
+   when it builds each row's two action links. The .ascx had the inline block FIRST and
+   <script src="TransferRequest.js"> SECOND, and ScriptUrls keeps exactly that order;
+   swapping them would leave both overrides undefined and send every row link to the
+   transfer-REQUEST screens instead of the delivery ones.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Core.Modules.Inventory.Internal.TransferRequestViewBase
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.WebControls.Flag
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<h2>@Titles.StockTransferAcknowledgement</h2>
+<div class="basic ui buttons">
+    @* #ReceiveButton is bound by TransferAcknowledgement.js, which reads the ticked row out
+       of #SelectedValuesHidden, posts to the acknowledgement endpoint and then navigates to
+       the resulting transfer's check list - so it stays a plain client-side button. *@
+    <input id="FlagButton" value="@Titles.Flag" class="ui button" type="button">
+    <input id="ReceiveButton" value="@Titles.Receive" class="ui button" type="button">
+    <input id="PrintButton" value="@Titles.Print" class="ui button" type="button">
+</div>
+
+<div id="FilterDiv" class="ui segment">
+    <div class="ui form" style="margin-left: 8px;">
+        <div class="eight fields">
+            <div class="field">
+                <label>@Titles.From</label>
+                <DateTextBox ID="DateFromDateTextBox" Mode="FrequencyType.MonthStartDate"
+                             OfficeId="@this.OfficeId" @bind-Text="this.DateFromText" />
+            </div>
+            <div class="field">
+                <label>@Titles.To</label>
+                <DateTextBox ID="DateToDateTextBox" Mode="FrequencyType.MonthEndDate"
+                             OfficeId="@this.OfficeId" @bind-Text="this.DateToText" />
+            </div>
+            <div class="field">
+                <label>@Titles.Office</label>
+                <input id="OfficeTextBox" type="text" @bind="this.Office" />
+            </div>
+            <div class="field">
+                <label>@Titles.Store</label>
+                <input id="StoreTextBox" type="text" @bind="this.Store" />
+            </div>
+            <div class="field">
+                <label>@Titles.Authorized</label>
+                <input id="AuthorizedTextBox" type="text" @bind="this.Authorized" />
+            </div>
+            <div class="field">
+                <label>@Titles.Delivered</label>
+                <input id="DeliveredTextBox" type="text" @bind="this.Delivered" />
+            </div>
+            <div class="field">
+                <label>@Titles.Received</label>
+                <input id="ReceivedTextBox" type="text" @bind="this.Received" />
+            </div>
+            <div class="field">
+                <label>@Titles.User</label>
+                <input id="UserTextBox" type="text" @bind="this.User" />
+            </div>
+            <div class="field">
+                <label>@Titles.ReferenceNumberAbbreviated</label>
+                <input id="ReferenceNumberTextBox" type="text" @bind="this.ReferenceNumber" />
+            </div>
+            <div class="field">
+                <label>@Titles.StatementReference</label>
+                <input id="StatementReferenceTextBox" type="text" @bind="this.StatementReference" />
+            </div>
+            <div class="field">
+                <label>&nbsp;</label>
+                @* The original's Text was the LITERAL "Show", not Titles.Show - preserved. *@
+                <button type="button" id="ShowButton" class="blue ui button" @onclick="this.ShowButton_Click">Show</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<MixERPGridView ID="@GridElementId" DataSource="@this.Rows" />
+
+@if (this.Loaded)
+{
+    <Flag ElementId="FlagPopUnder"
+          AssociatedControlId="FlagButton"
+          OnClientClick="return getSelectedItems();"
+          CssClass="ui form segment initially hidden"
+          Updated="@this.Flag_Updated"
+          Catalog="@this.Catalog" />
+}
+
+<input type="hidden" id="@SelectedValuesElementId" />
+
+@code {
+    private const string AcknowledgementScriptUrl =
+        "_content/MixERP.Net.Core.Modules.Inventory/js/TransferAcknowledgement.js";
+
+    protected override IJSRuntime JSRuntime
+    {
+        get { return this.JS; }
+    }
+
+    /// <summary>
+    ///     Document order as the .ascx had it, and it MATTERS: this screen's script sets the
+    ///     two url overrides TransferRequest.js then reads.
+    /// </summary>
+    protected override string[] ScriptUrls
+    {
+        get { return new[] { AcknowledgementScriptUrl, TransferRequestScriptUrl }; }
+    }
+
+    public TransferAcknowledgement()
+    {
+        //value="true" / "true" / "false" - authorized and delivered, not yet received.
+        this.Authorized = "true";
+        this.Delivered = "true";
+        this.Received = "false";
+    }
+}

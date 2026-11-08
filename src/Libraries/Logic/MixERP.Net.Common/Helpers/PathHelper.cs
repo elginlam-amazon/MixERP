@@ -31,9 +31,21 @@ namespace MixERP.Net.Common.Helpers
 
         public static string NormalizePhysicalPath(string path)
         {
-            string normalized = path.Replace("/", "\\");
+            if (string.IsNullOrEmpty(path))
+            {
+                return path;
+            }
 
-            if (normalized.StartsWith("\\"))
+            //The original implementation hard-coded the Windows separator ("\\"). On a Linux
+            //container "\\" is a legal filename character, so that transform collapsed
+            //"Resources/Reports" into a single segment literally named "Resources\Reports",
+            //silently resolving every resource/report/attachment lookup to a missing file.
+            //Normalizing to Path.DirectorySeparatorChar is byte-identical on Windows (where
+            //the separator IS '\\') and correct everywhere else.
+            string normalized = path.Replace('/', Path.DirectorySeparatorChar)
+                                    .Replace('\\', Path.DirectorySeparatorChar);
+
+            if (normalized.StartsWith(Path.DirectorySeparatorChar))
             {
                 normalized = normalized.Substring(1);
             }

@@ -1,0 +1,92 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Setup/CostPrices.ascx + .ascx.cs + .ascx.designer.cs - the item cost price
+   maintenance screen. OnControlLoad built a Scrud and added it to
+   <asp:PlaceHolder ID="ScrudPlaceholder">, which is this markup now. The display-field
+   lookups read DbConfig.GetDbParameter(AppUsers.GetCurrentUserDB(), ...); that catalog is
+   EMPTY inside a Blazor circuit, so it comes from ICurrentLogin in OnInitializedAsync.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.WebControls.ScrudFactory
+@using MixERP.Net.i18n.Resources
+
+@if (this.loaded)
+{
+    <Scrud KeyColumn="item_cost_price_id"
+           TableSchema="core"
+           Table="item_cost_prices"
+           ViewSchema="core"
+           View="item_cost_price_scrud_view"
+           DisplayFields="@this.displayFields"
+           DisplayViews="@this.displayViews"
+           Text="@Titles.ItemCostPrices" />
+}
+
+@code {
+    private bool loaded;
+    private string displayFields;
+    private string displayViews;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY built the Scrud above, which is markup now; its display-field
+    ///     lookups need the catalog, which is asynchronous.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.displayFields = GetDisplayFields(catalog);
+        this.displayViews = GetDisplayViews();
+        this.loaded = true;
+    }
+
+    private static string GetDisplayFields(string catalog)
+    {
+        List<string> displayFields = new List<string>();
+        ScrudHelper.AddDisplayField(displayFields, "core.items.item_id",
+            DbConfig.GetDbParameter(catalog, "ItemDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.parties.party_id",
+            DbConfig.GetDbParameter(catalog, "PartyDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.units.unit_id",
+            DbConfig.GetDbParameter(catalog, "UnitDisplayField"));
+        return string.Join(",", displayFields);
+    }
+
+    private static string GetDisplayViews()
+    {
+        List<string> displayViews = new List<string>();
+        ScrudHelper.AddDisplayView(displayViews, "core.items.item_id", "core.item_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.parties.party_id", "core.party_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.units.unit_id", "core.unit_scrud_view");
+        return string.Join(",", displayViews);
+    }
+}

@@ -21,19 +21,79 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
-using System.Web.UI;
+using Microsoft.JSInterop;
 
 namespace MixERP.Net.Common.Helpers
 {
     public static class JSUtility
     {
-        public static void AddJSReference(Page page, string resourceName, string key, Type type)
+        /// <summary>
+        ///     Registers an external javascript reference with the browser.
+        ///     <para>
+        ///         SIGNATURE CHANGE: <c>Page</c> → <see cref="IJSRuntime" />. WebForms served
+        ///         embedded scripts through <c>ClientScript.GetWebResourceUrl</c>, which no longer
+        ///         exists; on modern .NET a script embedded in a razor class library is served from
+        ///         the static web asset path <c>/_content/&lt;assembly&gt;/&lt;resource&gt;</c>, which
+        ///         is built here from <paramref name="type" />'s assembly and
+        ///         <paramref name="resourceName" />. The script element is then injected once per
+        ///         <paramref name="key" /> by
+        ///         <see cref="PageUtility.RegisterJavascript(string, string, IJSRuntime, bool)" />,
+        ///         preserving the original <c>addScriptTags: false</c> call.
+        ///     </para>
+        /// </summary>
+        [System.CLSCompliant(false)]
+        public static void AddJSReference(IJSRuntime page, string resourceName, string key, Type type)
         {
             if (page != null)
             {
-                string script = "<script type='text/javascript' src='" + page.Request.Url.GetLeftPart(UriPartial.Authority) + page.ClientScript.GetWebResourceUrl(type, resourceName) + "'></script>";
+                string script = "<script type='text/javascript' src='" + GetWebResourceUrl(type, resourceName) + "'></script>";
                 PageUtility.RegisterJavascript(key, script, page, false);
             }
+        }
+
+        /// <summary>
+        ///     The route prefix the host must map in order to serve the scripts this library
+        ///     references. See the note on <see cref="GetWebResourceUrl" />.
+        /// </summary>
+        public const string WebResourceRoutePrefix = "/_mixerp/script";
+
+        /// <summary>
+        ///     The url of a script shipped as an EMBEDDED RESOURCE of <paramref name="type" />'s
+        ///     assembly — the modern replacement for <c>ClientScriptManager.GetWebResourceUrl</c>.
+        ///     <para>
+        ///         The scripts remain <c>EmbeddedResource</c>s, so they are served through a single
+        ///         host endpoint backed by <see cref="GetEmbeddedScript" /> rather than through
+        ///         Razor-Class-Library static web assets (which these projects do not produce).
+        ///         The host MUST map that endpoint once during startup composition:
+        ///     </para>
+        ///     <code>
+        ///     app.MapGet(JSUtility.WebResourceRoutePrefix + "/{assemblyName}/{resourceName}",
+        ///         (string assemblyName, string resourceName) =>
+        ///         {
+        ///             Assembly assembly = Assembly.Load(assemblyName);
+        ///             string script = JSUtility.GetEmbeddedScript(resourceName, assembly);
+        ///             return Results.Text(script, "application/javascript");
+        ///         });
+        ///     </code>
+        ///     <para>
+        ///         The resource name is passed through VERBATIM (only url-escaped). It is NOT
+        ///         rewritten into a path: an embedded resource name cannot be told apart from a
+        ///         filename containing dots, so rewriting dots to separators corrupted names such
+        ///         as "jquery.qrcode.js", "JsBarcode.CODE128.js" and "ReportEngine.Barcode.js"
+        ///         into urls that silently 404.
+        ///     </para>
+        /// </summary>
+        public static string GetWebResourceUrl(Type type, string resourceName)
+        {
+            if (string.IsNullOrWhiteSpace(resourceName))
+            {
+                return string.Empty;
+            }
+
+            string assemblyName = type == null ? string.Empty : type.Assembly.GetName().Name;
+
+            return WebResourceRoutePrefix + "/" + Uri.EscapeDataString(assemblyName) + "/" +
+                   Uri.EscapeDataString(resourceName);
         }
 
         public static string GetEmbeddedScript(string embeddedScriptName, Assembly assembly)

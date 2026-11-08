@@ -1,0 +1,112 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+
+@* Ported from Tax/SalesTaxDetails.ascx + .ascx.cs + .ascx.designer.cs.
+   OnControlLoad built a Scrud over core.sales_tax_details and added it to
+   <asp:PlaceHolder ID="ScrudPlaceholder">, which is this markup now.
+
+   The display-field/display-view lookups read
+   DbConfig.GetDbParameter(AppUsers.GetCurrentUserDB(), ...); that catalog is EMPTY inside a
+   Blazor circuit, so it comes from ICurrentLogin in OnInitializedAsync - which is also why
+   the Scrud renders only once `loaded` is true (the display fields decide which column of
+   each parent view is shown).
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme, IsLandingPage or
+   IsRestrictedMode override, no AccessLevel override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.WebControls.ScrudFactory
+@using MixERP.Net.i18n.Resources
+
+@if (this.loaded)
+{
+    <Scrud KeyColumn="sales_tax_detail_id"
+           TableSchema="core"
+           Table="sales_tax_details"
+           ViewSchema="core"
+           View="sales_tax_detail_scrud_view"
+           DisplayFields="@this.displayFields"
+           DisplayViews="@this.displayViews"
+           Text="@Titles.SalesTaxDetails" />
+}
+
+@code {
+    private bool loaded;
+    private string displayFields;
+    private string displayViews;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY built the Scrud above, which is markup now; its display-field
+    ///     lookups need the catalog, which is asynchronous.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.displayFields = GetDisplayFields(catalog);
+        this.displayViews = GetDisplayViews();
+        this.loaded = true;
+    }
+
+    private static string GetDisplayFields(string catalog)
+    {
+        List<string> displayFields = new List<string>();
+        ScrudHelper.AddDisplayField(displayFields, "core.sales_tax_types.sales_tax_type_id",
+            DbConfig.GetDbParameter(catalog, "SalesTaxTypeDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.sales_taxes.sales_tax_id",
+            DbConfig.GetDbParameter(catalog, "SalesTaxDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.state_sales_taxes.state_sales_tax_id",
+            DbConfig.GetDbParameter(catalog, "StateSalesTaxDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.county_sales_taxes.county_sales_tax_id",
+            DbConfig.GetDbParameter(catalog, "CountySalesTaxDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.tax_rate_types.tax_rate_type_code",
+            DbConfig.GetDbParameter(catalog, "TaxRateTypeDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.tax_authorities.tax_authority_id",
+            DbConfig.GetDbParameter(catalog, "TaxAuthorityDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.accounts.account_id",
+            DbConfig.GetDbParameter(catalog, "AccountDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.rounding_methods.rounding_method_code",
+            DbConfig.GetDbParameter(catalog, "RoundingMethodCodeDisplayField"));
+        return string.Join(",", displayFields);
+    }
+
+    private static string GetDisplayViews()
+    {
+        List<string> displayViews = new List<string>();
+        ScrudHelper.AddDisplayView(displayViews, "core.sales_tax_types.sales_tax_type_id", "core.sales_tax_type_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.sales_taxes.sales_tax_id", "core.sales_tax_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.state_sales_taxes.state_sales_tax_id", "core.state_sales_tax_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.county_sales_taxes.county_sales_tax_id", "core.county_sales_tax_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.tax_rate_types.tax_rate_type_code", "core.tax_rate_type_selector_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.tax_authorities.tax_authority_id", "core.tax_authority_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.accounts.account_id", "core.account_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.rounding_methods.rounding_method_code", "core.rounding_method_selector_view");
+        return string.Join(",", displayViews);
+    }
+}

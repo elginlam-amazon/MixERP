@@ -1,0 +1,156 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Widgets/SalesByOfficeWidget.ascx + .ascx.cs + .ascx.designer.cs - the
+   dashboard bar chart of sales per office per month.
+
+   HOW IT WORKS, AND WHY THE HIDDEN TABLE IS LOAD-BEARING: the widget renders its data as a
+   plain HTML table that is hidden, and the host's mixerp-core.js `prepareChart` reads the
+   chart series straight out of that DOM -
+     labels  <- #SalesByOfficeGridView tr:first-child th:not(:first-child)
+     series  <- every other tr; the FIRST cell of the row is the series title
+   and then REMOVES the table. So the <asp:GridView> is ported as the markup it rendered:
+   the same id, the same `hidden` class, the same inline display:none the code-behind added,
+   the same twelve month headers in the same order, and the first column first.
+   DataSource/DataBind() become the @foreach - Blazor re-renders on state change, so there
+   is no separate bind step.
+
+   The <asp:Literal ID="TitleLiteral"> + `TitleLiteral.Text = Titles.SalesByOfficeInThousands`
+   become the inline @Titles expression.
+
+   The catalog comes from ICurrentLogin: AppUsers.GetCurrentUserDB() returns an EMPTY
+   catalog inside a Blazor circuit, and a widget deriving from MixERPWidget does NOT inherit
+   the CurrentLogin property (that is declared by MixERPUserControl), so ICurrentLogin is
+   injected here.
+
+   The inline $(document).ready(prepareChart(...)) block moved VERBATIM to
+   wwwroot/js/widgets/SalesByOfficeWidget.js and is loaded AFTER the table has rendered - a
+   .razor file may not contain <script>.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPWidget
+@using MixERP.Net.Core.Modules.Sales.Internal
+@using MixERP.Net.Entities.Transactions
+@using MixERP.Net.Framework.Security
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject ICurrentLogin CurrentLogin
+@inject IJSRuntime JS
+
+<div class="eight wide column widget" id="SalesByOfficeWidget">
+    <div class="ui attached segment">
+        <div class="ui left floated column">
+            <div class="ui header">
+                @Titles.SalesByOfficeInThousands
+            </div>
+        </div>
+        <div class="right floated column">
+            <i class="expand disabled icon"></i>
+            <i class="move icon"></i>
+            <i class="help icon"></i>
+            <i class="close icon" onclick="$(this).closest('.widget').remove();"></i>
+        </div>
+    </div>
+    <div class="ui attached segment">
+        <table id="SalesByOfficeGridView" class="hidden" style="display:none;">
+            <thead>
+                <tr>
+                    <th scope="col">OfficeCode</th>
+                    <th scope="col">Jan</th>
+                    <th scope="col">Feb</th>
+                    <th scope="col">Mar</th>
+                    <th scope="col">Apr</th>
+                    <th scope="col">May</th>
+                    <th scope="col">Jun</th>
+                    <th scope="col">Jul</th>
+                    <th scope="col">Aug</th>
+                    <th scope="col">Sep</th>
+                    <th scope="col">Oct</th>
+                    <th scope="col">Nov</th>
+                    <th scope="col">Dec</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (DbGetSalesByOfficesResult row in this.rows)
+                {
+                    <tr>
+                        <td>@row.Office</td>
+                        <td>@row.Jan</td>
+                        <td>@row.Feb</td>
+                        <td>@row.Mar</td>
+                        <td>@row.Apr</td>
+                        <td>@row.May</td>
+                        <td>@row.Jun</td>
+                        <td>@row.Jul</td>
+                        <td>@row.Aug</td>
+                        <td>@row.Sep</td>
+                        <td>@row.Oct</td>
+                        <td>@row.Nov</td>
+                        <td>@row.Dec</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <canvas id="sales-by-month-canvas" width="500" height="180"></canvas>
+        <div id="sales-by-month-legend"></div>
+    </div>
+</div>
+
+@code {
+    private IEnumerable<DbGetSalesByOfficesResult> rows = new List<DbGetSalesByOfficesResult>();
+    private bool scriptsLoaded;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body set the Literal text (markup now) and bound the grid; the catalog the
+    ///     binding needs is asynchronous, so the query moved to OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.rows = Data.Reports.SalesByMonth.GetSalesByOffice(catalog);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (this.scriptsLoaded)
+        {
+            return;
+        }
+
+        //The chart script reads the rendered table, so it must not run before the rows are in
+        //the DOM - which is the render AFTER the asynchronous query completed.
+        this.scriptsLoaded = true;
+
+        await ModuleScripts.LoadAsync(this.JS,
+            "_content/MixERP.Net.Core.Modules.Sales/js/widgets/SalesByOfficeWidget.js");
+    }
+}

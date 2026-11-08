@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
-using System.Web;
+﻿using System;
+using System.Collections.Generic;
+using MixERP.Net.Common;
+using MixERP.Net.Common.Helpers;
 using MixERP.Net.Framework;
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.Updater.Installation.Models;
@@ -76,8 +78,36 @@ namespace MixERP.Net.Updater.Installation
 
         private string GetFakeDownloadUrl()
         {
-            return HttpContext.Current.Request.Url.Scheme + "://" + HttpContext.Current.Request.Url.Authority +
-                   HttpContext.Current.Request.ApplicationPath + "update.zip";
+            //The original built this from HttpContext.Current.Request (scheme, authority and
+            //application path). PageUtility reads the ambient request through the
+            //IHttpContextAccessor seam, so the resulting URL shape is unchanged:
+            //"scheme://authority/<appPath>update.zip".
+            string domain = PageUtility.GetCurrentDomainName();
+
+            if (string.IsNullOrWhiteSpace(domain))
+            {
+                //No ambient request (background work, or a host that did not wire the accessor).
+                //Fall back to a configured base URL so development mode never yields null.
+                string configured = MixERPConfiguration.GetAppSetting("DevelopmentUpdateBaseUrl");
+
+                domain = string.IsNullOrWhiteSpace(configured)
+                    ? "http://localhost"
+                    : configured.TrimEnd('/');
+            }
+
+            string applicationPath = PageUtility.ResolveUrl("~/");
+
+            if (string.IsNullOrEmpty(applicationPath))
+            {
+                applicationPath = "/";
+            }
+
+            if (!applicationPath.EndsWith("/", StringComparison.Ordinal))
+            {
+                applicationPath += "/";
+            }
+
+            return domain + applicationPath + "update.zip";
         }
 
         protected virtual void OnProgress(ProgressInfo progressInfo)

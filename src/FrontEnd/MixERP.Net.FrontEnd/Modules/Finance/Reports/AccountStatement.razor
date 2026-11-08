@@ -1,0 +1,81 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/AccountStatement.ascx + .ascx.cs + .ascx.designer.cs - the account
+   statement screen (transaction statement + account overview tabs, flagging and
+   reconciliation).
+
+   ⚠ SHARED CODE-BEHIND: AccountStatement.ascx.cs was declared as the CodeBehind of BOTH this
+   .ascx and Reports/AccountStatementPopup.ascx (same Inherits=, and the popup had no .cs or
+   .designer.cs of its own). The shared class is preserved structurally as the
+   Internal/AccountStatementScreen component, which carries the WHOLE screen - the toolbar, the
+   two tabs, AutoInitialize(), BindGridView(), Flag_Updated(), the account-overview table, the
+   <Flag> control and the reconcile modal. This file and the popup differ only in what the two
+   .ascx files actually differed in; neither can drift from the other.
+
+   The .ascx's own <style> block (the #AccountOverViewGrid first-column width) is carried over -
+   a .razor file may contain <style>; only <script> is stripped.
+
+   The .ascx's <script src="js/reports/AccountStatement.js"> becomes a load from
+   OnAfterRenderAsync, on the render AFTER the screen's data is ready: that file binds
+   #StatementGridView's rows, the print icons and the reconcile modal, and calls loadAccounts()
+   + createFlaggedRows() - all of which need the final markup.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Core.Modules.Finance.Internal
+@inject IJSRuntime JS
+
+<style type="text/css">
+    #AccountOverViewGrid td:nth-child(1),
+    #AccountOverViewGrid th:nth-child(1) { width: 200px; }
+</style>
+
+<AccountStatementScreen @ref="this.screen" />
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.Finance/js/reports/AccountStatement.js";
+
+    private AccountStatementScreen screen;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body called the five Create* builders and AutoInitialize(), all of which
+    ///     now live in the shared Internal/AccountStatementScreen component above - whose own
+    ///     lifecycle runs the asynchronous login/catalog lookup first.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (this.screen == null || !this.screen.Ready)
+        {
+            return;
+        }
+
+        await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+    }
+}

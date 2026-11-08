@@ -1,0 +1,59 @@
+@* ---------------------------------------------------------------------------------------------
+   Site/Account/UserProfile.aspx (+ .aspx.cs) -> Components/Pages/Site/Account/UserProfile.razor
+   (checklist task 97). The route is the one the migrated layouts link to (Specialist 5).
+
+   The .aspx markup is ported faithfully: MasterPageFile="~/BackendMaster.Master" ->
+   @layout BackendLayout, the Script/StyleSheet/BottomScript <asp:Content> blocks were EMPTY -> no
+   <SectionContent>, and the body was
+
+       <h2><em>I'm under development.</em></h2>
+       <asp:PlaceHolder runat="server" ID="Placeholder1"></asp:PlaceHolder>
+
+   Placeholder1 was never populated by any code in the solution (re-grepped), so it rendered
+   nothing -- and nothing is emitted for it here.
+
+   THE emailLinkButton SURFACE. The code-behind declared
+
+       public LinkButton emailLinkButton;
+
+   and its only handler, EmailReportLinkButton_Click, was COMMENTED OUT in the original source.
+   The field was never instantiated and never added to the control tree, so the page emitted no
+   link at all. Both halves of that are preserved deliberately:
+     * the surface still exists, as the anchor below plus the EmailLinkButtonVisible flag that
+       gates it -- an ancestor/derived page can switch it on exactly as WebForms code could have
+       added the LinkButton to the placeholder;
+     * it is INERT. There is no click handler, because the original had none (it was commented
+       out), and no behaviour is invented. It is not a stub: there is no NotImplementedException
+       and nothing to implement -- the dead end is the original behaviour.
+     * it renders NOTHING by default, which is what the never-added LinkButton rendered.
+   --------------------------------------------------------------------------------------------- *@
+@page "/Site/Account/UserProfile"
+@layout BackendLayout
+@inherits MixERPAuthorizedPageBase
+
+<h2><em>I'm under development.</em></h2>
+
+@if (this.EmailLinkButtonVisible)
+{
+    @* The LinkButton's rendering: <a id="..."> with its text and NO behaviour. *@
+    <a id="emailLinkButton" href="#" @onclick:preventDefault>@Titles.Email</a>
+}
+
+@code {
+    /// <summary>
+    ///     Whether the <c>emailLinkButton</c> surface is rendered. FALSE by default, because the
+    ///     legacy <c>public LinkButton emailLinkButton</c> was declared but never added to
+    ///     Placeholder1, so the page rendered no link.
+    /// </summary>
+    protected bool EmailLinkButtonVisible { get; set; }
+
+    /// <summary>
+    ///     Page_Init: <c>this.IsLandingPage = true</c> -- the profile page has no menu entry of its
+    ///     own, so the policy check must not run against it. Set in the constructor because the
+    ///     base activation sequence that reads it runs in OnInitializedAsync.
+    /// </summary>
+    public UserProfile()
+    {
+        this.IsLandingPage = true;
+    }
+}

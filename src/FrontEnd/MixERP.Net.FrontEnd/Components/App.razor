@@ -1,0 +1,85 @@
+@* ---------------------------------------------------------------------------------------------
+   Components/App.razor — the root component (checklist task 67).
+
+   This is the ONE document shell of the application: it carries everything the four master pages
+   each declared in their own <!DOCTYPE>/<html>/<head>/<body> — the meta tags, the stylesheet and
+   script references the WebForms theme engine used to auto-inject, and the inline <style> blocks
+   of MixERPMaster/BackendMaster. Layouts (Components/Layout/*.razor) are fragments and must not
+   repeat any of it; a layout that needs extra head content uses <HeadContent>.
+
+   MUST NOT BE REMOVED (Specialist 3's note):
+     * <HeadOutlet @rendermode="InteractiveServer" /> — every migrated control that sets a page
+       title or head content (ReportEngine, ScrudFactory, ReportLayout, BlankLayout, ...) renders
+       through it.
+     * <link href="MixERP.Net.FrontEnd.styles.css" /> — the host scoped-CSS bundle carrying every
+       referenced RCL's .razor.css.
+     * <script src="_framework/blazor.web.js"></script>
+     * The global @rendermode="InteractiveServer" on <Routes> and <HeadOutlet>. It is declared
+       HERE and ONLY here: a page that also declares @rendermode would be a nested render-mode
+       error.
+
+   data-ng-app="MixERPApp" is kept from BackendMaster (the angular module the backend pages
+   bootstrap). lang="en" is kept from MixERPMaster.
+
+   The IE 8/9 shims (html5shiv, respond.js) and the IE-only ".grid3 td" conditional comment were
+   dropped: conditional comments are not honoured by any browser that can run Blazor.
+   --------------------------------------------------------------------------------------------- *@
+@using System.Globalization
+
+<!DOCTYPE html>
+<html lang="en" data-ng-app="MixERPApp">
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="description" content="MixERP" />
+    <base href="/" />
+    <title>MixERP: ASP.net ERP</title>
+
+    @* The former master-page bundles. master-page.min.css bundles colorbox, jquery-ui,
+       jstree, semantic-ui and the mixerp theme; the explicit mixerp.min.css link is the theme
+       stylesheet App_Themes used to inject automatically (flagged by Specialist 1). *@
+    <link href="/bundles/stylesheets/master-page.min.css" rel="stylesheet" />
+    <link href="/css/themes/mixerp/mixerp.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Titillium+Web" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="MixERP.Net.FrontEnd.styles.css" />
+
+    @* Inline <style> of MixERPMaster.Master / BackendMaster.Master, preserved verbatim. *@
+    <style>
+        #right {
+            padding: 0;
+            margin: 0;
+        }
+
+        .widget {
+            cursor: move;
+        }
+
+        .widget i {
+            cursor: pointer;
+        }
+    </style>
+
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+<body>
+    <Routes @rendermode="InteractiveServer" />
+
+    @* /Resources.js is the localized client resource script (MixERP.Net.i18n ResourcesEndpoint,
+       mapped by Program.cs). BackendMaster requested it with the current two-letter language, so
+       the same query value is emitted here — App.razor is statically rendered per request, so
+       CultureInfo.CurrentCulture is the request's (and therefore the user's) culture. *@
+    <script src="/Resources.js?culture=@CultureInfo.CurrentCulture.TwoLetterISOLanguageName"></script>
+
+    @* The master-page script bundle (jquery, angular, jquery-ui, semantic-ui, signalr, jstree,
+       mixerp-core and the master-page scripts, including the rewritten notification.js). All four
+       master pages loaded a subset of this bundle; the blank and report masters loaded only
+       libraries.min.js, a strict subset, so loading the full bundle for every page adds scripts
+       but removes none. *@
+    <script src="/bundles/scripts/master-page.min.js"></script>
+    <script src="/js/mixerp/master-page/layout-interop.js"></script>
+    <script src="/js/mixerp/master-page/eod.js"></script>
+
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>

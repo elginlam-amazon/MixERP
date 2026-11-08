@@ -18,14 +18,11 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
-using System.Runtime.Serialization;
-using System.Security.Permissions;
-using System.Web;
+using MixERP.Net.Framework.Errors;
 using Serilog;
 
 namespace MixERP.Net.Framework
 {
-    [Serializable]
     public class MixERPException : Exception
     {
         private readonly string dbConstraintName;
@@ -50,22 +47,46 @@ namespace MixERP.Net.Framework
             this.dbConstraintName = dbConstraintName;
         }
 
-        public MixERPException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
-
         public string DBConstraintName
         {
             get { return this.dbConstraintName; }
         }
 
-        [SecurityPermission(SecurityAction.Demand, SerializationFormatter = true)]
-        public override void GetObjectData(SerializationInfo info, StreamingContext context)
+        /// <summary>
+        ///     The error handler used by <see cref="Handle" /> for the CURRENT user. It replaces the
+        ///     WebForms session / <c>Server.TransferRequest</c> pair, which has no equivalent in
+        ///     ASP.NET Core. Resolved per circuit/request — never cached process-wide — because the
+        ///     handler owns circuit-scoped state and that circuit's navigation manager.
+        /// </summary>
+        public static IMixERPErrorHandler ErrorHandler
         {
-            base.GetObjectData(info, context);
+            get { return MixERPErrorHandlerAccessor.Current; }
         }
 
+        /// <summary>
+        ///     Binds the handler that <see cref="Handle" /> delegates to, for the current circuit/request
+        ///     only. In Blazor Server call this from a <c>CircuitHandler</c> with the circuit's own scoped
+        ///     instance:
+        ///     <c>MixERPException.UseErrorHandler(scope.ServiceProvider.GetRequiredService&lt;IMixERPErrorHandler&gt;())</c>.
+        ///     For the process-wide fallback, register a factory with
+        ///     <see cref="MixERPErrorHandlerAccessor.UseFactory" /> instead — do not store a scoped
+        ///     instance globally.
+        /// </summary>
+        public static void UseErrorHandler(IMixERPErrorHandler errorHandler)
+        {
+            if (errorHandler == null)
+            {
+                throw new ArgumentNullException(nameof(errorHandler));
+            }
+
+            MixERPErrorHandlerAccessor.SetCurrent(errorHandler);
+        }
+
+        /// <summary>
+        ///     Records the exception for display and routes the user to the runtime-error page.
+        ///     Equivalent of the original WebForms implementation, which put the exception into the session
+        ///     and transferred the request to <c>~/Site/RuntimeError.aspx</c>.
+        /// </summary>
         public static void Handle(MixERPException ex)
         {
             if (ex == null)
@@ -73,14 +94,17 @@ namespace MixERP.Net.Framework
                 return;
             }
 
-            if (HttpContext.Current.Session != null)
+            IMixERPErrorHandler handler = ErrorHandler;
+
+            if (handler == null)
             {
-                HttpContext.Current.Session["ex"] = ex;
-                Log.Information("Exception object was added to session.");
-
-                HttpContext.Current.Server.TransferRequest("~/Site/RuntimeError.aspx", true);
+                // No handler configured: the original code also did nothing when the session was absent,
+                // but a silent no-op would hide the failure, so record it.
+                Log.Error(ex, "No IMixERPErrorHandler is configured; the exception could not be routed to the runtime-error page. Call MixERPException.UseErrorHandler at startup.");
+                return;
             }
-        }
 
+            handler.Handle(ex);
+        }
     }
 }

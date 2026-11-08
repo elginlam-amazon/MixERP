@@ -1,0 +1,77 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/TopSellingItemsFrame.ascx + .ascx.cs + .ascx.designer.cs - the report
+   that TopSellingItems.razor shows inside its iframe.
+
+   OnControlLoad built a `WebReport` with AutoInitialize = true, NoHeader = true and the
+   TopSellingProductsOfAllTime.xml path, and added it to this.Controls. It takes NO
+   PARAMETERS at all, which is why AutoInitialize CAN stay true here (unlike the nine
+   parameterised Sales reports): the migrated Report component initializes itself from
+   OnParametersSet, and there is nothing that has to be pushed in first.
+
+   `WebReport` NO LONGER EXISTS - it was a one-property subclass of
+   MixERP.Net.WebControls.ReportEngine.Report that set Catalog from
+   AppUsers.GetCurrentUserDB(), which returns an EMPTY catalog inside a Blazor circuit - so
+   <Report> is hosted directly with Catalog from ICurrentLogin.
+
+   PRESERVED SURFACE: MasterPageId = "MixERPReportMaster.Master" and RemoveTheme = true,
+   assigned in the CONSTRUCTOR because ModuleHost.razor reads them off an Activator-created
+   probe instance. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.WebControls.ReportEngine
+
+@if (this.loaded)
+{
+    <Report AutoInitialize="true"
+            NoHeader="true"
+            Catalog="@this.catalog"
+            Path="~/Modules/Sales/Reports/Source/TopSellingProductsOfAllTime.xml" />
+}
+
+@code {
+    private bool loaded;
+    private string catalog;
+
+    public TopSellingItemsFrame()
+    {
+        //<%@ Control ... MasterPageId="MixERPReportMaster.Master" RemoveTheme="true" %>
+        this.MasterPageId = "MixERPReportMaster.Master";
+        this.RemoveTheme = true;
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the report above, which is markup now; only the catalog lookup
+    ///     is left and it is asynchronous, so it lives in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+    }
+}

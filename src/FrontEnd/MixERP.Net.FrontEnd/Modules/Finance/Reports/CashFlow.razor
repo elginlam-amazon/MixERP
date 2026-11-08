@@ -1,0 +1,243 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/CashFlow.ascx + .ascx.cs + .ascx.designer.cs - the direct statement of
+   cash flows.
+
+   The screen was built procedurally (CreateHeader / CreateForm / CreateGrid) into
+   <asp:PlaceHolder ID="Placeholder1">; it is markup now, in the same child order and with the
+   same ids and classes: an h2, a "ui form segment" wrapping an "inline fields" div (From, To,
+   Factor, Show, Print), then a div.auto-overflow-panel wrapping #CashFlowStatementGridView.
+
+   ⚠ #CashFlowStatementGridView IS AN AUTO-GENERATED, POSITIONALLY-READ GRID. The GridView had
+   AutoGenerateColumns on, so its columns ARE the data source's columns, in the data source's
+   order, with the column NAME as the header - and js/reports/CashFlow.js (the .ascx's inline
+   block, moved verbatim) depends on that shape: it reads `td:last, th:last`, tests whether
+   that cell's INPUT is :checked to mark a summation row, then REMOVES the column; it then
+   reddens every negative cell except the first, indents the non-summation rows and marks the
+   first and last rows. So the columns are rendered dynamically from the DataTable here, and
+   the trailing BOOLEAN column is rendered as the DISABLED CHECKBOX a GridView's
+   auto-generated CheckBoxField produced - that checkbox IS the "is summation" flag the script
+   tests. The script is loaded on the render AFTER the query, never on firstRender.
+
+   OnRowDataBound IS REPRODUCED EXACTLY, including its WebForms-specific side effect:
+     * the HEADER's first cell was blanked;
+     * for every data row it set cells 1 .. Count-2 to Text.ToFormattedNumber("{0:N}") and
+       CssClass "text right". Assigning TableCell.Text CLEARS that cell's controls, so a
+       checkbox sitting in that range was destroyed and the cell rendered the formatted text of
+       an empty string, i.e. EMPTY. That is why GetCell below renders a checkbox ONLY in the
+       last column - it is the original's behaviour, not a simplification. ToFormattedNumber
+       also renders a ZERO as an EMPTY cell, which is why the helper is used rather than a
+       plain format.
+   CashflowStatementGridViewDataBound only set HeaderRow.TableSection, which a real <thead>
+   makes unnecessary.
+
+   THE SHOW BUTTON IS A SERVER HANDLER (an <asp:Button> with Click -> BindGrid) and stays one;
+   its three inputs are re-read from the DOM at click time through ElementValueReader, because
+   the jQuery UI datepicker writes the dates without raising an input event - that read is the
+   faithful equivalent of the WebForms postback. The PRINT button had no server handler.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using System.Data
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Extensions
+@using MixERP.Net.Core.Modules.Finance.Internal
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.i18n.Resources
+@inject IJSRuntime JS
+
+<h2>@Titles.StatementOfCashFlows</h2>
+
+<div class="ui form segment">
+    <div class="inline fields">
+        <div class="field">
+            <label for="FromDateTextBox">@Titles.From</label>
+            <DateTextBox ID="FromDateTextBox" Mode="@(FrequencyType.FiscalYearStartDate)"
+                         Catalog="@this.catalog" OfficeId="@this.officeId" @bind-Text="this.fromDate" />
+        </div>
+        <div class="field">
+            <label for="ToDateTextBox">@Titles.To</label>
+            <DateTextBox ID="ToDateTextBox" Mode="@(FrequencyType.FiscalYearEndDate)"
+                         Catalog="@this.catalog" OfficeId="@this.officeId" @bind-Text="this.toDate" />
+        </div>
+        <div class="field">
+            <label for="FactorInputText">@Titles.Factor</label>
+            <input type="text" id="FactorInputText" class="small input integer" value="@this.factor" />
+        </div>
+        <button id="ShowButton" type="button" class="ui positive button" @onclick="this.ShowButton_Click">@Titles.Show</button>
+        <input type="button" id="PrintButton" class="ui orange button" value="@Titles.Print" />
+    </div>
+</div>
+
+<div class="auto-overflow-panel">
+    <table id="CashFlowStatementGridView" class="ui definition celled segment table nowrap">
+        @if (this.table != null)
+        {
+            <thead>
+                <tr>
+                    @for (int i = 0; i < this.table.Columns.Count; i++)
+                    {
+                        @* OnRowDataBound: header cell 0 was blanked. *@
+                        <th>@(i.Equals(0) ? string.Empty : this.table.Columns[i].ColumnName)</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (DataRow row in this.table.Rows)
+                {
+                    <tr>
+                        @for (int i = 0; i < this.table.Columns.Count; i++)
+                        {
+                            @if (this.IsNumberFormatted(i))
+                            {
+                                <td class="text right">@GridFormat.Text(row[i]).ToFormattedNumber("{0:N}")</td>
+                            }
+                            else if (this.IsCheckBoxColumn(i))
+                            {
+                                <td>
+                                    <input type="checkbox" disabled="disabled" checked="@Conversion.TryCastBoolean(row[i])" />
+                                </td>
+                            }
+                            else
+                            {
+                                <td>@GridFormat.Text(row[i])</td>
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        }
+    </table>
+</div>
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.Finance/js/reports/CashFlow.js";
+
+    private ElementValueReader elementValues;
+
+    private string catalog;
+    private int officeId;
+    private int userId;
+
+    private string fromDate;
+    private string toDate;
+    private string factor = "1000";
+
+    private DataTable table;
+    private bool bound;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body called the three Create* builders - all markup now - and then
+    ///     BindGrid(), which needs the catalog and is therefore asynchronous.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        this.elementValues = new ElementValueReader(this.JS);
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.userId = login.UserId;
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        //`if (!this.Page.IsPostBack) this.BindGrid();`
+        this.BindGrid();
+    }
+
+    /// <summary>
+    ///     OnRowDataBound formatted cells 1 .. Count-2 as "{0:N}" / "text right".
+    /// </summary>
+    private bool IsNumberFormatted(int index)
+    {
+        return index > 0 && index < this.table.Columns.Count - 1;
+    }
+
+    /// <summary>
+    ///     An auto-generated GridView column over a boolean rendered a DISABLED CheckBox. Only
+    ///     the LAST column can still show it - see the header note about TableCell.Text.
+    /// </summary>
+    private bool IsCheckBoxColumn(int index)
+    {
+        return index.Equals(this.table.Columns.Count - 1) &&
+               this.table.Columns[index].DataType == typeof(bool);
+    }
+
+    private async Task ShowButton_Click()
+    {
+        string from = await this.elementValues.GetValueAsync("FromDateTextBox");
+        string to = await this.elementValues.GetValueAsync("ToDateTextBox");
+        string factorValue = await this.elementValues.GetValueAsync("FactorInputText");
+
+        if (from != null)
+        {
+            this.fromDate = from;
+        }
+
+        if (to != null)
+        {
+            this.toDate = to;
+        }
+
+        if (factorValue != null)
+        {
+            this.factor = factorValue;
+        }
+
+        this.BindGrid();
+    }
+
+    /// <summary>
+    ///     Port of BindGrid(), verbatim - the same six arguments in the same order.
+    /// </summary>
+    private void BindGrid()
+    {
+        DateTime from = Conversion.TryCastDate(this.fromDate);
+        DateTime to = Conversion.TryCastDate(this.toDate);
+        decimal factorValue = Conversion.TryCastDecimal(this.factor);
+
+        this.table = Data.Reports.CashFlow.GetDirectCashFlowStatement(this.catalog, from, to, this.userId,
+            this.officeId, factorValue);
+        this.bound = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!this.bound)
+        {
+            return;
+        }
+
+        await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+    }
+}

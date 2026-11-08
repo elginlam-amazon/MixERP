@@ -1,0 +1,513 @@
+@* ComponentBase is not CLS-compliant; this assembly is CLSCompliant(true). *@
+@attribute [System.CLSCompliant(false)]
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Blazor replacement for the former WebForms CompositeControl
+    "MixERP.Net.WebControls.Common.DateTextBox"
+    (DateTextBox/Control.cs + DateTextBox/Properties.cs).
+
+    The markup below is the one-for-one port of the control's render tree:
+      CreateChildControls() + Render(HtmlTextWriter) -> this template
+        this.textBox                                -> the <input type="text">
+        AddMinDateValidator()                       -> the min-date <span>
+        AddMaxDateValidator()                       -> the max-date <span>
+        this.requiredValidator                      -> the required-field <span>
+        jQueryUI.AddjQueryUIDatePicker(...)         -> OnAfterRenderAsync (below)
+
+    DOM CONTRACT: consumer page scripts select this input by LITERAL id
+    ($("#ValueDateTextBox"), $("#FromDateTextBox"), $("#ToDateTextBox"),
+    $("#PreviousPeriodDateTextBox"), $("#CurrentPeriodDateTextBox"), $("#DateTextBox"))
+    and read .val(). The rendered id, name and the default class="date" must stay
+    byte-identical to the original TextBox output, and jQuery UI itself binds the
+    datepicker by that same id - otherwise the component renders, the page compiles,
+    and the date simply never reaches the server.
+*@
+
+@namespace MixERP.Net.WebControls.Common
+@using System
+@using System.Globalization
+@using System.Threading.Tasks
+@using MixERP.Net.ApplicationState
+@using MixERP.Net.Common.jQueryHelper
+@using MixERP.Net.Entities
+@using MixERP.Net.i18n.Resources
+@using MixERP.Net.WebControls.Common.Helpers
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
+
+@*
+    this.Controls.Add(this.textBox) - always rendered.
+    CssClass defaults to "date" (CreateChildControls set this.textBox.CssClass = "date"
+    before any consumer assignment, and the consumers that pass CssClass="date"
+    explicitly therefore keep rendering the same class).
+    Width was System.Web.UI.WebControls.Unit, applied by the TextBox as an inline
+    width style; it is a CSS length string here (see migration-summary.md section 4).
+*@
+<input type="text"
+       id="@this.ID"
+       name="@this.ID"
+       class="@this.CssClass"
+       value="@this.text"
+       disabled="@this.Disabled"
+       style="@this.GetWidthStyle()"
+       @oninput="this.OnTextInput" />
+
+@*
+    Validator render gating, ported VERBATIM from the original (see
+    migration-summary.md section 3): CreateChildControls added the required validator
+    to the control tree when Required, and the min-date compare validator when
+    EnableValidation - but Render() emitted BOTH only inside if (this.EnableValidation).
+    The effective visibility was therefore "EnableValidation && Required" for the
+    required message and "EnableValidation" for the compare message. That is what is
+    reproduced here, rather than the more intuitive reading of CreateChildControls.
+
+    ENFORCEMENT, not just markup. The original validators had EnableClientScript = true,
+    so ASP.NET emitted a real client validator that blocked the postback, and the page
+    additionally gated its handler on Page.IsValid. There is no WebForms validation
+    pipeline on net10.0, so the rules are evaluated HERE, in Validate() below, on every
+    keystroke and on demand. ValidatorDisplay.Static reserved the message's space and
+    kept it hidden until the rule failed; "visibility:hidden" vs "visibility:visible"
+    reproduces exactly that. A consumer gates its own submit on IsValid - the
+    replacement for Page.IsValid (see migration-summary.md section 5.6).
+*@
+@if (this.EnableValidation)
+{
+    @* this.requiredValidator - ValidatorDisplay.Static, SetFocusOnError = true *@
+    @if (this.Required)
+    {
+        <span id="@(this.ID + "RequiredFieldValidator")"
+              class="@this.ValidatorCssClass"
+              style="@GetValidatorStyle(this.requiredFailed)"
+              data-validate-for="@this.ID"
+              data-validate-required="true"
+              data-set-focus-on-error="true">@CommonResource.RequiredField</span>
+    }
+
+    @* AddMinDateValidator() - operator GreaterThan, type Date *@
+    <span id="@(this.ID + "CompareValidator")"
+          class="@this.ValidatorCssClass"
+          style="@GetValidatorStyle(this.minDateFailed)"
+          data-validate-for="@this.ID"
+          data-validate-type="Date"
+          data-validate-operator="GreaterThan"
+          data-value-to-compare="@this.GetMinDateValueToCompare()"
+          data-set-focus-on-error="true">@this.GetMinDateErrorMessage()</span>
+
+    @*
+        AddMaxDateValidator() - created ONLY when MaxDate != null, operator LessThan.
+        The original built this validator but never added it to the control tree and
+        never rendered it, so its rule was unreachable. It is rendered (and now actually
+        enforced) here because the control plainly intended a max-date rule - it computes
+        both the compare value and the message. Recorded in migration-summary.md section 3.
+    *@
+    @if (this.MaxDate != null)
+    {
+        <span id="@(this.ID + "MaxDateCompareValidator")"
+              class="@this.ValidatorCssClass"
+              style="@GetValidatorStyle(this.maxDateFailed)"
+              data-validate-for="@this.ID"
+              data-validate-type="Date"
+              data-validate-operator="LessThan"
+              data-value-to-compare="@this.MaxDate.ToString()"
+              data-set-focus-on-error="true">@this.GetMaxDateErrorMessage()</span>
+    }
+}
+
+@code {
+    //----------------------------------------------------------------------------------
+    // Parameters - names frozen from the former DateTextBox/Properties.cs so that the
+    // 11 dependent projects keep the same public surface.
+    //----------------------------------------------------------------------------------
+
+    /// <summary>
+    ///     The rendered element id AND name. Load-bearing: consumer page scripts select
+    ///     this input by literal id, and jQuery UI binds the datepicker to it by id.
+    /// </summary>
+    [Parameter]
+    public string ID { get; set; }
+
+    /// <summary>
+    ///     Former <c>override string CssClass</c> (proxied to the child TextBox).
+    ///     Defaults to "date", the value CreateChildControls assigned.
+    /// </summary>
+    [Parameter]
+    public string CssClass { get; set; } = "date";
+
+    /// <summary>Former <c>Disabled</c> - the inverse of the child TextBox's Enabled.</summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>Former <c>EnableValidation</c> - gates all validator markup, as Render() did.</summary>
+    [Parameter]
+    public bool EnableValidation { get; set; }
+
+    /// <summary>Former <c>MinDate</c>.</summary>
+    [Parameter]
+    public DateTime? MinDate { get; set; }
+
+    /// <summary>Former <c>MaxDate</c>.</summary>
+    [Parameter]
+    public DateTime? MaxDate { get; set; }
+
+    /// <summary>
+    ///     Former <c>Mode</c>. Its setter called InitializeDate(); that side effect now
+    ///     runs from OnParametersSet (see below).
+    /// </summary>
+    [Parameter]
+    public FrequencyType Mode { get; set; }
+
+    /// <summary>
+    ///     Former <c>OfficeId</c>. Its setter called InitializeDate(); same treatment as Mode.
+    /// </summary>
+    [Parameter]
+    public int OfficeId { get; set; }
+
+    /// <summary>Former <c>Catalog</c> - the tenant database InitializeDate reads from.</summary>
+    [Parameter]
+    public string Catalog { get; set; }
+
+    /// <summary>Former <c>Required</c>.</summary>
+    [Parameter]
+    public bool Required { get; set; }
+
+    /// <summary>
+    ///     Former <c>Text</c> (proxied to the child TextBox). Supports two-way binding
+    ///     via <c>@@bind-Text</c>, which is how a consumer reads the entered or computed
+    ///     date now that there is no ViewState round trip. The component renders from its
+    ///     own backing field and reports changes through <see cref="TextChanged" />; it
+    ///     never writes to this parameter (see the <c>text</c> field below).
+    /// </summary>
+    [Parameter]
+    public string Text { get; set; }
+
+    /// <summary>Change callback that makes <c>@@bind-Text</c> work.</summary>
+    [Parameter]
+    public EventCallback<string> TextChanged { get; set; }
+
+    /// <summary>Former <c>ValidatorCssClass</c> - applied to every validator message.</summary>
+    [Parameter]
+    public string ValidatorCssClass { get; set; }
+
+    /// <summary>
+    ///     Former <c>override Unit Width</c>. <c>System.Web.UI.WebControls.Unit</c> does not
+    ///     exist on net10.0, so this is the equivalent CSS length string (for example
+    ///     "150px" or "100%"). Recorded in migration-summary.md section 4.
+    /// </summary>
+    [Parameter]
+    public string Width { get; set; }
+
+    //----------------------------------------------------------------------------------
+    // Lifecycle
+    //----------------------------------------------------------------------------------
+
+    private FrequencyType lastMode;
+    private int lastOfficeId;
+    private string lastCatalog;
+    private bool dateInitialized;
+
+    /// <summary>
+    ///     The value actually rendered in the input.
+    ///     <para>
+    ///         This exists because a Blazor component must NEVER write to its own
+    ///         <c>[Parameter]</c>: the framework re-assigns every parameter from the parent
+    ///         on each render, so a date written into <see cref="Text" /> by
+    ///         <see cref="InitializeDate" /> would be silently overwritten (blanking the
+    ///         field) on the next parent re-render. The legacy control had no such problem -
+    ///         it stored the value in <c>textBox.Text</c>, which was authoritative and
+    ///         survived via ViewState. This field restores that authority, and
+    ///         <see cref="TextChanged" /> propagates it to a <c>@@bind-Text</c> consumer.
+    ///     </para>
+    /// </summary>
+    private string text;
+
+    private bool requiredFailed;
+    private bool minDateFailed;
+    private bool maxDateFailed;
+
+    /// <summary>
+    ///     Whether every enabled rule currently passes - the replacement for
+    ///     <c>Page.IsValid</c>, which the consuming pages used to gate their submit
+    ///     handlers. A consumer holds the component with <c>@@ref</c> and checks this
+    ///     before acting on the date.
+    /// </summary>
+    public bool IsValid
+    {
+        get { return !this.requiredFailed && !this.minDateFailed && !this.maxDateFailed; }
+    }
+
+    /// <summary>
+    ///     Port of the Mode/OfficeId property-setter side effect. Both legacy setters
+    ///     called InitializeDate() on every assignment; in Blazor the parameters arrive
+    ///     together, so the date is (re)computed whenever Mode, OfficeId or Catalog
+    ///     changes - which is the same effective behaviour with no redundant database
+    ///     round trips.
+    /// </summary>
+    protected override async Task OnParametersSetAsync()
+    {
+        //A parent re-render re-assigns Text. Honour an explicit consumer value, but never
+        //let a null/unchanged parameter wipe a date this component computed itself.
+        if (!string.IsNullOrEmpty(this.Text) && !string.Equals(this.Text, this.text, StringComparison.Ordinal))
+        {
+            this.text = this.Text;
+        }
+
+        if (!this.dateInitialized
+            || this.lastMode != this.Mode
+            || this.lastOfficeId != this.OfficeId
+            || !string.Equals(this.lastCatalog, this.Catalog, StringComparison.Ordinal))
+        {
+            this.lastMode = this.Mode;
+            this.lastOfficeId = this.OfficeId;
+            this.lastCatalog = this.Catalog;
+            this.dateInitialized = true;
+
+            if (this.InitializeDate())
+            {
+                //Propagate the computed date to a @bind-Text consumer. The legacy control
+                //needed no equivalent: it wrote textBox.Text, which the consumer then read
+                //back off the posted control. There is no postback now, so without this the
+                //consumer never learns the date the component chose for it.
+                await this.TextChanged.InvokeAsync(this.text);
+            }
+        }
+
+        this.Validate();
+
+        await base.OnParametersSetAsync();
+    }
+
+    /// <summary>
+    ///     Port of <c>jQueryUI.AddjQueryUIDatePicker(this.Page, this.textBox.ID, MinDate, MaxDate)</c>.
+    ///     The original ran inside CreateChildControls; JS interop is only legal after the
+    ///     first render in Blazor (and the input must already be in the DOM for jQuery UI
+    ///     to bind to it by id), so it moves to OnAfterRenderAsync(firstRender). The helper
+    ///     already takes IJSRuntime instead of Page.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            jQueryUI.AddjQueryUIDatePicker(this.JSRuntime, this.ID, this.MinDate, this.MaxDate);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    //----------------------------------------------------------------------------------
+    // Ported logic
+    //----------------------------------------------------------------------------------
+
+    /// <summary>
+    ///     Verbatim port of DateTextBox.InitializeDate(). All eight FrequencyType cases
+    ///     plus the model.Today default are preserved, including the legacy mapping of
+    ///     HalfStartDate/HalfEndDate onto FiscalHalfStartDate/FiscalHalfEndDate.
+    ///     Returns true when it actually set a date, so the caller can notify a
+    ///     <c>@@bind-Text</c> consumer.
+    /// </summary>
+    private bool InitializeDate()
+    {
+        if (this.OfficeId.Equals(0))
+        {
+            return false;
+        }
+
+        FrequencyDates model = DatePersister.GetFrequencyDates(this.Catalog, this.OfficeId);
+
+        if (model == null)
+        {
+            return false;
+        }
+
+        DateTime date = model.Today;
+
+        switch (this.Mode)
+        {
+            case FrequencyType.MonthStartDate:
+                date = model.MonthStartDate;
+                break;
+            case FrequencyType.MonthEndDate:
+                date = model.MonthEndDate;
+                break;
+            case FrequencyType.QuarterStartDate:
+                date = model.QuarterStartDate;
+                break;
+            case FrequencyType.QuarterEndDate:
+                date = model.QuarterEndDate;
+                break;
+            case FrequencyType.HalfStartDate:
+                date = model.FiscalHalfStartDate;
+                break;
+            case FrequencyType.HalfEndDate:
+                date = model.FiscalHalfEndDate;
+                break;
+            case FrequencyType.FiscalYearStartDate:
+                date = model.FiscalYearStartDate;
+                break;
+            case FrequencyType.FiscalYearEndDate:
+                date = model.FiscalYearEndDate;
+                break;
+        }
+
+        this.text = date.ToShortDateString();
+        return true;
+    }
+
+    /// <summary>
+    ///     Keeps the rendered value in step with what the user types, replacing the
+    ///     WebForms postback that used to repopulate TextBox.Text, re-runs the validator
+    ///     rules, and notifies a <c>@@bind-Text</c> consumer.
+    /// </summary>
+    private async Task OnTextInput(ChangeEventArgs e)
+    {
+        this.text = e.Value == null ? string.Empty : e.Value.ToString();
+
+        //Re-run the rules on every keystroke, which is what the legacy client validators
+        //did (EnableClientScript = true bound them to the input's change/keyup).
+        this.Validate();
+
+        await this.TextChanged.InvokeAsync(this.text);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Evaluates the ported validator rules and drives each message's visibility.
+    ///     This is the replacement for the WebForms validation pipeline: the original
+    ///     RequiredFieldValidator / CompareValidator pair ran as emitted client script
+    ///     (EnableClientScript = true) and again server-side through Page.IsValid. Both
+    ///     are gone on net10.0, so the same three rules are evaluated here - in C#, on
+    ///     the server, so a client that bypasses the browser cannot skip them - and
+    ///     surfaced through <see cref="IsValid" />.
+    ///     <para>
+    ///         Rules, matching the originals exactly: required (non-empty, only when
+    ///         Required); GreaterThan MinDate (or 1/1/1900 when MinDate is null, the
+    ///         AddMinDateValidator fallback); LessThan MaxDate (only when MaxDate is set).
+    ///         An unparseable value fails the compare rules, as ValidationDataType.Date did.
+    ///         All three are inert unless EnableValidation is set, exactly as Render() gated
+    ///         them.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    public void Validate()
+    {
+        this.requiredFailed = false;
+        this.minDateFailed = false;
+        this.maxDateFailed = false;
+
+        if (!this.EnableValidation)
+        {
+            return;
+        }
+
+        bool empty = string.IsNullOrWhiteSpace(this.text);
+
+        if (this.Required && empty)
+        {
+            this.requiredFailed = true;
+        }
+
+        if (empty)
+        {
+            //A CompareValidator treated an empty value as valid (it deferred to the
+            //RequiredFieldValidator), so neither compare rule fires here.
+            return;
+        }
+
+        DateTime value;
+
+        if (!DateTime.TryParse(this.text, CultureInfo.CurrentCulture, DateTimeStyles.None, out value))
+        {
+            //ValidationDataType.Date failed a value it could not convert.
+            this.minDateFailed = true;
+            return;
+        }
+
+        DateTime minimum;
+
+        if (this.MinDate != null)
+        {
+            minimum = this.MinDate.Value;
+        }
+        else if (!DateTime.TryParse("1/1/1900", CultureInfo.InvariantCulture, DateTimeStyles.None, out minimum))
+        {
+            minimum = new DateTime(1900, 1, 1);
+        }
+
+        if (value <= minimum)
+        {
+            //Operator GreaterThan: the value must be strictly greater.
+            this.minDateFailed = true;
+        }
+
+        if (this.MaxDate != null && value >= this.MaxDate.Value)
+        {
+            //Operator LessThan: the value must be strictly less.
+            this.maxDateFailed = true;
+        }
+    }
+
+    /// <summary>
+    ///     Port of ValidatorDisplay.Static: the message always occupies its space and is
+    ///     hidden until its rule fails.
+    /// </summary>
+    private static string GetValidatorStyle(bool failed)
+    {
+        return failed ? "visibility:visible" : "visibility:hidden";
+    }
+
+    /// <summary>Port of AddMinDateValidator()'s ValueToCompare, both branches.</summary>
+    private string GetMinDateValueToCompare()
+    {
+        return this.MinDate != null ? this.MinDate.ToString() : "1/1/1900";
+    }
+
+    /// <summary>Port of AddMinDateValidator()'s ErrorMessage, both branches.</summary>
+    private string GetMinDateErrorMessage()
+    {
+        if (this.MinDate != null)
+        {
+            return string.Format(CultureInfo.CurrentCulture, CommonResource.DateMustBeGreaterThan, this.MinDate);
+        }
+
+        return CommonResource.InvalidDate;
+    }
+
+    /// <summary>
+    ///     Port of AddMaxDateValidator()'s ErrorMessage. The original formatted
+    ///     CommonResource.DateMustBeLessThan with this.MinDate - not MaxDate. That is a
+    ///     legacy quirk and it is preserved here deliberately rather than silently
+    ///     "fixed"; it is recorded in migration-summary.md section 3.
+    /// </summary>
+    private string GetMaxDateErrorMessage()
+    {
+        return string.Format(CultureInfo.CurrentCulture, CommonResource.DateMustBeLessThan, this.MinDate);
+    }
+
+    /// <summary>
+    ///     Port of the child TextBox's Width rendering: a width style is emitted only when
+    ///     a width was actually set (Unit.Empty rendered no style attribute value).
+    /// </summary>
+    private string GetWidthStyle()
+    {
+        return string.IsNullOrWhiteSpace(this.Width) ? null : "width:" + this.Width;
+    }
+}

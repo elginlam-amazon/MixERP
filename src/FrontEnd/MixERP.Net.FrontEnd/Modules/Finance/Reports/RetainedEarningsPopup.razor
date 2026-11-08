@@ -1,0 +1,68 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/RetainedEarningsPopup.ascx - the retained-earnings statement shown
+   CHROME-FREE inside the pop-up window BalanceSheet's retained-earning drill-down opens.
+
+   ⚠ THIS .ascx HAD NO CODE-BEHIND OF ITS OWN: it declared
+       CodeBehind="RetainedEarnings.ascx.cs"
+       Inherits="MixERP.Net.Core.Modules.Finance.Reports.RetainedEarnings"
+   i.e. it SHARED Reports/RetainedEarnings' class, and there is no RetainedEarningsPopup.ascx.cs
+   or .designer.cs in the repository. Treating it as "a control with no code-behind" would have
+   silently emptied this screen. The shared implementation is the
+   Internal/RetainedEarningsStatement component below, which both screens render.
+
+   WHAT THIS SCREEN ACTUALLY DIFFERS IN, and all of it is preserved:
+     * MasterPageId = "MixERPBlankMaster.Master" - this is what renders it without the
+       application chrome inside the popup window. Assigned in the CONSTRUCTOR, because
+       ModuleHost.razor reads it off an Activator.CreateInstance PROBE INSTANCE on which no
+       lifecycle method ever runs (and it is what selects the host's BlankLayout).
+     * the <div style="padding: 24px;"> wrapper the .ascx put around the placeholder.
+     * NO <script>: this .ascx carried none, so its #PrintButton has always been inert. It is
+       deliberately left inert - loading the sibling's script would newly switch a button on.
+   RemoveTheme was NOT set on this control (unlike the Reports/*Report screens), so it is not
+   set here either.
+
+   The original declared no OverridePath, AccessLevel or IsLandingPage override and implemented
+   no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Core.Modules.Finance.Internal
+
+<div style="padding: 24px;">
+    <RetainedEarningsStatement />
+</div>
+
+@code {
+    public RetainedEarningsPopup()
+    {
+        //<%@ Control ... MasterPageId="MixERPBlankMaster.Master" %>
+        this.MasterPageId = "MixERPBlankMaster.Master";
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body (shared with Reports/RetainedEarnings) built the screen that is now
+    ///     the Internal/RetainedEarningsStatement component above, whose own lifecycle runs the
+    ///     asynchronous catalog lookup and the first bind.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+}

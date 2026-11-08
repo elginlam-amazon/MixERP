@@ -21,15 +21,46 @@ using MixERP.Net.i18n.Resources;
 using System;
 using System.Linq;
 using System.Threading;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
 {
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Shared option-list builder for the two list renderers (drop-down and radio-button list).
+    ///     <para>
+    ///         The original took a <c>System.Web.UI.WebControls.ListControl</c> and pushed
+    ///         <c>ListItem</c>s into its <c>Items</c> collection. Both types are removed on net10.0,
+    ///         so it now fills <see cref="ScrudField.Items" /> with
+    ///         <see cref="ScrudListItem" />s — the same text/value pairs, in the same order, with
+    ///         the same selection semantics.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
     internal static class Helper
     {
-        internal static void AddListItems(ListControl control, string keys, string values, string selectedValues)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>AddListItems(ListControl, keys, values, selectedValues)</c>, preserving:
+        ///     <list type="bullet">
+        ///         <item>the key/value count mismatch throwing with <c>Errors.KeyValueMismatch</c>;</item>
+        ///         <item><c>new ListItem(key[i].Trim(), value[i].Trim())</c> — the KEY is the option's
+        ///         TEXT and the VALUE is what is posted (this is how <c>Titles.Yes</c>/<c>Titles.No</c>
+        ///         map onto <c>true</c>/<c>false</c> for a boolean column);</item>
+        ///         <item>the single-selection branch, which matched only the LAST comma-separated
+        ///         entry of <paramref name="selectedValues" /> and stopped at the first hit.</item>
+        ///     </list>
+        ///     <para>
+        ///         The <c>control is CheckBoxList</c> branch (multi-select, matching ANY of the
+        ///         comma-separated values) is expressed by
+        ///         <paramref name="allowMultipleSelection" />: no scrud renderer ever built a
+        ///         <c>CheckBoxList</c>, so the branch was dead in this project, but it is carried
+        ///         rather than dropped because it is real logic the helper performed.
+        ///     </para>
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        internal static void AddListItems(ScrudField field, string keys, string values, string selectedValues, bool allowMultipleSelection)
         {
-            if (control == null)
+            if (field == null)
             {
                 return;
             }
@@ -56,13 +87,13 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
 
             for (int i = 0; i < key.Length; i++)
             {
-                ListItem item = new ListItem(key[i].Trim(), value[i].Trim());
-                control.Items.Add(item);
+                ScrudListItem item = new ScrudListItem(key[i].Trim(), value[i].Trim());
+                field.Items.Add(item);
             }
 
-            foreach (ListItem item in control.Items)
+            foreach (ScrudListItem item in field.Items)
             {
-                if (control is CheckBoxList)
+                if (allowMultipleSelection)
                 {
                     if (!string.IsNullOrWhiteSpace(selectedValues))
                     {
@@ -87,6 +118,24 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
                     }
                 }
             }
+
+            //A ListControl surfaced its chosen option through SelectedValue; ScrudField carries it
+            //in Value, which is what GetFormCollection reads back.
+            ScrudListItem selectedItem = field.Items.FirstOrDefault(item => item.Selected);
+
+            if (selectedItem != null)
+            {
+                field.Value = selectedItem.Value;
+            }
+        }
+
+        /// <summary>
+        ///     Convenience overload matching the original three-argument call shape (single
+        ///     selection, as every scrud list renderer used).
+        /// </summary>
+        internal static void AddListItems(ScrudField field, string keys, string values, string selectedValues)
+        {
+            AddListItems(field, keys, values, selectedValues, false);
         }
     }
 }

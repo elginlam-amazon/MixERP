@@ -19,17 +19,35 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.ScrudFactory.Helpers;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
 {
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Builds the text field of the schema-driven scrud form.
+    ///     <para>
+    ///         The factory used to new up a <c>System.Web.UI.WebControls.TextBox</c> with
+    ///         <c>ClientIDMode.Static</c> and add it to an <c>HtmlTable</c> cell. Both of those
+    ///         types are removed on net10.0, so it now produces a <see cref="ScrudField" /> that
+    ///         <c>ScrudFieldRow.razor</c> renders as the same
+    ///         <c>&lt;input id="{column}_textbox"&gt;</c>.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
     internal static class ScrudTextBox
     {
-        internal static void AddTextBox(HtmlTable htmlTable, string resourceClassName, string columnName, string dataType, string defaultValue, bool isNullable, int maxLength, string errorCssClass, bool disabled)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>AddTextBox(HtmlTable, …)</c>, branch for branch: the PASSWORD column-name
+        ///     detection and its "fake-password" placeholder, the <c>color</c> css class for a COLOR
+        ///     column, the read-only treatment of a disabled non-password column, the default value,
+        ///     and the <c>Titles.RequiredFieldIndicator</c>-suffixed label plus required rule for a
+        ///     non-nullable column.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        internal static void AddTextBox(ScrudFieldTable fieldTable, string resourceClassName, string columnName, string dataType, string defaultValue, bool isNullable, int maxLength, string errorCssClass, bool disabled)
         {
-            if (htmlTable == null)
+            if (fieldTable == null)
             {
                 return;
             }
@@ -46,62 +64,84 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
                 defaultValue = "fake-password";
             }
 
-            using (TextBox textBox = GetTextBox(columnName + "_textbox", maxLength))
+            ScrudField field = GetTextBox(columnName + "_textbox", maxLength);
+
+            if (field == null)
             {
-                string label = ScrudLocalizationHelper.GetResourceString(resourceClassName, columnName);
-
-
-                if (dataType.ToUpperInvariant().Equals("COLOR"))
-                {
-                    textBox.CssClass = "color";
-                }
-
-                if (isPasswordField)
-                {
-                    textBox.Attributes.Add("type", "password");
-                }
-
-                if (disabled && !isPasswordField)
-                {
-                    textBox.ReadOnly = true;
-                }
-
-                textBox.Text = defaultValue;
-
-
-                if (!isNullable)
-                {
-                    using (RequiredFieldValidator required = ScrudFactoryHelper.GetRequiredFieldValidator(textBox, errorCssClass))
-                    {
-                        ScrudFactoryHelper.AddRow(htmlTable, label + Titles.RequiredFieldIndicator, textBox, required);
-                        return;
-                    }
-                }
-
-                ScrudFactoryHelper.AddRow(htmlTable, label, textBox);
+                return;
             }
+
+            field.ColumnName = columnName;
+            field.Kind = ScrudFieldKind.TextBox;
+            field.DataType = dataType;
+            field.IsNullable = isNullable;
+            field.ValidatorCssClass = errorCssClass;
+
+            string label = ScrudLocalizationHelper.GetResourceString(resourceClassName, columnName);
+
+            if (dataType != null && dataType.ToUpperInvariant().Equals("COLOR"))
+            {
+                field.CssClass = "color";
+            }
+
+            if (isPasswordField)
+            {
+                //The original did textBox.Attributes.Add("type", "password") on top of the
+                //type="text" a TextBox already rendered, which produced a DUPLICATE type attribute
+                //(and browsers honour the first, so the field was not actually masked - a latent
+                //bug). The intent is unambiguous, so a single type="password" attribute is emitted
+                //here. Recorded in migration-summary.md.
+                field.InputType = "password";
+            }
+
+            if (disabled && !isPasswordField)
+            {
+                field.ReadOnly = true;
+            }
+
+            field.Value = defaultValue;
+
+            if (!isNullable)
+            {
+                field.Label = label + Titles.RequiredFieldIndicator;
+                field.AddRule(ScrudFactoryHelper.GetRequiredFieldValidator(field, errorCssClass));
+                fieldTable.Add(field);
+                return;
+            }
+
+            field.Label = label;
+            fieldTable.Add(field);
         }
 
-        internal static TextBox GetTextBox(string id, int maxLength)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>GetTextBox(string id, int maxLength)</c>, the single factory every text-ish
+        ///     renderer (text, number, decimal, date) went through.
+        ///     <para>
+        ///         <c>ClientIDMode.Static</c> is gone with WebForms, but it is precisely what the
+        ///         <see cref="ScrudField.ElementId" /> contract replaces: the element renders with
+        ///         the unmangled id <c>GetFormCollection</c> reads it back by.
+        ///     </para>
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        internal static ScrudField GetTextBox(string id, int maxLength)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
                 return null;
             }
 
-            using (TextBox textBox = new TextBox())
+            ScrudField field = new ScrudField();
+            field.ElementId = id;
+            field.Kind = ScrudFieldKind.TextBox;
+            field.InputType = "text";
+
+            if (maxLength > 0)
             {
-                textBox.ID = id;
-                textBox.ClientIDMode = ClientIDMode.Static;
-
-                if (maxLength > 0)
-                {
-                    textBox.MaxLength = maxLength;
-                }
-
-
-                return textBox;
+                field.MaxLength = maxLength;
             }
+
+            return field;
         }
     }
 }

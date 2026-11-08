@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using System;
 using MixERP.Net.Common;
 using MixERP.Net.DbFactory;
 using Npgsql;
@@ -32,8 +33,8 @@ namespace MixERP.Net.Core.Modules.Sales.Data.Helpers
             using (NpgsqlCommand command = new NpgsqlCommand(sql))
             {
                 command.Parameters.AddWithValue("@OfficeId", officeId);
-                command.Parameters.AddWithValue("@SourceCurrencyCode", sourceCurrencyCode);
-                command.Parameters.AddWithValue("@DestinationCurrencyCode", destinationCurrencyCode);
+                command.Parameters.AddWithValue("@SourceCurrencyCode", sourceCurrencyCode ?? (object)DBNull.Value);
+                command.Parameters.AddWithValue("@DestinationCurrencyCode", destinationCurrencyCode ?? (object)DBNull.Value);
 
                 return Conversion.TryCastDecimal(DbOperation.GetScalarValue(catalog, command));
             }

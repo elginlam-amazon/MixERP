@@ -1,24 +1,87 @@
-﻿using MixERP.Net.Common;
+﻿using MixERP.Net.ApplicationState.Cache;
+using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
-using MixERP.Net.ApplicationState;
-using MixERP.Net.ApplicationState.Cache;
 
 namespace MixERP.Net.CurrencyConversion.Currencylayer
 {
+    /// <summary>
+    /// Reads the Currencylayer parameters from the per-tenant <c>config.currency_layer</c> table.
+    /// The values used to be cached in <c>static readonly</c> fields initialized at type load
+    /// (which bound the whole library to the first request's catalog); they are now read on
+    /// demand so each request resolves against its own user database.
+    /// </summary>
     internal static class Config
-    {        
+    {
         internal const string ConfigFileName = "CurrencylayerConfigFile";
-        internal static readonly string UserAgent = DbConfig.GetCurrencylayerParameter(AppUsers.GetCurrentUserDB(), "UserAgent");
-        internal static readonly string MediaType = DbConfig.GetCurrencylayerParameter(AppUsers.GetCurrentUserDB(), "MediaType");
-        internal static readonly string AccessKey = DbConfig.GetCurrencylayerParameter(AppUsers.GetCurrentUserDB(), "APIAccessKey");
-        internal static readonly string ApiUrl = DbConfig.GetCurrencylayerParameter(AppUsers.GetCurrentUserDB(), "APIUrl");
-        internal static readonly string AccessKeyName = DbConfig.GetCurrencylayerParameter(AppUsers.GetCurrentUserDB(), "AccessKeyName");
-        internal static readonly string CurrenciesKey = DbConfig.GetCurrencylayerParameter(AppUsers.GetCurrentUserDB(), "CurrenciesKey");
-        internal static readonly string SourceKey= DbConfig.GetCurrencylayerParameter(AppUsers.GetCurrentUserDB(), "SourceKey");
-        internal static readonly int DecimalPlaces = Conversion.TryCastInteger(DbConfig.GetCurrencylayerParameter(AppUsers.GetCurrentUserDB(), "DecimalPlaces"));
-        internal static readonly string FormatKey = DbConfig.GetCurrencylayerParameter(AppUsers.GetCurrentUserDB(), "FormatKey");
-        internal static readonly string DefaultFormat = DbConfig.GetCurrencylayerParameter(AppUsers.GetCurrentUserDB(), "DefaultFormat");
-        internal static readonly string ResultSubKey = DbConfig.GetCurrencylayerParameter(AppUsers.GetCurrentUserDB(), "ResultSubKey");
-        internal static readonly bool RemoveSourceCurrencyFromResult = DbConfig.GetCurrencylayerParameter(AppUsers.GetCurrentUserDB(), "RemoveSourceCurrencyFromResult").ToUpperInvariant().Equals("TRUE");
+
+        /// <summary>
+        /// Loads every Currencylayer parameter for the catalog of the current user.
+        /// </summary>
+        internal static CurrencylayerOptions Read()
+        {
+            return Read(AppUsers.GetCurrentUserDB());
+        }
+
+        /// <summary>
+        /// Loads every Currencylayer parameter for the supplied catalog.
+        /// </summary>
+        internal static CurrencylayerOptions Read(string catalog)
+        {
+            return new CurrencylayerOptions
+            {
+                UserAgent = GetParameter(catalog, "UserAgent"),
+                MediaType = GetParameter(catalog, "MediaType"),
+                AccessKey = GetParameter(catalog, "APIAccessKey"),
+                ApiUrl = GetParameter(catalog, "APIUrl"),
+                AccessKeyName = GetParameter(catalog, "AccessKeyName"),
+                CurrenciesKey = GetParameter(catalog, "CurrenciesKey"),
+                SourceKey = GetParameter(catalog, "SourceKey"),
+                DecimalPlaces = Conversion.TryCastInteger(GetParameter(catalog, "DecimalPlaces")),
+                FormatKey = GetParameter(catalog, "FormatKey"),
+                DefaultFormat = GetParameter(catalog, "DefaultFormat"),
+                ResultSubKey = GetParameter(catalog, "ResultSubKey"),
+                RemoveSourceCurrencyFromResult = IsTrue(GetParameter(catalog, "RemoveSourceCurrencyFromResult")),
+                Enabled = IsTrue(GetParameter(catalog, "Enabled"))
+            };
+        }
+
+        /// <summary>
+        /// Used by the plugin-discovery path (<c>Activator.CreateInstance</c>), where no
+        /// <see cref="Microsoft.Extensions.Configuration.IConfiguration"/> is available: the
+        /// per-tenant values come from the database and the API access key may still be
+        /// overridden out-of-band by the <c>Currencylayer__AccessKey</c> environment variable,
+        /// so the secret never has to be stored in a *.config file.
+        /// </summary>
+        internal static CurrencylayerOptions ReadWithEnvironmentOverrides()
+        {
+            CurrencylayerOptions options = Read();
+
+            string accessKey = System.Environment.GetEnvironmentVariable("Currencylayer__AccessKey");
+
+            if (!string.IsNullOrWhiteSpace(accessKey))
+            {
+                options.AccessKey = accessKey;
+            }
+
+            return options;
+        }
+
+        private static string GetParameter(string catalog, string key)
+        {
+            return DbConfig.GetCurrencylayerParameter(catalog, key) ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Preserves the original case-insensitive "TRUE" semantics of the stored flags.
+        /// </summary>
+        internal static bool IsTrue(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return false;
+            }
+
+            return value.ToUpperInvariant().Equals("TRUE");
+        }
     }
 }

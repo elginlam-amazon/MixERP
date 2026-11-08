@@ -1,0 +1,74 @@
+@* ---------------------------------------------------------------------------------------------
+   Reports/ReportMaster.aspx (+ .aspx.cs, which was an EMPTY MixERPWebpage subclass)
+   -> Components/Pages/Reports/ReportMaster.razor (checklist task 90).
+
+   ROUTE. The legacy url came from Application/Routes.RegisterRoutes:
+       routes.MapPageRoute("Reporting", "Reports/{path}", "~/Reports/ReportMaster.aspx")
+   so this component claims Application/Routes.ReportingRoute == "/Reports/{path}" (which
+   Routes.Verify asserts at startup).
+
+   ⚠ STATIC FILES UNDER /Reports/ (Specialist 1's flag). wwwroot/Reports/Print.html and
+   wwwroot/Reports/Assets/Header.html keep their original casing because their urls are stored
+   in db/*.sql and Resource/Configs/ReportParameters.config. They are NOT shadowed by this
+   route: UseStaticFiles() runs BEFORE UseRouting() in Program.cs, so a request for an existing
+   file under wwwroot/Reports/ is served by the static-file middleware and never reaches the
+   component router. The route template is also single-segment ("{path}", not "{*path}"), so
+   /Reports/Assets/Header.html could not match it even if the file were missing.
+
+   MASTER PAGE. MasterPageFile="~/BackendMaster.Master" -> @layout BackendLayout.
+   ScriptContentPlaceholder and BottomScriptContentPlaceholder were EMPTY -> no <SectionContent>.
+   The StyleSheetContentPlaceholder <style> block became wwwroot/css/pages/report-master.css,
+   linked through <HeadContent> (a .razor file may not carry an inline style element).
+
+   The <script runat="server"> Page_Init block is ported in @code below: IsLandingPage = true
+   and the HtmlGenericControl("iframe") whose src was
+   ResolveUrl("~/Reports/ReportViewer.aspx?Id=" + RouteData.Values["path"]) -- repointed to the
+   new route /Reports/ReportViewer (task 91).
+
+   ReportPlaceholder was declared but NEVER populated by any code in the original solution
+   (re-grepped), so it rendered nothing; nothing is emitted for it here either.
+   --------------------------------------------------------------------------------------------- *@
+@page "/Reports/{path}"
+@layout BackendLayout
+@inherits MixERPAuthorizedPageBase
+
+<HeadContent>
+    <link href="/css/pages/report-master.css" rel="stylesheet" />
+</HeadContent>
+
+@* NO wrapper element: <asp:PlaceHolder> rendered its children only, with no container and no id
+   attribute, so the "#IFramePlaceholder { width: 800px; }" rule of the page's style block never
+   matched anything. The rule is carried over verbatim in report-master.css (it is part of the
+   original stylesheet) and is just as inert as before -- inventing a <div id="IFramePlaceholder">
+   here would newly ACTIVATE it and change the iframe's width from 100% to 800px. *@
+<iframe src="@this.ReportViewerUrl" style="width:100%;border:1px solid #C0C0C0;"></iframe>
+
+@code {
+    /// <summary>
+    ///     The legacy <c>RouteData.Values["path"]</c> of the "Reporting" route.
+    /// </summary>
+    [Parameter]
+    public string Path { get; set; }
+
+    /// <summary>
+    ///     <c>ResolveUrl("~/Reports/ReportViewer.aspx?Id=" + path)</c>, repointed to the migrated
+    ///     route. The value is escaped because it travels in a query string (the WebForms
+    ///     concatenation did not escape it, which is a defect, not behaviour to preserve).
+    /// </summary>
+    private string ReportViewerUrl
+    {
+        get
+        {
+            return "/Reports/ReportViewer?Id=" + Uri.EscapeDataString(this.Path ?? string.Empty);
+        }
+    }
+
+    /// <summary>
+    ///     Page_Init: <c>this.IsLandingPage = true</c>. Set in the constructor because the base
+    ///     activation sequence that reads it runs in OnInitializedAsync.
+    /// </summary>
+    public ReportMaster()
+    {
+        this.IsLandingPage = true;
+    }
+}

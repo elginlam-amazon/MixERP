@@ -1,0 +1,165 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Widgets/TopSellingProductOfAllTimeWidget.ascx + .ascx.cs + .ascx.designer.cs -
+   the dashboard BAR chart of the top selling products of all time, by office.
+
+   The <asp:GridView> here declared AutoGenerateColumns="True" and NO columns, so it rendered
+   one header per column of the DataTable returned by
+   TopSellingProducts.GetTopSellingProductsOfAllTimeByOffice(catalog), using the column NAME
+   as the header text, followed by one row per DataRow. That is reproduced literally by
+   iterating the DataTable's own columns - which also means the chart keeps working if the
+   underlying query's shape changes, exactly as the auto-generating GridView did.
+   The host's mixerp-core.js `prepareChart` takes the labels from the header row (skipping
+   the first cell), one series per remaining row (first cell = series title), then removes
+   the table - so the hidden table is LOAD-BEARING and keeps its id, its `hidden` class and
+   the inline display:none the code-behind added.
+
+   The <asp:Literal ID="TopSellingProductsLiteral"> + its Titles assignment become the
+   inline @Titles expression.
+
+   The catalog comes from ICurrentLogin: AppUsers.GetCurrentUserDB() returns an EMPTY
+   catalog inside a Blazor circuit, and a widget deriving from MixERPWidget does not inherit
+   the CurrentLogin property (that is declared by MixERPUserControl).
+
+   The inline $(document).ready(prepareChart(...)) block moved VERBATIM to
+   wwwroot/js/widgets/TopSellingProductOfAllTimeWidget.js.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPWidget
+@using System.Data
+@using MixERP.Net.Core.Modules.Sales.Internal
+@using MixERP.Net.Framework.Security
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject ICurrentLogin CurrentLogin
+@inject IJSRuntime JS
+
+<div class="eight wide column widget" id="TopSellingProductOfAllTimeWidget">
+    <div class="ui attached segment">
+        <div class="ui left floated column">
+            <div class="ui header">
+                @Titles.TopSellingProductsOfAllTime
+            </div>
+        </div>
+        <div class="right floated column">
+            <i class="expand disabled icon"></i>
+            <i class="move icon"></i>
+            <i class="help icon"></i>
+            <i class="close icon" onclick="$(this).closest('.widget').remove();"></i>
+        </div>
+    </div>
+    <div class="ui attached segment">
+        <table id="TopSellingProductsGridView" class="hidden" style="display:none;">
+            @if (this.table != null)
+            {
+                <thead>
+                    <tr>
+                        @foreach (DataColumn column in this.Columns)
+                        {
+                            <th scope="col">@column.ColumnName</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (DataRow row in this.Rows)
+                    {
+                        <tr>
+                            @foreach (DataColumn column in this.Columns)
+                            {
+                                <td>@row[column]</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            }
+        </table>
+
+        <canvas id="curr-office-top-selling-products-canvas" width="500" height="180"></canvas>
+        <div id="curr-office-top-selling-products-legend"></div>
+    </div>
+</div>
+
+@code {
+    private DataTable table;
+    private bool scriptsLoaded;
+
+    private IEnumerable<DataColumn> Columns
+    {
+        get
+        {
+            if (this.table == null)
+            {
+                return new List<DataColumn>();
+            }
+
+            return this.table.Columns.Cast<DataColumn>();
+        }
+    }
+
+    private IEnumerable<DataRow> Rows
+    {
+        get
+        {
+            if (this.table == null)
+            {
+                return new List<DataRow>();
+            }
+
+            return this.table.Rows.Cast<DataRow>();
+        }
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body set the Literal text (markup now) and bound the grid; the catalog the
+    ///     binding needs is asynchronous, so the query moved to OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.table = Data.Reports.TopSellingProducts.GetTopSellingProductsOfAllTimeByOffice(catalog);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (this.scriptsLoaded)
+        {
+            return;
+        }
+
+        //The chart script reads the rendered table, so it must not run before the rows are in
+        //the DOM - which is the render AFTER the asynchronous query completed.
+        this.scriptsLoaded = true;
+
+        await ModuleScripts.LoadAsync(this.JS,
+            "_content/MixERP.Net.Core.Modules.Sales/js/widgets/TopSellingProductOfAllTimeWidget.js");
+    }
+}

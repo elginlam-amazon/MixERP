@@ -1,0 +1,74 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/RetainedEarnings.ascx + .ascx.cs + .ascx.designer.cs - the interactive
+   retained-earnings statement.
+
+   ⚠ SHARED CODE-BEHIND: RetainedEarnings.ascx.cs was declared as the CodeBehind of BOTH this
+   .ascx and Reports/RetainedEarningsPopup.ascx (same Inherits=, and the popup had no .cs or
+   .designer.cs of its own). The shared class is preserved structurally as the
+   Internal/RetainedEarningsStatement component, which carries the WHOLE screen - the form, the
+   Show/Print buttons, SetQueryParameters(), BindGrid() and the 8-column
+   #RetainedEarningsGridView. This file and the popup differ only in what the two .ascx files
+   differed in; neither can drift from the other.
+
+   THE INLINE <script> BLOCK moved verbatim to wwwroot/js/reports/RetainedEarnings.js (a .razor
+   file may not contain <script>). It binds #PrintButton and opens RetainedEarningsReport.mix
+   with the current date and factor. It is loaded on the render AFTER the query, because it
+   reads #DateTextBox and #FactorInputText out of the DOM. NOTE: the POPUP variant deliberately
+   does NOT load it - that .ascx had no script block, so its Print button has always been
+   inert, and switching it on now would be a behaviour change.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Core.Modules.Finance.Internal
+@inject IJSRuntime JS
+
+<RetainedEarningsStatement @ref="this.statement" />
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.Finance/js/reports/RetainedEarnings.js";
+
+    private RetainedEarningsStatement statement;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the screen that is now the shared
+    ///     Internal/RetainedEarningsStatement component above, whose own lifecycle runs the
+    ///     asynchronous catalog lookup and the first bind.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (this.statement == null || !this.statement.Bound)
+        {
+            return;
+        }
+
+        await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+    }
+}

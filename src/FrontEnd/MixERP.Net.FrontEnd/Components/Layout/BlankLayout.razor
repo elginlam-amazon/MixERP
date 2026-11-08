@@ -1,0 +1,49 @@
+@* ---------------------------------------------------------------------------------------------
+   MixERPBlankMaster.Master  ->  Components/Layout/BlankLayout.razor   (checklist task 63)
+
+   PLACEHOLDER MAPPING
+     ContentPlaceHolderHead -> <SectionOutlet SectionName="@LayoutSections.BlankHeadContent" />
+     BodyContentPlaceholder -> @Body (wrapped in <AuthorizationOutlet>)
+
+   Page_Load was EMPTY in the original (MixERPBlankMaster inherited MixERPMasterPage only for the
+   javascript globals), so this layout has no literals — but it DOES register the globals, exactly
+   as MixERPMasterPage.OnLoad did for every master page.
+
+   The master page's two inline <style> blocks became wwwroot/css/blank-layout.css and the
+   <head> stylesheet/script references are pulled in per layout through <HeadContent>, because the
+   blank master deliberately loaded ONLY libraries.min.js + master-page.min.css (no chrome).
+   --------------------------------------------------------------------------------------------- *@
+@inherits LayoutComponentBase
+@inject MasterPageScriptService MasterPageScript
+@inject IJSRuntime JS
+
+<HeadContent>
+    <link href="/bundles/stylesheets/master-page.min.css" rel="stylesheet" />
+    <link href="/css/themes/mixerp/mixerp.min.css" rel="stylesheet" />
+    <link href="/css/blank-layout.css" rel="stylesheet" />
+</HeadContent>
+
+@* The former <asp:ContentPlaceHolder ID="ContentPlaceHolderHead">. It is rendered here rather
+   than inside <HeadContent> so a page can target it with ordinary markup; a page that needs its
+   content to land in the document <head> uses <HeadContent> directly instead. *@
+<SectionOutlet SectionName="@LayoutSections.BlankHeadContent" />
+
+<div class="row">
+    <div class="col-md-12">
+        <AuthorizationOutlet>
+            @Body
+        </AuthorizationOutlet>
+    </div>
+</div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender).ConfigureAwait(true);
+
+        if (firstRender)
+        {
+            await this.MasterPageScript.RegisterAsync(this.JS).ConfigureAwait(true);
+        }
+    }
+}

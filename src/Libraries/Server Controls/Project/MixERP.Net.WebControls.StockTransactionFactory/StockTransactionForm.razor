@@ -1,0 +1,1055 @@
+@* ComponentBase is not CLS-compliant; this assembly is CLSCompliant(true). *@
+@attribute [System.CLSCompliant(false)]
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Blazor replacement for the former WebForms CompositeControl
+    "MixERP.Net.WebControls.StockTransactionFactory.StockTransactionForm"
+    (the sealed partial class formerly spread over Control/**).
+
+    The markup below reproduces, in order, the DOM that
+    Control/Control.cs CreateChildControls() built:
+
+        CreateTitle(placeHolder)            -> the <h1>
+        CreateTopFormPanel(placeHolder)     -> div.ui.segment > table.ui.form (+ div.ui.form > .two.fields)
+        CreateGrid(placeHolder)             -> div.ui.form.vpad16 > table#ProductGridView
+        CreateErrorLabel(placeHolder)       -> span#ErrorLabel
+        CreateAttachmentPanel(placeHolder)  -> the attachment panel
+        CreateBottomFormPanel(placeHolder)  -> the bottom form
+        CreateHiddenFields(placeHolder)     -> the 14 hidden inputs
+        CreateErrorLabelBottom(placeHolder) -> span#ErrorLabelBottom
+
+    DROPPED (recorded in migration-summary.md section 2):
+      CreateChildControls / RecreateChildControls / EnsureChildControls /
+      Render(HtmlTextWriter) and the PlaceHolder wrapper (a Razor component re-renders
+      declaratively and owns no child-control tree); Page.IsPostBack and this.ID (a Blazor
+      component has neither a postback nor a naming-container id, so the
+      "if (!IsPostBack) SessionHelper.RemoveSessionKey(this.ID)" first-load reset becomes the
+      first-render reset of this component's own product state); the
+      [ToolboxData("<{0}:StockTransactionForm runat=server></{0}:StockTransactionForm>")]
+      designer attribute; AddStylesheet() (the CSS is now the scoped StockTransactionForm.razor.css);
+      HtmlSelect.DataSource/DataBind and System.Web.UI.WebControls.ListItem (the sales-type
+      options are rendered with a plain @@foreach); Helpers/TableHelper (it only built
+      HtmlTableCell/TableHeaderCell trees).
+
+    DOM CONTRACT - read before editing any markup. Includes/Script/StockTransactionForm.js
+    caches EVERY handle it uses at top level by LITERAL element id, so each id below must stay
+    byte-identical. In addition:
+      * The 12 grid columns (ItemCode, ItemName, Quantity, Unit, Price, Amount, Discount,
+        ShippingCharge, SubTotal, TaxForm, Tax, Action) must keep this order in BOTH the header
+        row and the footer input row: editRow() reads #ProductGridView td:nth-child(1..11) and
+        summate() does sumOfColumn("#ProductGridView", 8) / (..., 10). The scoped CSS also
+        targets #ProductGridView th:nth-child(1..11).
+      * The footer input row must keep class="ui footer-row form" - the JS selects $(".footer-row").
+      * #ProductGridViewDataHidden is the server -> JS channel: BindGridView() writes a JSON
+        ARRAY OF ARRAYS OF STRINGS into it and the JS rebuilds the body rows from
+        rowData[i][0..11].
+      * The top-form label row and control row must keep MATCHING cell counts and order,
+        because the scoped CSS sizes table.form td:nth-child(1..6). The CashTransaction and
+        PaymentTerm cells are therefore rendered EITHER WAY (empty when the flag is off),
+        exactly as the original did.
+      * The title attributes (F2, ALT + C, Ctrl + I, Ctrl + Q, Ctrl + U, Alt + P, Ctrl + D,
+        Ctrl + T, Ctrl + Return) are the user-visible keyboard-shortcut hints.
+*@
+
+@namespace MixERP.Net.WebControls.StockTransactionFactory
+@using System
+@using System.Collections.Generic
+@using System.Collections.ObjectModel
+@using System.Globalization
+@using System.Linq
+@using System.Text.Json
+@using System.Threading.Tasks
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Microsoft.JSInterop
+@using MixERP.Net.ApplicationState.Cache
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Entities
+@using MixERP.Net.Entities.Models.Transactions
+@using MixERP.Net.i18n.Resources
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.WebControls.StockTransactionViewFactory.Data.Models
+
+@*
+    Control/Javascript.cs needed the WebForms Page to register its script vars and the embedded
+    script file; both now go through IJSRuntime. Control/Session.cs read the merge payload from
+    Page.Session; the writer (StockTransactionViewFactory) now hands it over through
+    ProtectedSessionStorage under the key "Product". HttpContext.Current is NULL over the SignalR
+    circuit and must never be reintroduced.
+*@
+@inject IJSRuntime JSRuntime
+@inject ProtectedSessionStorage ProtectedSessionStorage
+
+@* Control/Form/Title.cs - CreateTitle: an h1 carrying the Text property. *@
+<h1>@this.Text</h1>
+
+@*
+    Control/Form/TopForm.cs - CreateTopFormPanel, part 1:
+    HtmlControlHelper.GetSegment() -> div.ui.segment, wrapping table.ui.form which holds the
+    label row (Control/Form/Top Form/Labels.cs) and the control row
+    (Control/Form/Top Form/Controls.cs).
+*@
+<div class="ui segment">
+    <table class="ui form">
+        @* Control/Form/Top Form/Labels.cs - AddTopFormLabels. Cell order is a CSS contract. *@
+        <tr>
+            <td><label for="DateTextBox">@Titles.ValueDate</label></td>
+            @if (this.ShowStore)
+            {
+                <td><label for="StoreSelect">@Titles.SelectStore</label></td>
+            }
+            <td><label for="PartyCodeInputText">@Titles.SelectParty</label></td>
+            <td></td>
+            @if (this.ShowPriceTypes)
+            {
+                <td><label for="PriceTypeSelect">@Titles.PriceType</label></td>
+            }
+            <td><label for="ReferenceNumberInputText">@Titles.ReferenceNumberAbbreviated</label></td>
+            <td></td>
+            <td></td>
+        </tr>
+        @*
+            Control/Form/Top Form/Controls.cs - AddTopFormControls. Every cell carries
+            class="ui field" (the former Helpers/TableHelper.GetFieldCell()).
+        *@
+        <tr>
+            @* Control/Form/Top Form/Controls/DateTextBox.cs. The original assigned OfficeId
+               twice (identical value) - collapsed to a single assignment here; recorded in
+               migration-summary.md section 2. *@
+            <td class="ui field">
+                <DateTextBox ID="DateTextBox"
+                             Mode="FrequencyType.Today"
+                             CssClass="date"
+                             Catalog="@this.Catalog"
+                             OfficeId="@this.OfficeId"
+                             @bind-Text="this.valueDate"
+                             @ref="this.dateTextBox" />
+            </td>
+            @if (this.ShowStore)
+            {
+                @* Control/Form/Top Form/Controls/Store.cs - populated by the JS. *@
+                <td class="ui field"><select id="StoreSelect"></select></td>
+            }
+            @* Control/Form/Top Form/Controls/Party.cs. PartyCodeInputText is written by the
+               merge-session reader, so its value is bound to component state. *@
+            <td class="ui field"><input type="text" id="PartyCodeInputText" name="PartyCodeInputText" title="F2" @oninput="this.OnPartyCodeInput" /></td>
+            <td class="ui field"><select id="PartySelect" title="F2"></select></td>
+            @if (this.ShowPriceTypes)
+            {
+                @* Control/Form/Top Form/Controls/PriceType.cs *@
+                <td class="ui field"><select id="PriceTypeSelect"></select></td>
+            }
+            @* Control/Form/Top Form/Controls/ReferenceNumber.cs - also written by the session reader. *@
+            <td class="ui field"><input type="text" id="ReferenceNumberInputText" name="ReferenceNumberInputText" maxlength="24" @oninput="this.OnReferenceNumberInput" /></td>
+            @*
+                Control/Form/Top Form/Controls/CashTransaction.cs - the "ui field" cell is
+                rendered either way, empty when ShowTransactionType is off, to keep the column
+                count that the scoped CSS depends on.
+            *@
+            <td class="ui field">
+                @if (this.ShowTransactionType)
+                {
+                    <div id="CashTransactionDiv" class="ui toggle checkbox">
+                        <input type="checkbox" id="CashTransactionInputCheckBox" name="CashTransactionInputCheckBox" checked="checked" />
+                        <label>@Titles.CashTransaction</label>
+                    </div>
+                }
+            </td>
+            @* Control/Form/Top Form/Controls/PaymentTerm.cs - same "render the cell either way" rule. *@
+            <td class="ui field">
+                @if (this.ShowPaymentTerms)
+                {
+                    <select id="PaymentTermSelect"></select>
+                }
+            </td>
+        </tr>
+    </table>
+</div>
+
+@*
+    Control/Form/TopForm.cs - CreateTopFormPanel, part 2:
+    HtmlControlHelper.GetForm() -> div.ui.form wrapping GetFields("two fields"), holding the
+    shipping-address composite field and then the sales-type field, each under its original
+    condition.
+*@
+<div class="ui form">
+    <div class="two fields">
+        @if (this.ShowShippingInformation)
+        {
+            @* Control/Form/Top Form/Controls/ShippingAddress.cs - AddShippingAddressCompositeField.
+               HtmlControlHelper.GetField() rendered class="field". *@
+            <div id="ShippingAddressInfoDiv" class="field" style="width:500px;">
+                <div class="two fields">
+                    <div class="field">
+                        <label for="ShippingCompanySelect">@Titles.ShippingCompany</label>
+                        <select id="ShippingCompanySelect"></select>
+                    </div>
+                    <div class="field">
+                        <label for="ShippingAddressSelect">@Titles.ShippingAddress</label>
+                        <select id="ShippingAddressSelect"></select>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (this.Book == TranBook.Sales && this.ShowSalesType)
+        {
+            @* Control/Form/Top Form/Controls/SalesType.cs - AddSalesTypeField. The two options
+               are rendered SERVER-SIDE from GetSalesTypes(), replacing
+               HtmlSelect.DataSource/DataBind over System.Web.UI.WebControls.ListItem. *@
+            <div id="SalesTypeDiv" class="field" style="width:200px">
+                <div class="field">
+                    <label for="SalesTypeSelect">@Titles.SalesType</label>
+                    <select id="SalesTypeSelect">
+                        @foreach (var item in this.GetSalesTypes())
+                        {
+                            <option value="@item.Value" selected="@item.Selected">@item.Text</option>
+                        }
+                    </select>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@*
+    Control/Form/GridView.cs - CreateGrid. Header row + footer input row only: the body rows
+    are built by StockTransactionForm.js from #ProductGridViewDataHidden.
+    The table's inline style still comes from
+    ConfigurationHelper.GetStockTransactionFactoryParameter("GridStyle")
+    (formerly Table.Style.Value).
+*@
+<div style="width:100%;overflow:auto;" class="ui form vpad16">
+    <table id="ProductGridView" class="ui table" style="@this.gridStyle">
+        @* Control/Form/GridView/HeaderRow.cs - 12 header cells; ORDER IS A JS/CSS CONTRACT. *@
+        <thead>
+            <tr>
+                <th><label for="ItemCodeInputText">@Titles.ItemCode</label></th>
+                <th><label for="ItemSelect">@Titles.ItemName</label></th>
+                <th><label for="QuantityInputText">@Titles.QuantityAbbreviated</label></th>
+                <th><label for="UnitSelect">@Titles.Unit</label></th>
+                <th><label for="PriceInputText">@Titles.Price</label></th>
+                <th><label for="AmountInputText">@Titles.Amount</label></th>
+                <th><label for="DiscountInputText">@Titles.Discount</label></th>
+                <th><label for="ShippingChargeInputText">@Titles.ShippingCharge</label></th>
+                <th><label for="SubTotalInputText">@Titles.SubTotal</label></th>
+                <th><label for="TaxSelect">@Titles.TaxForm</label></th>
+                <th><label for="TaxInputText">@Titles.Tax</label></th>
+                @* CreateHeaderCell(header, Titles.Action, null) - plain text, no label. *@
+                <th>@Titles.Action</th>
+            </tr>
+        </thead>
+        @*
+            Control/Form/GridView/FooterRow.cs - the 12 input cells in the SAME order as the
+            header. The "footer-row" class is selected by the JS ($(".footer-row")).
+        *@
+        <tbody>
+            <tr class="ui footer-row form">
+                @* FooterRow/Item.cs *@
+                <td><input type="text" id="ItemCodeInputText" name="ItemCodeInputText" title="ALT + C" /></td>
+                <td><select id="ItemSelect" title="Ctrl + I"></select></td>
+                @* FooterRow/Quantity.cs - the value="1" default is behaviour, not decoration. *@
+                <td><input type="text" id="QuantityInputText" name="QuantityInputText" title="Ctrl + Q" class="integer text-right" value="1" /></td>
+                @* FooterRow/Unit.cs *@
+                <td><select id="UnitSelect" title="Ctrl + U"></select></td>
+                @* FooterRow/PriceType.cs *@
+                <td><input type="text" id="PriceInputText" name="PriceInputText" title="Alt + P" class="currency text-right" /></td>
+                @* FooterRow/Amount.cs *@
+                <td><input type="text" id="AmountInputText" name="AmountInputText" class="currency text-right" readonly="readonly" /></td>
+                @* FooterRow/Discount.cs *@
+                <td><input type="text" id="DiscountInputText" name="DiscountInputText" title="Ctrl + D" class="currency text-right" /></td>
+                @* FooterRow/ShippingCharge.cs - readonly ONLY when shipping information is hidden. *@
+                <td>
+                    @if (this.ShowShippingInformation)
+                    {
+                        <input type="text" id="ShippingChargeInputText" name="ShippingChargeInputText" title="Ctrl + D" class="currency text-right" />
+                    }
+                    else
+                    {
+                        <input type="text" id="ShippingChargeInputText" name="ShippingChargeInputText" title="Ctrl + D" class="currency text-right" readonly="readonly" />
+                    }
+                </td>
+                @* FooterRow/SubTotal.cs *@
+                <td><input type="text" id="SubTotalInputText" name="SubTotalInputText" class="currency text-right" readonly="readonly" /></td>
+                @* FooterRow/Tax.cs *@
+                <td><select id="TaxSelect" title="Ctrl + T"></select></td>
+                <td><input type="text" id="TaxInputText" name="TaxInputText" class="currency text-right" readonly="readonly" /></td>
+                @* FooterRow/Action.cs - the click handler lives in StockTransactionForm.js. *@
+                <td><input type="button" id="AddButton" name="AddButton" class="small ui button blue" value="@Titles.Add" title="Ctrl + Return" /></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+@*
+    Control/Form/ErrorLabels.cs - CreateErrorLabel. Rendered EMPTY, exactly as the original:
+    StockTransactionForm.js owns this node (errorLabel.html(...)), so the component must not
+    render children into it - a later component re-render would wipe a JS-written validation
+    message.
+
+    The merge-handoff guard therefore gets its OWN sibling span with no id (so no element id
+    is added to the 46-id JS contract, and nothing the JS selects is server-owned): a
+    successful ProtectedSessionStorage read whose MergeModel collections are BOTH empty means
+    the JSON round-trip regressed, and that must never be rendered as a silently empty merge
+    form.
+*@
+<span id="ErrorLabel" class="big error"></span>
+<span class="big error">@this.mergeDataWarning</span>
+
+@*
+    Control/Form/Attachment.cs - CreateAttachmentPanel: the h2 toggler (clicked by the JS,
+    which toggles #attachment and strips "initially hidden") and the attachment panel itself.
+    The WebForms "new Attachment(AppUsers.GetCurrentUserDB())" constructor argument is now the
+    Catalog parameter of the migrated Attachment component (AttachmentFactory precedent);
+    recorded in migration-summary.md section 4. The tag is fully qualified because
+    MixERP.Net.Entities also defines an Attachment type.
+*@
+<h2 id="attachmentToggler">@Titles.AttachmentsPlus</h2>
+<div id="attachment" class="ui segment initially hidden">
+    <MixERP.Net.WebControls.AttachmentFactory.Attachment Catalog="@AppUsers.GetCurrentUserDB()" ShowSaveButton="false" />
+</div>
+
+@*
+    Control/Form/BottomForm.cs - CreateBottomFormPanel: div[style=width:500px] wrapping
+    HtmlControlHelper.GetFormSegment(), which really emits class="ui form segment" (the helper's
+    actual output - the original source comment said "ui page form segment"). The six groups keep
+    their original order and their original conditionals.
+    HtmlControlHelper.GetField() emits class="field" and GetLabel(text, targetId) emits
+    <label for="targetId">text</label>.
+*@
+<div style="width:500px">
+    <div class="ui form segment">
+        @if (this.ShowShippingInformation)
+        {
+            @* Control/Form/Bottom Form/ShippingAddress.cs - AddShippingAddressTextAreaField. *@
+            <div id="ShippingAddressDiv" class="field">
+                <label for="ShippingAddressTextArea">@Titles.ShippingAddress</label>
+                <textarea id="ShippingAddressTextArea" name="ShippingAddressTextArea" readonly="readonly"></textarea>
+            </div>
+        }
+
+        @* Control/Form/Bottom Form/Summation.cs - AddTotalFields: GetFields("three fields"). *@
+        <div class="three fields">
+            <div class="field">
+                <label for="RunningTotalInputText">@Titles.RunningTotal</label>
+                <input type="text" id="RunningTotalInputText" name="RunningTotalInputText" class="currency" readonly="readonly" />
+            </div>
+            <div class="field">
+                <label for="TaxTotalInputText">@Titles.TaxTotal</label>
+                <input type="text" id="TaxTotalInputText" name="TaxTotalInputText" class="currency" readonly="readonly" />
+            </div>
+            <div class="field">
+                @*
+                    The original AddGrandTotalField() passed "GrandTotalInputTextInputText" as the
+                    label target while the input's id is "GrandTotalInputText". The typo is kept
+                    VERBATIM so the rendered markup stays byte-identical; it is only a label/for
+                    association, and #GrandTotalInputText is the id the JS binds.
+                *@
+                <label for="GrandTotalInputTextInputText">@Titles.GrandTotal</label>
+                <input type="text" id="GrandTotalInputText" name="GrandTotalInputText" class="currency" readonly="readonly" />
+            </div>
+        </div>
+
+        @if (this.ShowCostCenter)
+        {
+            @* Control/Form/Bottom Form/CostCenter.cs - JS-populated select. *@
+            <div id="CostCenterDiv" class="field">
+                <label for="CostCenterSelect">@Titles.CostCenter</label>
+                <select id="CostCenterSelect"></select>
+            </div>
+        }
+
+        @if (this.ShowSalesAgents)
+        {
+            @* Control/Form/Bottom Form/Salesperson.cs - JS-populated select. *@
+            <div id="SalespersonDiv" class="field">
+                <label for="SalesPersonSelect">@Titles.Salesperson</label>
+                <select id="SalesPersonSelect"></select>
+            </div>
+        }
+
+        @*
+            Control/Form/Bottom Form/StatementReference.cs - the textarea value came from
+            this.model.StatementReference, which the merge-session reader fills; it is therefore
+            two-way bound to component state.
+        *@
+        <div class="field">
+            <label for="StatementReferenceTextArea">@Titles.StatementReference</label>
+            <textarea id="StatementReferenceTextArea" name="StatementReferenceTextArea" @oninput="this.OnStatementReferenceInput"></textarea>
+        </div>
+
+        @*
+            Control/Form/Bottom Form/SaveButton.cs - deliberately NO @@onclick: saveButton.click
+            in StockTransactionForm.js owns the click (it collects the grid with tableToJSON and
+            posts to the module's save .asmx endpoint).
+        *@
+        <input type="button" id="SaveButton" name="SaveButton" class="small ui red button" value="@Titles.Save" />
+    </div>
+</div>
+
+@*
+    Control/Form/HiddenFields.cs - CreateHiddenFields(): the 14 former WebForms HiddenField
+    controls, in the ORIGINAL order, with their exact ids and matching name attributes (a
+    WebForms HiddenField rendered <input type="hidden" id=".." name=".." value=".." />).
+    The eight the server writes are bound to component state (the merge-session reader and
+    BindGridView). ALL of them render with value="" and are JS-owned: the server's initial
+    values are seeded once through the DOM by SeedAndInitializeJavascript() instead of being
+    bound here, because StockTransactionForm.js writes these very nodes with .val() and a later
+    component re-render would otherwise re-apply the stale server value over the live data.
+*@
+<input type="hidden" id="ItemCodeHidden" name="ItemCodeHidden" value="" />
+<input type="hidden" id="ItemIdHidden" name="ItemIdHidden" value="" />
+<input type="hidden" id="ModeHiddenField" name="ModeHiddenField" value="" />
+<input type="hidden" id="PartyCodeHidden" name="PartyCodeHidden" value="" />
+<input type="hidden" id="PartyIdHidden" name="PartyIdHidden" value="" />
+<input type="hidden" id="ProductGridViewDataHidden" name="ProductGridViewDataHidden" value="" />
+<input type="hidden" id="PriceTypeIdHidden" name="PriceTypeIdHidden" value="" />
+<input type="hidden" id="TranIdCollectionHiddenField" name="TranIdCollectionHiddenField" value="" />
+<input type="hidden" id="UnitIdHidden" name="UnitIdHidden" value="" />
+<input type="hidden" id="UnitNameHidden" name="UnitNameHidden" value="" />
+<input type="hidden" id="StoreIdHidden" name="StoreIdHidden" value="" />
+<input type="hidden" id="ShipperIdHidden" name="ShipperIdHidden" value="" />
+<input type="hidden" id="ShippingAddressCodeHidden" name="ShippingAddressCodeHidden" value="" />
+<input type="hidden" id="SalesPersonIdHidden" name="SalesPersonIdHidden" value="" />
+
+@* Control/Form/ErrorLabels.cs - CreateErrorLabelBottom. Also written by the JS. *@
+<span id="ErrorLabelBottom" class="big error"></span>
+
+@code {
+    //---------------------------------------------------------------------------------------
+    // Control/Properties.cs
+    //
+    // The 14 public properties are a FROZEN API: five consumer projects
+    // (MixERP.Net.Core.Modules.Sales / .Purchase / .Finance / .BackOffice and
+    // MixERP.Net.FrontEnd) set them by name. Each keeps its original name and type and
+    // becomes a [Parameter].
+    //---------------------------------------------------------------------------------------
+
+    /// <summary>
+    ///     This property is used to temporarily store pre assigned instance of transactions for
+    ///     merging transactions and creating a batch transactions. Some cases: Multiple Sales
+    ///     Quotations --> Sales Order. Multiple Sales Quotations --&gt; Sales Delivery.
+    /// </summary>
+    /// <remarks>
+    ///     Component state, never null: GetSalesTypes() and the statement-reference field read it
+    ///     during the very first render, before the merge-session read has run.
+    /// </remarks>
+    private MergeModel model = new MergeModel();
+
+    /// <summary>
+    ///     Transaction book for products are Sales and Purchase.
+    /// </summary>
+    [Parameter]
+    public TranBook Book { get; set; }
+
+    /// <summary>
+    ///     This property when enabled will display cost centers.
+    /// </summary>
+    [Parameter]
+    public bool ShowCostCenter { get; set; }
+
+    /// <summary>
+    ///     This property when enabled will display payment terms.
+    /// </summary>
+    [Parameter]
+    public bool ShowPaymentTerms { get; set; }
+
+    /// <summary>
+    ///     This property when set to true will display stores.
+    /// </summary>
+    [Parameter]
+    public bool ShowPriceTypes { get; set; }
+
+    /// <summary>
+    ///     This property when enabled will display sales agents.
+    /// </summary>
+    [Parameter]
+    public bool ShowSalesAgents { get; set; }
+
+    /// <summary>
+    ///     This property when set to true will display sales types, namely "Taxable" and "Nontaxable".
+    /// </summary>
+    [Parameter]
+    public bool ShowSalesType { get; set; }
+
+    /// <summary>
+    ///     This property when enabled will display shipping information, such as shipping address,
+    ///     shipping company, and shipping costs.
+    /// </summary>
+    [Parameter]
+    public bool ShowShippingInformation { get; set; }
+
+    /// <summary>
+    ///     This property when set to true will display stores.
+    /// </summary>
+    [Parameter]
+    public bool ShowStore { get; set; }
+
+    /// <summary>
+    ///     This property when set to true will display transaction types. Transaction types are
+    ///     Cash and Credit.
+    /// </summary>
+    [Parameter]
+    public bool ShowTransactionType { get; set; }
+
+    /// <summary>
+    ///     Sub transaction books are maintained for breaking down the Purchase and Sales
+    ///     transaction into smaller steps such as Quotations, Orders, Deliveries, e.t.c.
+    /// </summary>
+    [Parameter]
+    public SubTranBook SubBook { get; set; }
+
+    /// <summary>
+    ///     The title displayed in the form.
+    /// </summary>
+    [Parameter]
+    public string Text { get; set; }
+
+    /// <summary>
+    ///     This property when set to true will verify the stock against the credit inventory
+    ///     transactions or "Sales". Since negative stock is not allowed, you will not be able to
+    ///     add a product to the grid. This property must be enabled for Sales transaction which
+    ///     affect the available inventory on hand. Please also note that even when this property is
+    ///     enabled, the products having the switch "Maintain Stock" set to "Off" will not be
+    ///     checked for stock availability. This property should be disabled or set to false for
+    ///     stock transactions that do not affect stock such as "Quotations", "Orders", e.t.c.
+    /// </summary>
+    [Parameter]
+    public bool VerifyStock { get; set; }
+
+    [Parameter]
+    public int OfficeId { get; set; }
+
+    [Parameter]
+    public string Catalog { get; set; }
+
+    //---------------------------------------------------------------------------------------
+    // Control/IDisposable.cs - the former private WebForms child-control fields become
+    // ordinary component state. The whole Dispose()/Dispose(bool)/disposed pattern and the
+    // placeHolder/title fields are DROPPED (recorded in migration-summary.md section 2):
+    // a Razor component owns no child-control tree, so there is nothing to dispose, and an
+    // empty Dispose() would be a stub.
+    //---------------------------------------------------------------------------------------
+
+    /// <summary>
+    ///     Value of the #DateTextBox input (formerly the dateTextBox child control's Text).
+    /// </summary>
+    private string valueDate;
+
+    /// <summary>
+    ///     Live reference to the migrated DateTextBox component (formerly the dateTextBox field).
+    /// </summary>
+    private DateTextBox dateTextBox;
+
+    /// <summary>
+    ///     Value of #PartyCodeInputText - written by the merge-session reader
+    ///     (formerly partyCodeInputText.Value).
+    /// </summary>
+    private string partyCode;
+
+    /// <summary>
+    ///     Value of #ReferenceNumberInputText - written by the merge-session reader
+    ///     (formerly referenceNumberInputText.Value).
+    /// </summary>
+    private string referenceNumber;
+
+    /// <summary>
+    ///     Value of #ProductGridViewDataHidden: the server -> JS grid payload written by
+    ///     BindGridView() (formerly productGridViewDataHidden.Value).
+    /// </summary>
+    private string productGridViewData;
+
+    /// <summary>
+    ///     The inline style of #ProductGridView, read from the StockTransactionFactory config
+    ///     file (formerly Table.Style.Value).
+    /// </summary>
+    private string gridStyle;
+
+    //---------------------------------------------------------------------------------------
+    // Lifecycle. Markup/state initialisation happens in OnParametersSet; everything that
+    // needs a live DOM or the browser (the merge-session read through
+    // ProtectedSessionStorage, BindGridView, RegisterJavascript and AddJavascript) belongs in
+    // OnAfterRenderAsync(firstRender) - see Control/Session.cs and Control/Javascript.cs.
+    //---------------------------------------------------------------------------------------
+
+    protected override void OnParametersSet()
+    {
+        // Control/Form/GridView.cs: productGridView.Style.Value =
+        // ConfigurationHelper.GetStockTransactionFactoryParameter("GridStyle");
+        this.gridStyle = ConfigurationHelper.GetStockTransactionFactoryParameter("GridStyle");
+
+        // Control/Form/Bottom Form/StatementReference.cs assigned
+        // statementReferenceTextArea.Value = this.model.StatementReference once, while the
+        // control tree was being created. The null check keeps a later parameter change from
+        // discarding what the user (or the merge-session reader) has put in the textarea.
+        if (this.statementReference == null)
+        {
+            this.statementReference = this.model.StatementReference;
+        }
+    }
+
+    //---------------------------------------------------------------------------------------
+    // Control/Control.cs CreateChildControls() ran, in this order, LoadValuesFromSession() ->
+    // BindGridView() -> ClearSession() -> RegisterJavascript() -> AddJavascript(). All of it
+    // needs either the browser (ProtectedSessionStorage, IJSRuntime) or a live DOM (the script
+    // file binds 46 literal ids), so all of it belongs in OnAfterRenderAsync(firstRender):
+    // ProtectedSessionStorage is NOT available during prerender, and HttpContext.Current is
+    // NULL over the SignalR circuit.
+    //
+    // The load -> bind -> clear order is load-bearing: it is what makes the merge payload be
+    // consumed EXACTLY ONCE.
+    //---------------------------------------------------------------------------------------
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Control/Control.cs: "if (!this.Page.IsPostBack) SessionHelper.RemoveSessionKey(this.ID)"
+            // - the first-load reset of this control's own product slot. A Blazor component has no
+            // postback and no naming-container id, so this is simply the first-render reset of the
+            // component's own product state.
+            this.productCollection = null;
+
+            await this.LoadValuesFromSessionAsync();
+
+            this.BindGridView();
+
+            await this.ClearSessionAsync();
+
+            // The script wiring is deliberately NOT done in this pass. The seeded values the JS
+            // reads (notably #ProductGridViewDataHidden, which restoreData() consumes) are only
+            // in the DOM after the re-render this StateHasChanged() queues, so the interop runs
+            // in the NEXT OnAfterRenderAsync pass.
+            this.pendingJavascriptInit = true;
+            this.StateHasChanged();
+            return;
+        }
+
+        if (!this.pendingJavascriptInit)
+        {
+            return;
+        }
+
+        this.pendingJavascriptInit = false;
+
+        // Control/Javascript.cs - the vars MUST be registered BEFORE the file is injected:
+        // StockTransactionForm.js reads the globals isSales, tranBook and verifyStock.
+        this.RegisterJavascript();
+        this.AddJavascript();
+        this.SeedAndInitializeJavascript();
+    }
+
+    /// <summary>
+    ///     Seeds the DOM nodes StockTransactionForm.js owns, then initializes the form.
+    ///
+    ///     Two hazards are handled here:
+    ///
+    ///     1. PageUtility.RegisterJavascript and JSUtility.AddJSReference only QUEUE a script
+    ///        append (they are fire-and-forget), so window.initStockTransactionForm does not
+    ///        exist yet at the moment this runs. Invoking it directly would throw a JSException
+    ///        out of OnAfterRenderAsync and tear down the circuit on first load. The emitted
+    ///        bootstrap therefore polls for the function and only then calls it.
+    ///
+    ///     2. The server-side values the form starts with (the merge-session payload and the
+    ///        grid JSON) must NOT be rendered as value="..." attributes: the JS writes those
+    ///        very nodes with .val(), and any later component re-render would re-apply the stale
+    ///        server value over the user's/JS's data - silent data loss at save time. They are
+    ///        seeded ONCE, here, through the DOM instead, which leaves the nodes JS-owned.
+    ///
+    ///     The bootstrap is keyed per component instance so a second instantiation (SPA navigate
+    ///     away and back) re-seeds and re-initializes, matching the WebForms behaviour of
+    ///     re-executing the file on every page load.
+    /// </summary>
+    private void SeedAndInitializeJavascript()
+    {
+        Dictionary<string, string> seed = new Dictionary<string, string>
+        {
+            { "PartyCodeHidden", this.partyCodeHidden },
+            { "PartyCodeInputText", this.partyCode },
+            { "PriceTypeIdHidden", this.priceTypeId },
+            { "StoreIdHidden", this.storeId },
+            { "ShipperIdHidden", this.shipperId },
+            { "ShippingAddressCodeHidden", this.shippingAddressCode },
+            { "SalesPersonIdHidden", this.salesPersonId },
+            { "ReferenceNumberInputText", this.referenceNumber },
+            { "StatementReferenceTextArea", this.statementReference },
+            { "TranIdCollectionHiddenField", this.tranIdCollection },
+            { "ProductGridViewDataHidden", this.productGridViewData }
+        };
+
+        string json = JsonSerializer.Serialize(seed);
+
+        string javaScript =
+            "(function(){var seed=" + json + ";" +
+            "var apply=function(){for(var id in seed){var el=document.getElementById(id);" +
+            "if(el&&seed[id]!==null&&seed[id]!==''){el.value=seed[id];}}};" +
+            "var tries=0;var run=function(){" +
+            "if(typeof window.initStockTransactionForm==='function'){apply();" +
+            "window.initStockTransactionForm();return;}" +
+            "if(++tries<600){window.setTimeout(run,50);}};run();})();";
+
+        PageUtility.RegisterJavascript(
+            "StockTransactionForm_Init_" + this.javascriptInstanceKey,
+            javaScript,
+            JSRuntime,
+            true);
+    }
+
+    /// <summary>
+    ///     Set on first render so the script wiring happens in the following render pass, once
+    ///     the markup the JS binds to is actually in the DOM.
+    /// </summary>
+    private bool pendingJavascriptInit;
+
+    /// <summary>
+    ///     Makes the per-instance bootstrap key unique: PageUtility.RegisterJavascript injects a
+    ///     given key only ONCE, but every instantiation of this component needs its own seed and
+    ///     init run.
+    /// </summary>
+    private readonly string javascriptInstanceKey = Guid.NewGuid().ToString("N");
+
+
+    //---------------------------------------------------------------------------------------
+    // Control/Session.cs
+    //---------------------------------------------------------------------------------------
+
+    /// <summary>
+    ///     The key under which StockTransactionViewFactory hands the merge payload over.
+    ///     Formerly Page.Session["Product"], now ProtectedSessionStorage.
+    /// </summary>
+    private const string MergeModelSessionKey = "Product";
+
+    /// <summary>
+    ///     Replaces the second session slot, Session["StockTransactionFactory"], which was pure
+    ///     intra-request plumbing between LoadValuesFromSession() and GetTable() - it had no
+    ///     reader outside this class. It is now an ordinary private field with the same
+    ///     lifetime over the circuit; the session key itself is gone (recorded in
+    ///     migration-summary.md section 2), and with it this project's last use of
+    ///     MixERP.Net.Common SessionHelper.
+    /// </summary>
+    private Collection<ProductDetail> productCollection;
+
+    /// <summary>Value of #PartyCodeHidden (formerly partyCodeHidden.Value).</summary>
+    private string partyCodeHidden;
+
+    /// <summary>Value of #PriceTypeIdHidden (formerly priceTypeIdHidden.Value).</summary>
+    private string priceTypeId;
+
+    /// <summary>Value of #StoreIdHidden (formerly storeIdHidden.Value).</summary>
+    private string storeId;
+
+    /// <summary>Value of #ShipperIdHidden (formerly shipperIdHidden.Value).</summary>
+    private string shipperId;
+
+    /// <summary>Value of #ShippingAddressCodeHidden (formerly shippingAddressCodeHidden.Value).</summary>
+    private string shippingAddressCode;
+
+    /// <summary>Value of #SalesPersonIdHidden (formerly salesPersonIdHidden.Value).</summary>
+    private string salesPersonId;
+
+    /// <summary>Value of #TranIdCollectionHiddenField (formerly tranIdCollectionHidden.Value).</summary>
+    private string tranIdCollection;
+
+    /// <summary>Value of #StatementReferenceTextArea (formerly statementReferenceTextArea.Value).</summary>
+    private string statementReference;
+
+    /// <summary>
+    ///     Rendered in the contracted #ErrorLabel span when the merge handoff arrives empty.
+    /// </summary>
+    private string mergeDataWarning;
+
+    /// <summary>
+    ///     Control/Session.cs - LoadValuesFromSession(), ported. The payload used to be the very
+    ///     same CLR MergeModel instance in HttpContext.Current.Session; it now travels as JSON
+    ///     through ProtectedSessionStorage. Both of the original early returns are kept: no
+    ///     value stored (formerly Session[key] == null) and a value that does not deserialize to
+    ///     a MergeModel (formerly the failed "as MergeModel" cast).
+    /// </summary>
+    private async Task LoadValuesFromSessionAsync()
+    {
+        ProtectedBrowserStorageResult<MergeModel> result =
+            await ProtectedSessionStorage.GetAsync<MergeModel>(MergeModelSessionKey);
+
+        if (!result.Success)
+        {
+            return;
+        }
+
+        MergeModel merged = result.Value;
+
+        if (merged == null)
+        {
+            return;
+        }
+
+        // GUARD (migration-summary section 3.4): the merge payload travels as JSON over
+        // ProtectedSessionStorage. A successful read whose collections are BOTH empty means the
+        // MergeModel JSON round-trip has regressed and every merged line/id was lost. Surface
+        // it; never render an empty merge form as if the merge had succeeded.
+        if (merged.View.Count == 0 && merged.TransactionIdCollection.Count == 0)
+        {
+            this.mergeDataWarning = Titles.NothingSelected;
+            Console.Error.WriteLine(
+                "StockTransactionForm: ProtectedSessionStorage key \"Product\" was read successfully " +
+                "but MergeModel.View and MergeModel.TransactionIdCollection are both EMPTY. " +
+                "The MergeModel System.Text.Json round-trip has regressed - see " +
+                "StockTransactionFactory/migration-summary.md 3.2/3.3.");
+        }
+
+        this.model = merged;
+
+        this.partyCodeHidden = this.model.PartyCode.ToString(CultureInfo.InvariantCulture);
+        this.partyCode = this.model.PartyCode.ToString(CultureInfo.InvariantCulture);
+        this.priceTypeId = this.model.PriceTypeId.ToString(CultureInfo.InvariantCulture);
+        this.storeId = this.model.StoreId.ToString(CultureInfo.InvariantCulture);
+        this.shipperId = this.model.ShippingCompanyId.ToString(CultureInfo.InvariantCulture);
+        this.shippingAddressCode = this.model.ShippingAddressCode.ToString(CultureInfo.InvariantCulture);
+        this.salesPersonId = this.model.SalesPersonId.ToString(CultureInfo.InvariantCulture);
+
+        this.referenceNumber = this.model.ReferenceNumber;
+        this.statementReference = this.model.StatementReference;
+
+        // Formerly: this.Page.Session[sessionKey] = this.model.View;
+        this.productCollection = this.model.View;
+        this.tranIdCollection = string.Join(",", this.model.TransactionIdCollection);
+    }
+
+    /// <summary>
+    ///     Control/Session.cs - ClearSession(). The two SessionHelper.RemoveSessionKey() calls
+    ///     become the deletion of the ProtectedSessionStorage key plus the clearing of the local
+    ///     product field. MUST run AFTER BindGridView() so the merge payload is consumed exactly
+    ///     once.
+    /// </summary>
+    private async Task ClearSessionAsync()
+    {
+        await ProtectedSessionStorage.DeleteAsync(MergeModelSessionKey);
+        this.productCollection = null;
+    }
+
+    /// <summary>
+    ///     Control/Session.cs - GetTable(), ported verbatim against the new field: when it holds
+    ///     a collection the collection is summated and the SUMMATED collection is stored back
+    ///     ("summate once, keep summated"); otherwise an empty collection is returned.
+    /// </summary>
+    private Collection<ProductDetail> GetTable()
+    {
+        Collection<ProductDetail> productCollection = new Collection<ProductDetail>();
+
+        if (this.productCollection != null)
+        {
+            //Get an instance of the ProductDetailsModel collection stored for this form.
+            productCollection = this.productCollection;
+
+            //Summate the collection.
+            productCollection = SummateProducts(productCollection);
+
+            //Store the summated table back.
+            this.productCollection = productCollection;
+        }
+
+        return productCollection;
+    }
+
+    /// <summary>
+    ///     Control/Session.cs - SummateProducts(), ported VERBATIM: the five-key match
+    ///     (ItemCode, ItemName, Unit, Price, TaxCode), the "collection.Count > 0" guard before
+    ///     FirstOrDefault and the seven accumulated fields. No behaviour change.
+    /// </summary>
+    private static Collection<ProductDetail> SummateProducts(IEnumerable<ProductDetail> productCollection)
+    {
+        //Create a new collection of products.
+        Collection<ProductDetail> collection = new Collection<ProductDetail>();
+
+        //Iterate through the supplied product collection.
+        foreach (ProductDetail product in productCollection)
+        {
+            //Create a product
+            ProductDetail productInCollection = null;
+
+            if (collection.Count > 0)
+            {
+                productInCollection = collection.FirstOrDefault(x => x.ItemCode == product.ItemCode && x.ItemName == product.ItemName && x.Unit == product.Unit && x.Price == product.Price && x.TaxCode == product.TaxCode);
+            }
+
+            if (productInCollection == null)
+            {
+                collection.Add(product);
+            }
+            else
+            {
+                productInCollection.Quantity += product.Quantity;
+                productInCollection.Amount += product.Amount;
+                productInCollection.Discount += product.Discount;
+                productInCollection.Subtotal += product.Subtotal;
+                productInCollection.ShippingCharge += product.ShippingCharge;
+                productInCollection.Tax += product.Tax;
+                productInCollection.Total += product.Total;
+            }
+        }
+
+        return collection;
+    }
+
+    //---------------------------------------------------------------------------------------
+    // Control/Javascript.cs
+    //
+    // DROPPED (recorded in migration-summary.md section 2):
+    //   [assembly: WebResource("...StockTransactionForm.js", "application/x-javascript",
+    //   PerformSubstitution = true)] and the companion stylesheet WebResource attribute -
+    //   System.Web.UI.WebResourceAttribute is a removed type; the script is now resolved by
+    //   JSUtility through the assembly manifest name and served by the host's
+    //   JSUtility.WebResourceRoutePrefix endpoint.
+    //   [AspNetHostingPermission(SecurityAction.Demand, Level = Minimal)] on AddJavascript()
+    //   (and the one on AddStylesheet()) - Code Access Security is gone from modern .NET, and
+    //   these were host-trust demands rather than application authorization rules.
+    //---------------------------------------------------------------------------------------
+
+    /// <summary>
+    ///     Control/Javascript.cs - RegisterJavascript(), ported verbatim. isSales and
+    ///     verifyStock are emitted as NON-string vars ("true"/"false") and tranBook as a string
+    ///     var, under the unchanged key "StockTransactionForm_Vars": StockTransactionForm.js
+    ///     reads the globals isSales, tranBook and verifyStock.
+    /// </summary>
+    private void RegisterJavascript()
+    {
+        string isSales = (this.Book.Equals(TranBook.Sales)) ? "true" : "false";
+        string tranBook = this.GetTranBook();
+        string verifyStock = (this.VerifyStock) ? "true" : "false";
+
+        string js = string.Empty;
+        js += JSUtility.GetVar("isSales", isSales, false);
+        js += JSUtility.GetVar("tranBook", tranBook);
+        js += JSUtility.GetVar("verifyStock", verifyStock, false);
+
+        PageUtility.RegisterJavascript("StockTransactionForm_Vars", js, JSRuntime, true);
+    }
+
+    /// <summary>
+    ///     Control/Javascript.cs - GetTranBook(). Public API, return strings unchanged.
+    /// </summary>
+    public string GetTranBook()
+    {
+        if (this.Book == TranBook.Sales)
+        {
+            return "Sales";
+        }
+
+        return "Purchase";
+    }
+
+    /// <summary>
+    ///     Control/Javascript.cs - AddJavascript(). The manifest name is pinned by the
+    ///     &lt;LogicalName&gt; of the EmbeddedResource in the csproj and must stay byte-identical.
+    /// </summary>
+    private void AddJavascript()
+    {
+        JSUtility.AddJSReference(JSRuntime, "MixERP.Net.WebControls.StockTransactionFactory.Includes.Script.StockTransactionForm.js", "StockTransactionForm", typeof(StockTransactionForm));
+    }
+
+    private void OnPartyCodeInput(ChangeEventArgs e)
+    {
+        this.partyCode = e.Value as string;
+    }
+
+    /// <summary>
+    ///     Keeps this.statementReference in step with #StatementReferenceTextArea without the
+    ///     component owning the node's content: @bind would re-render the textarea's value and
+    ///     clobber whatever StockTransactionForm.js had written into it.
+    /// </summary>
+    private void OnStatementReferenceInput(ChangeEventArgs e)
+    {
+        this.statementReference = e.Value as string;
+    }
+
+    private void OnReferenceNumberInput(ChangeEventArgs e)
+    {
+        this.referenceNumber = e.Value as string;
+    }
+
+    /// <summary>
+    ///     Control/Form/Top Form/Controls/SalesType.cs - GetSalesTypes().
+    ///     The original returned IEnumerable&lt;System.Web.UI.WebControls.ListItem&gt; and fed it to
+    ///     HtmlSelect.DataSource/DataBind. ListItem is a removed type and there is no server-side
+    ///     databinding, so the same two items are returned as a plain tuple list and rendered by
+    ///     the @@foreach above. Text, value and the "selected when NonTaxableSales" rule are
+    ///     unchanged.
+    /// </summary>
+    private IEnumerable<(string Text, string Value, bool Selected)> GetSalesTypes()
+    {
+        List<(string Text, string Value, bool Selected)> items = new List<(string Text, string Value, bool Selected)>();
+
+        items.Add((Titles.TaxableSales, "1", false));
+        items.Add((Titles.NonTaxableSales, "0", false));
+
+        if (this.model != null && this.model.NonTaxableSales)
+        {
+            items[1] = (items[1].Text, items[1].Value, true);
+        }
+
+        return items;
+    }
+
+    /// <summary>
+    ///     Control/Form/GridView.cs - BindGridView(), ported verbatim.
+    ///     <para>
+    ///         The payload MUST stay a JSON array of arrays of strings: StockTransactionForm.js
+    ///         rebuilds the grid body by indexing rowData[i][0..11], in the same column order as
+    ///         the header and footer rows. System.Text.Json serializes List&lt;string[]&gt; as
+    ///         [["a","b",...],...], the identical shape the removed
+    ///         System.Web.Script.Serialization.JavaScriptSerializer produced.
+    ///     </para>
+    /// </summary>
+    private void BindGridView()
+    {
+        Collection<ProductDetail> table = this.GetTable();
+
+        if (table.Count > 0)
+        {
+            List<string[]> rowData = new List<string[]>();
+
+            foreach (ProductDetail row in table)
+            {
+                string[] colData = new string[12];
+
+                colData[0] = row.ItemCode;
+                colData[1] = row.ItemName;
+                colData[2] = row.Quantity.ToString(CultureInfo.CurrentCulture);
+                colData[3] = row.Unit;
+                colData[4] = row.Price.ToString(CultureInfo.CurrentCulture);
+                colData[5] = row.Amount.ToString(CultureInfo.CurrentCulture);
+                colData[6] = row.Discount.ToString(CultureInfo.CurrentCulture);
+                colData[7] = row.ShippingCharge.ToString(CultureInfo.CurrentCulture);
+                colData[8] = row.Subtotal.ToString(CultureInfo.CurrentCulture);
+                colData[9] = row.TaxCode.ToString(CultureInfo.CurrentCulture);
+                colData[10] = row.Tax.ToString(CultureInfo.CurrentCulture);
+                colData[11] = row.Total.ToString(CultureInfo.CurrentCulture);
+
+                rowData.Add(colData);
+            }
+
+            string data = JsonSerializer.Serialize(rowData);
+
+            this.productGridViewData = data;
+        }
+    }
+}

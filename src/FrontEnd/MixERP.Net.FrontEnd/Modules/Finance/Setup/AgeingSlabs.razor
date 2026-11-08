@@ -1,0 +1,70 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Setup/AgeingSlabs.ascx + .ascx.cs + .ascx.designer.cs.
+   OnControlLoad built a Scrud over core.ageing_slabs and added it to
+   <asp:PlaceHolder ID="ScrudPlaceholder">, which is this markup now.
+
+   THE INLINE <script> BLOCK MOVED, VERBATIM, to wwwroot/js/setup/AgeingSlabs.js. Blazor strips
+   a <script> element inside a .razor file, so it is loaded as a file from
+   OnAfterRenderAsync(firstRender). It declares the GLOBAL scrudCustomValidator(), which
+   ScrudFactory's Scrud.js calls BY BARE NAME before a save - it compares #from_days_textbox
+   with #to_days_textbox and blocks the save when To <= From. Dropping it would silently let
+   invalid ageing slabs be saved, so the name and the body are preserved exactly.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Core.Modules.Finance.Internal
+@using MixERP.Net.WebControls.ScrudFactory
+@using MixERP.Net.i18n.Resources
+@inject IJSRuntime JS
+
+<Scrud KeyColumn="ageing_slab_id"
+       TableSchema="core"
+       Table="ageing_slabs"
+       ViewSchema="core"
+       View="ageing_slab_scrud_view"
+       Text="@Titles.AgeingSlabs" />
+
+@code {
+    private const string ValidatorScript =
+        "_content/MixERP.Net.Core.Modules.Finance/js/setup/AgeingSlabs.js";
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY built the Scrud above, which is markup now.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await ModuleScripts.LoadAsync(this.JS, ValidatorScript);
+    }
+}

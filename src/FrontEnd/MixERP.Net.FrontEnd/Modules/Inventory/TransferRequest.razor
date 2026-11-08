@@ -1,0 +1,160 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+*@
+
+@* Ported from TransferRequest.ascx + TransferRequest.ascx.cs + .ascx.designer.cs - the
+   stock transfer REQUEST list screen.
+
+   THE SHARED CODE-BEHIND. TransferRequest.ascx.cs was declared as the CodeBehind of FOUR
+   .ascx files (this one, TransferAcknowledgement.ascx, TransferAuthorization.ascx and
+   TransferDelivery.ascx), all four with
+   Inherits="MixERP.Net.Core.Modules.Inventory.TransferRequest". That single source of truth
+   is preserved as Internal/TransferRequestViewBase, which every one of the four ported
+   components inherits; the heading, the toolbar, the three tri-state filter DEFAULTS and the
+   javascript are the only per-screen differences, and they live in the markup, as they did.
+
+   This screen's defaults: Authorized = "" , Delivered = "" , Received = "false".
+
+   MARKUP PORT:
+     * <asp:Button ID="ShowButton" OnClick="ShowButton_Click"> -> <button @@onclick>.
+     * the 8 <input runat="server"> filters -> @@bind inputs (they are user-typed; their
+       .Value reached the handler on the postback before).
+     * <mixerp:DateTextBox> -> the migrated <DateTextBox> component, Mode unchanged, with the
+       OfficeId the code-behind assigned.
+     * <asp:PlaceHolder ID="GridViewPlaceholder"> + AddGridView/AddHiddenField/AddFlagControl
+       -> the <MixERPGridView>, the hidden <input> and the <Flag> component below.
+     * <script src="..."> -> loaded from the base's OnAfterRenderAsync; a .razor file may not
+       contain <script>.
+
+   DOM-ID CONTRACT, frozen - wwwroot/js/TransferRequest.js (loaded by all four screens)
+   selects #TransferRequestGridView and #SelectedValuesHidden by literal id, #FlagButton is
+   the <Flag> popunder's trigger, and getSelectedItems() reads the checkbox from grid column
+   2 and the transaction id from column 3 (the two columns the script itself prepends, which
+   makes the grid's own first column the id).
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction (the ENTRY screen does). *@
+
+@inherits MixERP.Net.Core.Modules.Inventory.Internal.TransferRequestViewBase
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.WebControls.Flag
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<h2>@Titles.StockTransferRequest</h2>
+<div class="basic ui buttons">
+    @* The AddNew onclick stays an HTML attribute: it is a plain client-side navigation, as
+       the original emitted it. *@
+    <input id="AddNewButton" value="@Titles.AddNew" class="ui button" onclick=" window.location = 'Entry/TransferRequest.mix' " type="button">
+    <input id="FlagButton" value="@Titles.Flag" class="ui button" type="button">
+</div>
+
+<div id="FilterDiv" class="ui segment">
+    <div class="ui form" style="margin-left: 8px;">
+        <div class="eight fields">
+            <div class="field">
+                <label>@Titles.From</label>
+                <DateTextBox ID="DateFromDateTextBox" Mode="FrequencyType.MonthStartDate"
+                             OfficeId="@this.OfficeId" @bind-Text="this.DateFromText" />
+            </div>
+            <div class="field">
+                <label>@Titles.To</label>
+                <DateTextBox ID="DateToDateTextBox" Mode="FrequencyType.MonthEndDate"
+                             OfficeId="@this.OfficeId" @bind-Text="this.DateToText" />
+            </div>
+            <div class="field">
+                <label>@Titles.Office</label>
+                <input id="OfficeTextBox" type="text" @bind="this.Office" />
+            </div>
+            <div class="field">
+                <label>@Titles.Store</label>
+                <input id="StoreTextBox" type="text" @bind="this.Store" />
+            </div>
+            <div class="field">
+                <label>@Titles.Authorized</label>
+                <input id="AuthorizedTextBox" type="text" @bind="this.Authorized" />
+            </div>
+            <div class="field">
+                <label>@Titles.Delivered</label>
+                <input id="DeliveredTextBox" type="text" @bind="this.Delivered" />
+            </div>
+            <div class="field">
+                <label>@Titles.Received</label>
+                <input id="ReceivedTextBox" type="text" @bind="this.Received" />
+            </div>
+            <div class="field">
+                <label>@Titles.User</label>
+                <input id="UserTextBox" type="text" @bind="this.User" />
+            </div>
+            <div class="field">
+                <label>@Titles.ReferenceNumberAbbreviated</label>
+                <input id="ReferenceNumberTextBox" type="text" @bind="this.ReferenceNumber" />
+            </div>
+            <div class="field">
+                <label>@Titles.StatementReference</label>
+                <input id="StatementReferenceTextBox" type="text" @bind="this.StatementReference" />
+            </div>
+            <div class="field">
+                <label>&nbsp;</label>
+                @* The original's Text was the LITERAL "Show", not Titles.Show - preserved. *@
+                <button type="button" id="ShowButton" class="blue ui button" @onclick="this.ShowButton_Click">Show</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* The former <asp:PlaceHolder ID="GridViewPlaceholder"> contents, in the order
+   OnControlLoad added them: the grid, the flag popunder, the hidden field. *@
+<MixERPGridView ID="@GridElementId" DataSource="@this.Rows" />
+
+@if (this.Loaded)
+{
+    <Flag ElementId="FlagPopUnder"
+          AssociatedControlId="FlagButton"
+          OnClientClick="return getSelectedItems();"
+          CssClass="ui form segment initially hidden"
+          Updated="@this.Flag_Updated"
+          Catalog="@this.Catalog" />
+}
+
+<input type="hidden" id="@SelectedValuesElementId" />
+
+@code {
+    protected override IJSRuntime JSRuntime
+    {
+        get { return this.JS; }
+    }
+
+    /// <summary>
+    ///     This screen loaded ONLY the shared list script.
+    /// </summary>
+    protected override string[] ScriptUrls
+    {
+        get { return new[] { TransferRequestScriptUrl }; }
+    }
+
+    public TransferRequest()
+    {
+        //<input id="ReceivedTextBox" type="text" value="false" runat="server"/> - the only
+        //one of the three tri-state filters this screen defaults; Authorized and Delivered
+        //were value="" (any).
+        this.Received = "false";
+    }
+}

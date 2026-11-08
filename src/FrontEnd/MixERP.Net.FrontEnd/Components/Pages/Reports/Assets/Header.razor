@@ -1,0 +1,32 @@
+@* ---------------------------------------------------------------------------------------------
+   Reports/Assets/Header.aspx (+ .aspx.cs) -> Components/Pages/Reports/Assets/Header.razor
+   (checklist task 92).
+
+   The legacy page was a STANDALONE document (its own <!DOCTYPE>/<html>/<head>/<body>, no master
+   page) whose only content was an asp:PlaceHolder filled in Page_Load with
+
+       using (ReportHeader header = new ReportHeader())
+       {
+           this.Placeholder1.Controls.Add(header);
+       }
+
+   CONSUMER CALL-SITE CONVERSION. ReportHeader is now the Blazor component
+   MixERP.Net.WebControls.ReportEngine/ReportHeader.razor, so "new + Controls.Add" becomes the
+   <ReportHeader /> element below. Its Path parameter is deliberately left unset: the original
+   never assigned Path either, so the component falls back to the same default report-header
+   template it always used.
+
+   The document chrome is owned by App.razor now, so this page carries no <html>/<head>/<body>.
+   <title>MixERP WebReport</title> survives as <PageTitle>. @layout BlankLayout is the migrated
+   form of "no master page" (Specialist 7's note: BlankLayout is the layout for the standalone
+   WebForms documents; it also supplies the master-page javascript globals that the always-loaded
+   master-page bundle reads).
+   --------------------------------------------------------------------------------------------- *@
+@page "/Reports/Assets/Header"
+@layout BlankLayout
+@inherits MixERPWebpage
+@using MixERP.Net.WebControls.ReportEngine
+
+<PageTitle>MixERP WebReport</PageTitle>
+
+<ReportHeader />

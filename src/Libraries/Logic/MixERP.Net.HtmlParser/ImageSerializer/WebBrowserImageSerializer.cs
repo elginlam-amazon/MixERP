@@ -1,90 +1,78 @@
 ﻿using MixERP.Net.Common.Helpers;
-using System.Drawing;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 using System.IO;
-using System.Threading;
-using System.Windows.Forms;
 
 namespace MixERP.Net.HtmlParser.ImageSerializer
 {
+    /// <summary>
+    ///     The <see cref="ParserType.IEWebBrowser" /> serializer. It used to host the Windows-only
+    ///     Internet Explorer <c>System.Windows.Forms.WebBrowser</c> control on an STA thread,
+    ///     navigate it to a temporary .html file, spin on <c>ReadyState</c> with
+    ///     <c>Application.DoEvents()</c> and then <c>DrawToBitmap</c> the full document. Headless
+    ///     Chromium now does the navigation and rasterization, and the distinctive post-processing
+    ///     of this serializer - the temporary file, the 100 pixel side margins and top allowance,
+    ///     the white canvas and the 3200 DPI metadata - is preserved below.
+    /// </summary>
     public sealed class WebBrowserImageSerializer : HtmlImageSerializer
     {
+        private const int Margin = 100;
+        private const double Resolution = 3200;
+
         internal override void CreateImage(string imagePath)
         {
-            Thread thread = new Thread(delegate()
+            string tempPath = imagePath + ".html";
+
+            File.WriteAllText(tempPath, this.Html);
+
+            byte[] rendered;
+
+            try
             {
-                using (WebBrowser browser = new WebBrowser())
+                //The legacy canvas width came from browser.Width (the un-sized WebBrowser control's
+                //default, since its Width/Height assignments were commented out). The width is
+                //configurable through HtmlRenderingEngine.ViewportWidth so the legacy output
+                //dimensions can be pinned if a layout regresses.
+                rendered = HtmlRenderingEngine.RenderFile(tempPath, HtmlRenderingEngine.ViewportWidth, 1);
+            }
+            finally
+            {
+                //The original deleted the navigated temp file once the document had loaded.
+                if (File.Exists(tempPath))
                 {
-                    browser.ScrollBarsEnabled = false;
-                    browser.AllowNavigation = true;
-
-                    string tempPath = imagePath + ".html";
-
-                    File.WriteAllText(tempPath, this.Html);
-                    browser.Navigate(tempPath);
-                    browser.ScriptErrorsSuppressed = true;
-                    //browser.Width = 1024;
-                    //browser.Height = 19999;
-                    browser.Tag = imagePath;
-
-                    browser.DocumentCompleted += DocumentCompleted;
-
-                    while (browser.ReadyState != WebBrowserReadyState.Complete)
-                    {
-                        Application.DoEvents();
-                    }
+                    File.Delete(tempPath);
                 }
-            });
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
+            }
+
+            string path = imagePath + ImageHelper.GetFileExtension(this.ImageFormat);
+
+            using (Image content = Image.Load(rendered))
+            {
+                int width = content.Width;
+                int height = content.Height + Margin;
+
+                using (Image<Rgba32> canvas = new Image<Rgba32>(width + 2 * Margin, height))
+                {
+                    canvas.Mutate(context =>
+                    {
+                        context.BackgroundColor(Color.White);
+                        context.DrawImage(content, new Point(Margin, 0), 1f);
+                    });
+
+                    canvas.Metadata.HorizontalResolution = Resolution;
+                    canvas.Metadata.VerticalResolution = Resolution;
+
+                    IImageEncoder encoder = ImageHelper.GetEncoder(this.ImageFormat) ?? new PngEncoder();
+                    canvas.Save(path, encoder);
+                }
+            }
+
+            this.OnImageSaved(new ImageSavedEventArgs(path));
 
             base.CreateImage(imagePath);
-        }
-
-        private void DocumentCompleted(object sender, WebBrowserDocumentCompletedEventArgs e)
-        {
-            WebBrowser browser = sender as WebBrowser;
-            if (browser == null)
-            {
-                return;
-            }
-
-            if (browser.Document == null || browser.Document.Body == null)
-            {
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(browser.Tag.ToString()))
-            {
-                return;
-            }
-
-            File.Delete(browser.Tag.ToString());
-
-            browser.Document.Body.Style = "zoom:100%;";
-
-            if (browser.Document.Body != null)
-            {
-                const int margin = 100;
-                int height = browser.Document.Body.ScrollRectangle.Height + margin;
-                int width = browser.Width;
-                string imagePath = browser.Tag + ImageHelper.GetFileExtension(this.ImageFormat);
-
-                using (Bitmap bitmap = new Bitmap(width + 2 * margin, height))
-                {
-                    using (Graphics g = Graphics.FromImage(bitmap))
-                    {
-                        g.Clear(Color.White);
-                        g.DrawImage(bitmap, 0, 0, width + 2 * margin, height);
-                    }
-
-                    browser.DrawToBitmap(bitmap, new Rectangle(margin, 0, width, height));
-                    bitmap.SetResolution(3200, 3200);
-                    bitmap.Save(imagePath, ImageHelper.GetEncoder(this.ImageFormat), null);
-
-                    this.OnImageSaved(new ImageSavedEventArgs(imagePath));
-                }
-            }
         }
     }
 }

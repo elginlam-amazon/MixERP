@@ -1,0 +1,1456 @@
+@* ComponentBase is not CLS-compliant; this assembly is CLSCompliant(true). *@
+@attribute [System.CLSCompliant(false)]
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Blazor replacement for the former WebForms CompositeControl
+    "MixERP.Net.WebControls.ReportEngine.Report", which was spread over nine partial
+    files under Report/.
+
+    Markup provenance (Report/Control.cs CreateChildControls order):
+      reportContainer Panel    -> the root <div> below (the Panel carried no id/class)
+        AddHiddenControls      -> #ReportHidden, #ReportTitleHidden
+        AddCommandPanel        -> #ReportParameterPanel .report-command.hide + 6 buttons
+        AddReportBody          -> #report + ReportHeader + 4 literals + grid placeholder
+
+    NO @page: this is a library control, not a route. It is deliberately NOT sealed -
+    FrontEnd/Controls/WebReport.cs derives from it.
+*@
+
+@namespace MixERP.Net.WebControls.ReportEngine
+@using System
+@using System.Collections.Generic
+@using System.Collections.ObjectModel
+@using System.Data
+@using System.Globalization
+@using System.IO
+@using System.Linq
+@using System.Reflection
+@using System.Threading
+@using System.Threading.Tasks
+@using System.Xml
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using Serilog
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.i18n
+@using MixERP.Net.i18n.Resources
+@using MixERP.Net.WebControls.ReportEngine.Data
+@using MixERP.Net.WebControls.ReportEngine.Helpers
+
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+@*
+    Report/Control.cs did PageUtility.AddMeta(this.Page, "generator", <assembly name>),
+    which mutated Page.Header.Controls. AddMeta's first parameter is now a StringBuilder
+    accumulator and a Blazor component cannot mutate a server-side header control tree, so
+    the SAME <meta name="generator" content="MixERP.Net.WebControls.ReportEngine" />
+    element is emitted through <HeadContent>. This requires the host layout to render
+    <HeadOutlet> (standard for a Blazor Server host); if it does not, the meta element is
+    dropped - it is informational only and nothing in the solution reads it.
+*@
+<HeadContent>
+    @((MarkupString)PageUtility.AddMeta(null, "generator", GeneratorName))
+</HeadContent>
+
+@*
+    Report/Intializer.cs SetTitle() did "this.Page.Title = reportTitle". A Razor class
+    library component owns no Page, so the browser-tab title is re-expressed through
+    <PageTitle> (which needs the host's <HeadOutlet>, exactly like <HeadContent> above).
+    Recorded as an API-freeze divergence in migration-summary.md section 4.
+*@
+@if (!string.IsNullOrWhiteSpace(this.pageTitle))
+{
+    <PageTitle>@this.pageTitle</PageTitle>
+}
+
+<div>
+    @* Report/HiddenControls.cs - the ids are a load-bearing contract (report export
+       handshake). No in-solution reader was found, but the ids are preserved verbatim. *@
+    <input type="hidden" id="ReportHidden" name="ReportHidden" value="@this.reportHiddenValue" />
+    <input type="hidden" id="ReportTitleHidden" name="ReportTitleHidden" value="@this.reportTitleHiddenValue" />
+
+    @* Report/CommandPanel.cs - #ReportParameterPanel and BOTH class names are
+       load-bearing: report.css styles ".report-command" as a fixed overlay and
+       "@@media print{.hide{display:none}}" keeps the toolbar off printed pages.
+
+       Each button is an <input type="image">, which is exactly what the original
+       asp:ImageButton rendered. That element type is itself a load-bearing contract:
+       report.css:81 (and report.min.css) carry ".report-command input{padding:2px}",
+       so rendering these as <img> would silently drop the toolbar's button padding.
+       @onclick:preventDefault stops the input from submitting an enclosing form. *@
+    <div id="ReportParameterPanel" class="report-command hide">
+        @* Email: the original ImageButton had NO OnClientClick and NO server-side
+           Click handler - it posted the form back and nothing happened. Rendered here
+           with no behaviour so the toolbar keeps its six buttons and its layout; see
+           migration-summary.md (dead end, deliberately not invented). *@
+        <input type="image" id="SendEmailImageButton" class="@this.GetImageButtonCssClass()"
+               src="@PageUtility.ResolveUrl(ConfigurationHelper.GetReportParameter("EmailIcon"))"
+               title="@Titles.Email" alt="@Titles.Email" @onclick:preventDefault />
+
+        @* window.print() *@
+        <input type="image" id="PrintImageButton" class="@this.GetImageButtonCssClass()"
+               src="@PageUtility.ResolveUrl(ConfigurationHelper.GetReportParameter("PrintIcon"))"
+               title="@Titles.Print" alt="@Titles.Print"
+               @onclick="this.PrintAsync" @onclick:preventDefault />
+
+        @* window.scrollTo(0, 0) *@
+        <input type="image" id="GoTop" class="@this.GetImageButtonCssClass()"
+               src="@PageUtility.ResolveUrl(ConfigurationHelper.GetReportParameter("GoTopIcon"))"
+               title="@Titles.GoToTop" alt="@Titles.GoToTop"
+               @onclick="this.GoTopAsync" @onclick:preventDefault />
+
+        @* window.scrollTo(0, document.body.scrollHeight) *@
+        <input type="image" id="GoBottom" class="@this.GetImageButtonCssClass()"
+               src="@PageUtility.ResolveUrl(ConfigurationHelper.GetReportParameter("GoBottomIcon"))"
+               title="@Titles.GoToBottom" alt="@Titles.GoToBottom"
+               @onclick="this.GoBottomAsync" @onclick:preventDefault />
+
+        @* $('.report-parameter').toggle(500) *@
+        <input type="image" id="FilterImageButton" class="@this.GetImageButtonCssClass()"
+               src="@PageUtility.ResolveUrl(ConfigurationHelper.GetReportParameter("FilterIcon"))"
+               title="@Titles.Filter" alt="@Titles.Filter"
+               @onclick="this.ToggleFilterAsync" @onclick:preventDefault />
+
+        @* closeWindow() *@
+        <input type="image" id="CloseImageButton" class="@this.GetImageButtonCssClass()"
+               src="@PageUtility.ResolveUrl(ConfigurationHelper.GetReportParameter("CloseIcon"))"
+               title="@Titles.Close" alt="@Titles.Close"
+               @onclick="this.CloseAsync" @onclick:preventDefault />
+    </div>
+
+    @* Report/Body.cs AddReportBody - the "report" id is the export/styling anchor. *@
+    <div id="report">
+        @if (!this.NoHeader)
+        {
+            @* The original set header.Path from exactly this configuration key. *@
+            <ReportHeader Path="@ConfigurationHelper.GetReportParameter("HeaderPath")" />
+        }
+
+        @* The four former Literals. A WebForms Literal did NOT html-encode its Text, and
+           these hold authored report XML/HTML (titles, sections, barcodes, charts), so
+           they are rendered as MarkupString. Encoding them would show the user raw tags. *@
+        @((MarkupString)(this.reportTitleText ?? string.Empty))
+        @((MarkupString)(this.topSectionText ?? string.Empty))
+        @((MarkupString)(this.bodyContentsText ?? string.Empty))
+
+        @* ===================================================================
+           Former gridPlaceHolder (PlaceHolder control) - Report/Intializer.cs
+           SetGridViews()/LoadGrid() plus Report/Events.cs GridView_DataBound /
+           GridView_RowDataBound. Rendered between the body contents and the
+           bottom section: the original child order of AddReportBody.
+
+           MixERPGridView is deliberately NOT reused here (see the GridModel
+           comment in @code): it renders no <tfoot> and exposes no header/row
+           data-bound hook, so the running-total footer and the header
+           localization cannot be expressed through its [Parameter] surface.
+
+           LOAD-BEARING: id="GridView{n}" is scraped by mixerp-core.min.js
+           (preparePieChart/prepareChart do $("#" + n)), and class="report" /
+           class="text right" are owned by FrontEnd/Stylesheets/report.css.
+           =================================================================== *@
+        @foreach (GridModel grid in this.grids)
+        {
+            @if (grid.IsEmpty)
+            {
+                @* MixERPGridView.OnDataBound() returned early when there were no
+                   rows, so a GridView rendered only its EmptyDataText
+                   (CommonResource.NoRecordFound) in a single-cell table - and the
+                   running-total footer never ran either. *@
+                <table id="@grid.Id" class="report" style="@grid.Style">
+                    <tr>
+                        <td>@grid.EmptyDataText</td>
+                    </tr>
+                </table>
+            }
+            else
+            {
+                <table id="@grid.Id" class="report" style="@grid.Style">
+                    <thead>
+                        <tr>
+                            @foreach (GridCell header in grid.HeaderCells)
+                            {
+                                <th class="@header.CssClass">@header.Text</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (List<GridCell> row in grid.Rows)
+                        {
+                            <tr>
+                                @foreach (GridCell cell in row)
+                                {
+                                    <td class="@cell.CssClass">@cell.Text</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                    @if (grid.FooterCells != null)
+                    {
+                        <tfoot>
+                            <tr>
+                                @foreach (GridCell cell in grid.FooterCells)
+                                {
+                                    @if (cell.Visible)
+                                    {
+                                        <td class="@cell.CssClass" style="@cell.Style" colspan="@cell.ColumnSpan">@cell.Text</td>
+                                    }
+                                }
+                            </tr>
+                        </tfoot>
+                    }
+                </table>
+            }
+        }
+
+        @((MarkupString)(this.bottomSectionText ?? string.Empty))
+    </div>
+</div>
+
+@code {
+    //=====================================================================
+    // Report/Properties.cs - PUBLIC API, FROZEN (6 dependent projects).
+    //=====================================================================
+
+    private readonly Collection<Collection<KeyValuePair<string, object>>> parameterCollection =
+        new Collection<Collection<KeyValuePair<string, object>>>();
+
+    [Parameter]
+    public bool AutoInitialize { get; set; }
+
+    [Parameter]
+    public string Catalog { get; set; }
+
+    [Parameter]
+    public string ImageButtonCssClass { get; set; }
+
+    [Parameter]
+    public string InvalidLocationErrorMessage { get; set; }
+
+    [Parameter]
+    public bool NoHeader { get; set; }
+
+    /// <summary>
+    ///     Collection of each datasources' parameter collection.
+    ///     The datasource parameter collection is a collection of
+    ///     parameters stored in KeyValuePair.
+    /// </summary>
+    public Collection<Collection<KeyValuePair<string, object>>> ParameterCollection
+    {
+        get { return this.parameterCollection; }
+    }
+
+    [Parameter]
+    public string Path { get; set; }
+
+    [Parameter]
+    public string ReportNotFoundErrorMessage { get; set; }
+
+    [Parameter]
+    public string RunningTotalText { get; set; }
+
+    public void AddParameterToCollection(Collection<KeyValuePair<string, object>> parameter)
+    {
+        this.parameterCollection.Add(parameter);
+    }
+
+    //=====================================================================
+    // Rendered state - replaces the WebForms child controls of
+    // Report/IDisposable.cs. A Blazor component owns no control tree, so the
+    // four Literals, the two HiddenFields and the Panels become values that
+    // the template above renders.
+    //   reportTitleLiteral.Text  -> reportTitleText
+    //   topSectionLiteral.Text   -> topSectionText
+    //   bodyContentsLiteral.Text -> bodyContentsText
+    //   bottomSectionLiteral.Text-> bottomSectionText
+    //   reportHidden.Value       -> reportHiddenValue
+    //   reportTitleHidden.Value  -> reportTitleHiddenValue
+    //=====================================================================
+
+    protected string reportTitleText;
+    protected string topSectionText;
+    protected string bodyContentsText;
+    protected string bottomSectionText;
+    protected string reportHiddenValue;
+    protected string reportTitleHiddenValue;
+
+    /// <summary>
+    ///     The former "this.Page.Title", rendered through &lt;PageTitle&gt;. Kept separate
+    ///     from <see cref="reportTitleHiddenValue" /> because the original assigned the
+    ///     tab title only in SetTitle(), never on the "Report not found." path.
+    /// </summary>
+    protected string pageTitle;
+
+    /// <summary>
+    ///     The physical path of the report file, resolved by <see cref="IsValid" />.
+    /// </summary>
+    protected string reportPath;
+
+    /// <summary>
+    ///     The value the original emitted as
+    ///     &lt;meta name="generator" content="..." /&gt;:
+    ///     Assembly.GetAssembly(typeof(Report)).GetName().Name.
+    /// </summary>
+    protected static string GeneratorName
+    {
+        get { return typeof(Report).Assembly.GetName().Name; }
+    }
+
+    //=====================================================================
+    // Report/Body.cs IsValid()
+    //=====================================================================
+
+    /// <summary>
+    ///     True when <see cref="Path" /> is set and resolves to an existing file.
+    ///     this.Page.Server.MapPath(...) -> PageUtility.MapPath(...).
+    /// </summary>
+    protected bool IsValid()
+    {
+        if (string.IsNullOrWhiteSpace(this.Path))
+        {
+            return false;
+        }
+
+        this.reportPath = PageUtility.MapPath(this.Path);
+
+        if (!File.Exists(this.reportPath))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    //=====================================================================
+    // Report/CommandPanel.cs GetImageButtonCssClass()
+    //=====================================================================
+
+    protected string GetImageButtonCssClass()
+    {
+        string cssClass = this.ImageButtonCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = ConfigurationHelper.GetReportParameter("ImageButtonCssClass");
+        }
+
+        return cssClass;
+    }
+
+    //=====================================================================
+    // Report/CommandPanel.cs - the OnClientClick strings, re-expressed as JS
+    // interop. Every call is guarded: an interop failure (a disconnected
+    // circuit, a missing host script) must not tear down the circuit.
+    //=====================================================================
+
+    /// <summary>
+    ///     Url of this library's command-panel interop module, shipped as a static web
+    ///     asset. The host must call app.UseStaticFiles() for it to resolve.
+    /// </summary>
+    public const string InteropModulePath =
+        "./_content/MixERP.Net.WebControls.ReportEngine/js/reportengine-interop.js";
+
+    private IJSObjectReference interopModule;
+
+    //SEAM for Specialist 3 (task 47): when the component's IDisposable/IAsyncDisposable
+    //is implemented for the DataTables, also DisposeAsync this module reference if it is
+    //not null (swallowing JSDisconnectedException).
+    protected IJSObjectReference InteropModule
+    {
+        get { return this.interopModule; }
+    }
+
+    private async Task<IJSObjectReference> GetInteropModuleAsync()
+    {
+        if (this.interopModule == null)
+        {
+            this.interopModule =
+                await this.JSRuntime.InvokeAsync<IJSObjectReference>("import", InteropModulePath);
+        }
+
+        return this.interopModule;
+    }
+
+    /// <summary>
+    ///     Was: OnClientClick = "javascript:window.print();return false;".
+    /// </summary>
+    protected async Task PrintAsync()
+    {
+        try
+        {
+            await this.JSRuntime.InvokeVoidAsync("window.print");
+        }
+        catch (JSException)
+        {
+            //A browser that refuses to print must not break the report.
+        }
+        catch (JSDisconnectedException)
+        {
+            //The circuit is gone; there is nothing left to print.
+        }
+    }
+
+    /// <summary>
+    ///     Was: OnClientClick = "window.scrollTo(0, 0);".
+    /// </summary>
+    protected async Task GoTopAsync()
+    {
+        try
+        {
+            await this.JSRuntime.InvokeVoidAsync("window.scrollTo", 0, 0);
+        }
+        catch (JSException)
+        {
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+
+    /// <summary>
+    ///     Was: OnClientClick = "window.scrollTo(0,document.body.scrollHeight);".
+    ///     document.body.scrollHeight cannot be read from C#, so the two-statement
+    ///     expression lives in the interop module (no "eval", CSP safe).
+    /// </summary>
+    protected Task GoBottomAsync()
+    {
+        return this.InvokeInteropAsync("scrollToBottom");
+    }
+
+    /// <summary>
+    ///     Was: OnClientClick = "$('.report-parameter').toggle(500);return false;".
+    ///     The ".report-parameter" selector is preserved verbatim: the panel it toggles is
+    ///     owned by FrontEnd/Reports/ReportViewer.aspx:26.
+    /// </summary>
+    protected Task ToggleFilterAsync()
+    {
+        return this.InvokeInteropAsync("toggleReportParameter");
+    }
+
+    /// <summary>
+    ///     Was: OnClientClick = "closeWindow();" - a global defined by the page
+    ///     (ScrudFactory/Scrud.js, ScrudItemSelector.js). The module checks that the
+    ///     global exists before calling it, so a page without it is a silent no-op
+    ///     rather than a circuit-killing exception.
+    /// </summary>
+    protected Task CloseAsync()
+    {
+        return this.InvokeInteropAsync("closeWindow");
+    }
+
+    private async Task InvokeInteropAsync(string function)
+    {
+        try
+        {
+            IJSObjectReference module = await this.GetInteropModuleAsync();
+            await module.InvokeVoidAsync(function);
+        }
+        catch (JSException)
+        {
+            //The interop module could not be loaded or the function failed. The command
+            //panel degrades to a no-op instead of terminating the circuit.
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+
+    //=====================================================================
+    // Report/Javascript.cs AddJavascript()
+    // The [AspNetHostingPermission(SecurityAction.Demand, ...)] attribute and
+    // "using System.Security.Permissions" are REMOVED: Code Access Security no longer
+    // exists in .NET and the demand had no replacement (recorded in migration-summary).
+    // The ten [assembly: WebResource] declarations moved to Properties/WebResources.cs.
+    // Every resource name / registration key pair below is byte-identical to the
+    // original and to the <EmbeddedResource LogicalName> items in the .csproj.
+    //=====================================================================
+
+    protected void AddJavascript()
+    {
+        JSUtility.AddJSReference(this.JSRuntime, "MixERP.Net.WebControls.ReportEngine.Scripts.JsBarcode.CODE128.js", "code128", typeof(Report));
+        JSUtility.AddJSReference(this.JSRuntime, "MixERP.Net.WebControls.ReportEngine.Scripts.JsBarcode.CODE39.js", "code39", typeof(Report));
+        JSUtility.AddJSReference(this.JSRuntime, "MixERP.Net.WebControls.ReportEngine.Scripts.JsBarcode.EAN_UPC.js", "ean_upc", typeof(Report));
+        JSUtility.AddJSReference(this.JSRuntime, "MixERP.Net.WebControls.ReportEngine.Scripts.JsBarcode.ITF.js", "itf", typeof(Report));
+        JSUtility.AddJSReference(this.JSRuntime, "MixERP.Net.WebControls.ReportEngine.Scripts.JsBarcode.ITF14.js", "itf14", typeof(Report));
+        JSUtility.AddJSReference(this.JSRuntime, "MixERP.Net.WebControls.ReportEngine.Scripts.JsBarcode.JsBarcode.js", "jsbarcode", typeof(Report));
+        JSUtility.AddJSReference(this.JSRuntime, "MixERP.Net.WebControls.ReportEngine.Scripts.ReportEngine.Barcode.js", "reportengine_barcode", typeof(Report));
+        JSUtility.AddJSReference(this.JSRuntime, "MixERP.Net.WebControls.ReportEngine.Scripts.JQueryQRcode.jquery.qrcode.js", "reportengine_jquery_qrcode", typeof(Report));
+        JSUtility.AddJSReference(this.JSRuntime, "MixERP.Net.WebControls.ReportEngine.Scripts.JQueryQRcode.qrcode.js", "reportengine_qrcode1", typeof(Report));
+        JSUtility.AddJSReference(this.JSRuntime, "MixERP.Net.WebControls.ReportEngine.Scripts.ReportEngine.QRCode.js", "reportengine_qrcode2", typeof(Report));
+    }
+
+    //=====================================================================
+    // Lifecycle - replaces CreateChildControls / RecreateChildControls /
+    // Render(HtmlTextWriter) of Report/Control.cs.
+    //   * CreateChildControls built the control tree -> the template above.
+    //   * RecreateChildControls -> EnsureChildControls: dropped, there is no
+    //     control tree to re-create; Blazor re-renders from state.
+    //   * Render(w) -> reportContainer.RenderControl(w): the template above.
+    //   * AddMeta -> the <HeadContent> block above.
+    //   * if (AutoInitialize) InitializeReport() -> OnParametersSet, so a consumer
+    //     that sets Path/Catalog/ParameterCollection AFTER construction (which a
+    //     Blazor component always does - parameters arrive after the ctor) still
+    //     initializes. It runs once, mirroring the single CreateChildControls call.
+    //=====================================================================
+
+    private bool initialized;
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+
+        if (this.AutoInitialize && !this.initialized)
+        {
+            this.initialized = true;
+            this.InitializeReport();
+        }
+    }
+
+    private bool javascriptAdded;
+
+    /// <summary>
+    ///     The JS-interop half of initialization. It MUST run from here and not from
+    ///     OnInitialized/OnParametersSet: interop before the first render is legal C#
+    ///     that silently does nothing.
+    ///
+    ///     Both steps below run on EVERY render pass, not only the first. The original
+    ///     Report/Intializer.cs ran AddJavascript() and registered the preparePieChart
+    ///     startup scripts as steps 9 and 8b of InitializeReport(), and the only two
+    ///     in-solution consumers (FrontEnd/Reports/ReportViewer.aspx.cs:83 and :94) use
+    ///     the non-AutoInitialize path: they set Path/parameters and call
+    ///     InitializeReport() AFTER the component has already rendered. Gating the flush
+    ///     on firstRender therefore dropped every pie chart on the real consumer path -
+    ///     a silent failure with a green build. The latches below are keyed to the work
+    ///     itself (javascriptAdded / an empty queue) rather than to firstRender, so each
+    ///     side effect still happens exactly once no matter when InitializeReport runs.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        //Report/Javascript.cs - the ten embedded script references. The original ran
+        //this as step 9 of InitializeReport(), i.e. ONLY for a report that passed the
+        //IsValid() guard, so it stays gated on reportValid: a blank/missing Path must
+        //not inject ten script tags onto a page that previously had none.
+        if (this.reportValid && !this.javascriptAdded)
+        {
+            this.javascriptAdded = true;
+            this.AddJavascript();
+        }
+
+        //Report/Intializer.cs LoadPieCharts() - the preparePieChart startup scripts,
+        //registered through the very same PageUtility.RegisterJavascript API the
+        //original used. Flushed after every render because InitializeReport() may run
+        //either before the first render (AutoInitialize) or long after it (ReportViewer).
+        if (this.pieChartScripts.Count > 0)
+        {
+            foreach (KeyValuePair<string, string> pieChartScript in this.pieChartScripts)
+            {
+                PageUtility.RegisterJavascript(pieChartScript.Key, pieChartScript.Value, this.JSRuntime, true);
+            }
+
+            this.pieChartScripts.Clear();
+        }
+    }
+
+    //=====================================================================
+    // Report/IDisposable.cs
+    // Dispose(bool) disposed the DataTables AND ~17 WebForms child controls
+    // (Literal, Panel, ImageButton, PlaceHolder, HiddenField, ReportHeader).
+    // A Blazor component owns no child-control tree, so those 17 calls are
+    // DROPPED and recorded in migration-summary.md; only the DataTable
+    // disposal - a real resource - survives, plus the JS module reference this
+    // component imported.
+    //=====================================================================
+
+    private bool disposed;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (this.disposed)
+        {
+            return;
+        }
+
+        this.disposed = true;
+
+        if (this.dataTableCollection != null && this.dataTableCollection.Count > 0)
+        {
+            for (int i = 0; i < this.dataTableCollection.Count; i++)
+            {
+                if (this.dataTableCollection[i] != null)
+                {
+                    this.dataTableCollection[i].Dispose();
+                    this.dataTableCollection[i] = null;
+                }
+            }
+
+            this.dataTableCollection = null;
+        }
+
+        if (this.interopModule != null)
+        {
+            try
+            {
+                await this.interopModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                //The circuit is already gone; the module died with the browser.
+            }
+
+            this.interopModule = null;
+        }
+    }
+
+    //=====================================================================
+    // Report/Intializer.cs - PUBLIC API, FROZEN
+    // (FrontEnd/Reports/ReportViewer.aspx.cs calls InitializeReport()).
+    //
+    // SEAM for Specialist 3 (checklist tasks 29-31 and 33-47): the engine body
+    // belongs here, preserving the original order
+    //   IsValid() guard -> InitializeLiterals() + ReportNotFoundErrorMessage /
+    //   InvalidLocationErrorMessage branch -> SetDecimalFields -> SetRunningTotalFields
+    //   -> SetDataSources -> SetTitle -> SetTopSection -> SetBodySection
+    //   -> SetGridViews -> SetBottomSection -> AddJavascript -> CleanUp.
+    // AddJavascript() above is the interop step: it is already invoked from
+    // OnAfterRenderAsync(firstRender) and must NOT be called from here, because
+    // InitializeReport can run before the first render.
+    // EnsureChildControls() is dropped - there is no child-control tree.
+    //=====================================================================
+
+    private bool reportValid;
+
+    public void InitializeReport()
+    {
+        //Check if the set report path is a valid file.
+        if (!this.IsValid())
+        {
+            this.InitializeLiterals();
+
+            this.reportValid = false;
+            this.reportTitleText = this.ReportNotFoundErrorMessage;
+            this.reportTitleHiddenValue = this.reportTitleText;
+            this.topSectionText = string.Format(Thread.CurrentThread.CurrentCulture,
+                this.InvalidLocationErrorMessage, this.reportPath);
+
+            //Signal the renderer: see the note at the end of this method.
+            this.StateHasChanged();
+            return;
+        }
+
+        this.reportValid = true;
+
+        this.SetDecimalFields();
+        this.SetRunningTotalFields();
+        this.SetDataSources();
+        this.SetTitle();
+        this.SetTopSection();
+        this.SetBodySection();
+        this.SetGridViews();
+        this.SetBottomSection();
+
+        //AddJavascript() is the interop step and runs from OnAfterRenderAsync instead
+        //of here (interop before the first render silently does nothing). Its position
+        //in the original ten-step order is preserved by this comment.
+
+        this.CleanUp();
+
+        //InitializeReport() is public, frozen API and the in-solution consumers
+        //(FrontEnd/Reports/ReportViewer.aspx.cs:83 and :94) call it from outside any
+        //Blazor event dispatch. Every method above mutates rendered state, so without
+        //this the component keeps its pre-init (blank) output while the state says
+        //otherwise - a silent blank report. A consumer calling in from a non-UI thread
+        //should route through InvokeAsync; the summary records that.
+        this.StateHasChanged();
+    }
+
+    //=====================================================================
+    // Report/Intializer.cs - engine state. These are the only fields of the
+    // former Report/IDisposable.cs that survive: the WebForms child-control
+    // fields are gone with the control tree (recorded in migration-summary).
+    //=====================================================================
+
+    private Collection<DataTable> dataTableCollection;
+    private Collection<string> decimalFieldIndicesCollection;
+    private Collection<string> runningTotalFieldIndicesCollection;
+    private Collection<int> runningTotalTextColumnIndexCollection;
+
+    /// <summary>
+    ///     Report/Intializer.cs InitializeLiterals(): default values, each applied only
+    ///     when the consumer left the property blank.
+    /// </summary>
+    private void InitializeLiterals()
+    {
+        if (string.IsNullOrWhiteSpace(this.ReportNotFoundErrorMessage))
+        {
+            this.ReportNotFoundErrorMessage = "Report not found.";
+        }
+
+        if (string.IsNullOrWhiteSpace(this.InvalidLocationErrorMessage))
+        {
+            this.InvalidLocationErrorMessage = "Invalid location.";
+        }
+
+        if (string.IsNullOrWhiteSpace(this.RunningTotalText))
+        {
+            this.RunningTotalText = "Total";
+        }
+    }
+
+    //=====================================================================
+    // Report/Intializer.cs - XML driven engine steps
+    //=====================================================================
+
+    private string GetAttributeValue(XmlNode node, string key)
+    {
+        if (node.Attributes != null && node.Attributes[key] != null)
+        {
+            return node.Attributes[key].Value;
+        }
+
+        return string.Empty;
+    }
+
+    private void SetDecimalFields()
+    {
+        //Get the list of datasources for this report.
+        XmlNodeList dataSourceList = XmlHelper.GetNodes(this.reportPath, "//DataSource");
+
+        //Initializing decimal field indices collection.
+        this.decimalFieldIndicesCollection = new Collection<string>();
+
+        foreach (XmlNode dataSource in dataSourceList)
+        {
+            //Resetting the variable for each iteration.
+            string decimalFieldIndices = string.Empty;
+
+            foreach (XmlNode node in dataSource.ChildNodes)
+            {
+                if (node.Name.Equals("DecimalFieldIndices"))
+                {
+                    decimalFieldIndices = node.InnerText;
+                }
+            }
+
+            //An empty string is added when the node is absent: the PADDING is what keeps
+            //this collection's indices aligned with dataTableCollection.
+            this.decimalFieldIndicesCollection.Add(decimalFieldIndices);
+        }
+    }
+
+    private void SetRunningTotalFields()
+    {
+        //Get the list of datasources for this report.
+        XmlNodeList dataSourceList = XmlHelper.GetNodes(this.reportPath, "//DataSource");
+
+        //Initializing running total text column gridViewIndex collection.
+        this.runningTotalTextColumnIndexCollection = new Collection<int>();
+
+        //Initializing running total field indices collection.
+        this.runningTotalFieldIndicesCollection = new Collection<string>();
+
+        foreach (XmlNode dataSource in dataSourceList)
+        {
+            //Resetting the variables for each iteration.
+            int runningTotalTextColumnIndex = 0;
+            string runningTotalFieldIndices = string.Empty;
+
+            foreach (XmlNode node in dataSource.ChildNodes)
+            {
+                if (node.Name.Equals("RunningTotalTextColumnIndex"))
+                {
+                    runningTotalTextColumnIndex = Conversion.TryCastInteger(node.InnerText);
+                }
+
+                if (node.Name.Equals("RunningTotalFieldIndices"))
+                {
+                    runningTotalFieldIndices = node.InnerText;
+                }
+            }
+
+            //Zero / empty-string padding when the nodes are absent - same index-alignment
+            //contract as SetDecimalFields().
+            this.runningTotalTextColumnIndexCollection.Add(runningTotalTextColumnIndex);
+            this.runningTotalFieldIndicesCollection.Add(runningTotalFieldIndices);
+        }
+    }
+
+    private void SetDataSources()
+    {
+        int count = 0;
+
+        //Get the list of datasources for this report.
+        XmlNodeList dataSources = XmlHelper.GetNodes(this.reportPath, "//DataSource");
+
+        //Initializing data source collection.
+        this.dataTableCollection = new Collection<DataTable>();
+
+        foreach (XmlNode datasource in dataSources)
+        {
+            foreach (XmlNode c in datasource.ChildNodes)
+            {
+                //Selecting the nodes matching the tag <Query>.
+                if (c.Name.Equals("Query"))
+                {
+                    count++;
+                    string sql = c.InnerText;
+
+                    //Initializing query parameter collection.
+                    Collection<KeyValuePair<string, object>> parameters =
+                        new Collection<KeyValuePair<string, object>>();
+
+                    if (this.parameterCollection != null)
+                    {
+                        if (this.parameterCollection.Count >= count)
+                        {
+                            //Get the parameter collection for this datasource.
+                            parameters = this.ParameterCollection[count - 1];
+                        }
+                    }
+
+                    //QUIRK PRESERVED VERBATIM: the original wrapped the table in a "using"
+                    //and therefore Dispose()d it immediately after adding it to the
+                    //collection, yet every later step still reads its rows. That works
+                    //because DataTable.Dispose() is Component.Dispose(): it detaches the
+                    //table from its DataSet and fires Disposed, but it does not clear
+                    //Rows/Columns. The shape is kept EXACTLY as it was so that the set of
+                    //tables readable downstream is unchanged (see migration-summary.md).
+                    using (DataTable table = TableHelper.GetDataTable(this.Catalog, sql, parameters))
+                    {
+                        //Add this datatable to the collection for later binding.
+                        this.dataTableCollection.Add(table);
+                    }
+                }
+            }
+        }
+    }
+
+    private void SetTitle()
+    {
+        string title = XmlHelper.GetNodeText(this.reportPath, "/MixERPReport/Title");
+        string reportTitle = ReportParser.ParseExpression(title, this.dataTableCollection);
+
+        this.reportTitleText = @"<h2>" + reportTitle + @"</h2>";
+
+        //this.Page.Title = reportTitle. The original assigned the browser-tab title ONLY
+        //here, inside SetTitle() - never on the invalid-report path - so <PageTitle>
+        //binds to this dedicated field rather than to reportTitleHiddenValue, which the
+        //"Report not found." branch also writes (and which must keep that error text for
+        //the #ReportTitleHidden export contract).
+        this.pageTitle = reportTitle;
+        this.reportTitleHiddenValue = reportTitle;
+    }
+
+    private void SetTopSection()
+    {
+        string topSection = XmlHelper.GetNodeText(this.reportPath, "/MixERPReport/TopSection");
+        topSection = ReportParser.ParseExpression(topSection, this.dataTableCollection);
+        topSection = ReportParser.ParseDataSource(topSection, this.dataTableCollection);
+        topSection = this.SetPieCharts(topSection);
+        this.topSectionText = topSection;
+    }
+
+    private void SetBodySection()
+    {
+        string bodySection = XmlHelper.GetNodeText(this.reportPath, "/MixERPReport/Body/Content");
+        bodySection = ReportParser.ParseExpression(bodySection, this.dataTableCollection);
+        bodySection = ReportParser.ParseDataSource(bodySection, this.dataTableCollection);
+
+        //ASYMMETRY PRESERVED: unlike the top and bottom sections, the body section does
+        //NOT run SetPieCharts - a <PieChart> element in the body was never expanded.
+        this.bodyContentsText = bodySection;
+    }
+
+    private void SetBottomSection()
+    {
+        string bottomSection = XmlHelper.GetNodeText(this.reportPath, "/MixERPReport/BottomSection");
+        bottomSection = ReportParser.ParseExpression(bottomSection, this.dataTableCollection);
+        bottomSection = ReportParser.ParseDataSource(bottomSection, this.dataTableCollection);
+        bottomSection = this.SetPieCharts(bottomSection);
+
+        this.bottomSectionText = bottomSection;
+    }
+
+    //=====================================================================
+    // Report/Intializer.cs SetPieCharts / LoadPieCharts
+    //=====================================================================
+
+    /// <summary>
+    ///     The (key, script) pairs SetPieCharts produced. The original registered them
+    ///     straight away through PageUtility.RegisterJavascript, which buffered them into
+    ///     the WebForms response. RegisterJavascript now executes over the circuit, and
+    ///     InitializeReport runs BEFORE the first render, so the pairs are queued here and
+    ///     registered - through that very same API - from OnAfterRenderAsync(firstRender).
+    /// </summary>
+    private readonly List<KeyValuePair<string, string>> pieChartScripts =
+        new List<KeyValuePair<string, string>>();
+
+    private string SetPieCharts(string xml)
+    {
+        XmlNodeList pieCharts = XmlHelper.GetNodesFromText(xml, "//PieChart");
+        if (pieCharts == null)
+        {
+            return xml;
+        }
+
+        foreach (XmlNode node in pieCharts)
+        {
+            string id = this.GetAttributeValue(node, "ID");
+            int gridViewIndex = Conversion.TryCastInteger(this.GetAttributeValue(node, "GridViewIndex"));
+
+            string pieType = this.GetAttributeValue(node, "Type").ToLower(CultureInfo.InvariantCulture);
+
+            int width = Conversion.TryCastInteger(this.GetAttributeValue(node, "Width"));
+            int height = Conversion.TryCastInteger(this.GetAttributeValue(node, "Height"));
+            int titleColumnIndex = Conversion.TryCastInteger(this.GetAttributeValue(node, "TitleColumnIndex"));
+            int valueColumnIndex = Conversion.TryCastInteger(this.GetAttributeValue(node, "ValueColumnIndex"));
+
+            bool hideGridView = Conversion.TryCastBoolean(this.GetAttributeValue(node, "HideGridView"));
+
+            //System.Drawing.Color + ColorTranslator.FromHtml/ToHtml are replaced by
+            //ToHtmlColor below, which round-trips the attribute to the SAME html color
+            //string the original emitted (recorded in migration-summary.md section 4).
+            string backgroundColor = this.ToHtmlColor(this.GetAttributeValue(node, "BackgroundColor"));
+            string borderColor = this.ToHtmlColor(this.GetAttributeValue(node, "BorderColor"));
+
+            xml = this.LoadPieCharts(xml, node, id, gridViewIndex, hideGridView, pieType, width, height,
+                titleColumnIndex, valueColumnIndex, backgroundColor, borderColor);
+        }
+
+        return xml.Replace("<Charts>", "").Replace("</Charts>", "");
+    }
+
+    private string LoadPieCharts(string xml, XmlNode node, string id, int gridViewIndex, bool hideGridView,
+        string type, int width, int height, int titleColumnIndex, int valueColumnIndex, string backgroundColor,
+        string borderColor)
+    {
+        //The "maring" below is a typo in the original markup (it should be "margin").
+        //It is PRESERVED byte for byte: it is inert css, and changing it would be an
+        //unnecessary deviation. Recorded in migration-summary.md.
+        string pieChart = string.Format(CultureInfo.InvariantCulture,
+            "<div style='background-color:{0};padding:24px;maring:0 auto;border:1px solid {1};'>" +
+            "<canvas id='{2}' width='{3}px' height='{4}px'></canvas>" +
+            "<br />" +
+            "<div id='{2}-legend'></div></div>", backgroundColor,
+            borderColor, id, width, height);
+
+        string script = string.Format(CultureInfo.InvariantCulture, "$(document).ready(function () {{" +
+                                                                    "preparePieChart('GridView{0}', '{1}', '{1}-legend', '{2}', {3}, {4}, {5});" +
+                                                                    " }});", gridViewIndex, id, type,
+            hideGridView.ToString().ToLower(), titleColumnIndex, valueColumnIndex);
+
+        this.pieChartScripts.Add(new KeyValuePair<string, string>(id, script));
+
+        return xml.Replace(node.OuterXml, pieChart);
+    }
+
+    /// <summary>
+    ///     Replacement for <c>ColorTranslator.ToHtml(ColorTranslator.FromHtml(value))</c>.
+    ///     System.Drawing is not cross-platform here, so the round trip is performed on the
+    ///     string itself and produces the SAME html color strings:
+    ///     <list type="bullet">
+    ///         <item>blank -&gt; blank (FromHtml("") was Color.Empty, ToHtml(Empty) was "").</item>
+    ///         <item>"#FFF" -&gt; "#FFFFFF" (FromHtml expanded the shorthand, and the
+    ///         resulting color was not a KnownColor so ToHtml emitted upper-case hex).</item>
+    ///         <item>a known color name -&gt; its canonical casing ("red" -&gt; "Red"),
+    ///         which is what ToHtml emitted for a named color.</item>
+    ///         <item>anything else is passed through unchanged.</item>
+    ///     </list>
+    /// </summary>
+    private string ToHtmlColor(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        string color = value.Trim();
+
+        if (color.StartsWith("#", StringComparison.Ordinal))
+        {
+            string hex = color.Substring(1);
+
+            //ColorTranslator.FromHtml THREW on a malformed value, which surfaced a
+            //mis-authored report loudly. Passing it through would instead emit a broken
+            //style attribute and a silently unstyled chart, so validate and log.
+            bool validHex = (hex.Length.Equals(3) || hex.Length.Equals(6)) &&
+                hex.All(c => Uri.IsHexDigit(c));
+
+            if (!validHex)
+            {
+                Log.Warning("Report {ReportPath} declares a malformed chart colour {Colour}; ignoring it.",
+                    this.reportPath, value);
+                return string.Empty;
+            }
+
+            if (hex.Length.Equals(3))
+            {
+                //ColorTranslator.FromHtml expanded "#abc" to "#aabbcc".
+                hex = new string(new[] { hex[0], hex[0], hex[1], hex[1], hex[2], hex[2] });
+            }
+
+            return "#" + hex.ToUpperInvariant();
+        }
+
+        foreach (string known in KnownColorNames)
+        {
+            if (known.Equals(color, StringComparison.OrdinalIgnoreCase))
+            {
+                return known;
+            }
+        }
+
+        return color;
+    }
+
+    /// <summary>
+    ///     The System.Drawing KnownColor names, in their canonical casing - the only part of
+    ///     ColorTranslator this engine needed.
+    /// </summary>
+    private static readonly string[] KnownColorNames =
+        ("Transparent,AliceBlue,AntiqueWhite,Aqua,Aquamarine,Azure,Beige,Bisque,Black,BlanchedAlmond,Blue," +
+         "BlueViolet,Brown,BurlyWood,CadetBlue,Chartreuse,Chocolate,Coral,CornflowerBlue,Cornsilk,Crimson,Cyan," +
+         "DarkBlue,DarkCyan,DarkGoldenrod,DarkGray,DarkGreen,DarkKhaki,DarkMagenta,DarkOliveGreen,DarkOrange," +
+         "DarkOrchid,DarkRed,DarkSalmon,DarkSeaGreen,DarkSlateBlue,DarkSlateGray,DarkTurquoise,DarkViolet," +
+         "DeepPink,DeepSkyBlue,DimGray,DodgerBlue,Firebrick,FloralWhite,ForestGreen,Fuchsia,Gainsboro," +
+         "GhostWhite,Gold,Goldenrod,Gray,Green,GreenYellow,Honeydew,HotPink,IndianRed,Indigo,Ivory,Khaki," +
+         "Lavender,LavenderBlush,LawnGreen,LemonChiffon,LightBlue,LightCoral,LightCyan,LightGoldenrodYellow," +
+         "LightGray,LightGreen,LightPink,LightSalmon,LightSeaGreen,LightSkyBlue,LightSlateGray,LightSteelBlue," +
+         "LightYellow,Lime,LimeGreen,Linen,Magenta,Maroon,MediumAquamarine,MediumBlue,MediumOrchid,MediumPurple," +
+         "MediumSeaGreen,MediumSlateBlue,MediumSpringGreen,MediumTurquoise,MediumVioletRed,MidnightBlue," +
+         "MintCream,MistyRose,Moccasin,NavajoWhite,Navy,OldLace,Olive,OliveDrab,Orange,OrangeRed,Orchid," +
+         "PaleGoldenrod,PaleGreen,PaleTurquoise,PaleVioletRed,PapayaWhip,PeachPuff,Peru,Pink,Plum,PowderBlue," +
+         "Purple,Red,RosyBrown,RoyalBlue,SaddleBrown,Salmon,SandyBrown,SeaGreen,SeaShell,Sienna,Silver,SkyBlue," +
+         "SlateBlue,SlateGray,Snow,SpringGreen,SteelBlue,Tan,Teal,Thistle,Tomato,Turquoise,Violet,Wheat,White," +
+         "WhiteSmoke,Yellow,YellowGreen,RebeccaPurple,ActiveBorder,ActiveCaption,ActiveCaptionText,AppWorkspace,ButtonFace,ButtonHighlight,ButtonShadow,Control,ControlDark,ControlDarkDark,ControlLight,ControlLightLight,ControlText,Desktop,GradientActiveCaption,GradientInactiveCaption,GrayText,Highlight,HighlightText,HotTrack,InactiveBorder,InactiveCaption,InactiveCaptionText,Info,InfoText,Menu,MenuBar,MenuHighlight,MenuText,ScrollBar,Window,WindowFrame,WindowText").Split(',');
+
+    //=====================================================================
+    // Report/Intializer.cs SetGridViews / LoadGrid, and Report/Events.cs
+    // GridView_DataBound / GridView_RowDataBound.
+    //
+    // KEY DECISION (checklist task 43): MixERPGridView is NOT reused, even though
+    // MixERP.Net.WebControls.Common's migration summary lists Intializer.cs:125 as
+    // a consumer. The Blazor MixERPGridView renders no <tfoot> and exposes no
+    // header/row data-bound hook, so neither the running-total footer
+    // (GridView_DataBound) nor the header localization (GridView_RowDataBound) can
+    // be expressed through its [Parameter] surface. This component therefore
+    // renders <table>/<thead>/<tbody>/<tfoot> itself, reproducing BOTH the
+    // MixERPGridView base formatting the original inherited AND the Report-level
+    // handlers that ran on top of it.
+    //=====================================================================
+
+    protected sealed class GridCell
+    {
+        public string Text { get; set; }
+        public string CssClass { get; set; }
+        public string Style { get; set; }
+        public int ColumnSpan { get; set; } = 1;
+        public bool Visible { get; set; } = true;
+    }
+
+    protected sealed class GridModel
+    {
+        public string Id { get; set; }
+        public string Style { get; set; }
+        public bool IsEmpty { get; set; }
+        public string EmptyDataText { get; set; }
+        public List<GridCell> HeaderCells { get; set; }
+        public List<List<GridCell>> Rows { get; set; }
+        public List<GridCell> FooterCells { get; set; }
+    }
+
+    private readonly List<GridModel> grids = new List<GridModel>();
+
+    private void SetGridViews()
+    {
+        XmlNodeList gridViewDataSource = XmlHelper.GetNodes(this.reportPath, "//GridViewDataSource");
+        string indices = string.Empty;
+        string styles = string.Empty;
+
+        foreach (XmlNode node in gridViewDataSource)
+        {
+            if (node.Attributes != null)
+            {
+                if (node.Attributes["Index"] != null)
+                {
+                    indices += node.Attributes["Index"].Value + ",";
+                }
+
+                if (node.Attributes["Style"] != null)
+                {
+                    styles += node.Attributes["Style"].Value + ",";
+                }
+                else
+                {
+                    //EMPTY-SLOT PADDING: LoadGrid walks "styles" POSITIONALLY against
+                    //"indices", so a datasource without a Style attribute must still
+                    //contribute a slot.
+                    styles += ",";
+                }
+            }
+        }
+
+        this.LoadGrid(indices, styles);
+    }
+
+    private void LoadGrid(string indices, string styles)
+    {
+        List<string> styleList = styles.Split(',').ToList();
+
+        int counter = 0;
+
+        this.grids.Clear();
+
+        foreach (string data in indices.Split(','))
+        {
+            string style = styleList[counter];
+
+            string ds = data.Trim();
+
+            if (!string.IsNullOrWhiteSpace(ds))
+            {
+                int index = Conversion.TryCastInteger(ds);
+
+                GridModel grid = new GridModel();
+
+                //"GridView" + ds is a LOAD-BEARING id: mixerp-core.min.js's
+                //preparePieChart/prepareChart scrape the table by it.
+                grid.Id = "GridView" + ds;
+
+                //grid.Width = Unit.Percentage(100) rendered style="width:100%;", and the
+                //optional per-grid Style attribute was merged into the same attribute.
+                //grid.CssClass = "report" and GridLines.None (no border attributes) are
+                //expressed by the markup above.
+                grid.Style = "width:100%;" + (string.IsNullOrWhiteSpace(style) ? string.Empty : style);
+
+                this.BindGrid(grid, index);
+
+                this.grids.Add(grid);
+
+                counter++;
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Replaces <c>grid.DataSource = table; grid.DataBind();</c> and the two event
+    ///     handlers of Report/Events.cs.
+    /// </summary>
+    private void BindGrid(GridModel grid, int arg)
+    {
+        DataTable table = null;
+
+        if (this.dataTableCollection != null && arg >= 0 && arg < this.dataTableCollection.Count)
+        {
+            table = this.dataTableCollection[arg];
+        }
+        else
+        {
+            //The original indexed dataTableCollection[arg] unguarded, so a mis-authored
+            //GridViewDataSource/@Index threw a visible error. The guard above keeps the
+            //circuit alive, but a silently blank grid is undiagnosable - so log it.
+            Log.Warning(
+                "Report {ReportPath} declares GridViewDataSource index {Index}, which has no datasource; the grid renders empty.",
+                this.reportPath, arg);
+        }
+
+        if (table == null || table.Rows.Count.Equals(0))
+        {
+            //MixERPGridView.Initialize() set EmptyDataText = CommonResource.NoRecordFound,
+            //and its OnDataBound returned early for an empty grid - so neither the header
+            //row nor the running-total footer was produced.
+            grid.IsEmpty = true;
+            grid.EmptyDataText = CommonResource.NoRecordFound;
+            return;
+        }
+
+        string decimalFieldIndices = string.Empty;
+
+        if (this.decimalFieldIndicesCollection != null && arg < this.decimalFieldIndicesCollection.Count)
+        {
+            decimalFieldIndices = this.decimalFieldIndicesCollection[arg];
+        }
+
+        //GridView_RowDataBound's data-row branch: every comma separated token is cast with
+        //TryCastInteger, so a blank token resolves to column 0 exactly as it did before.
+        HashSet<int> decimalColumns = new HashSet<int>();
+
+        if (!string.IsNullOrWhiteSpace(decimalFieldIndices))
+        {
+            foreach (string fieldIndex in decimalFieldIndices.Split(','))
+            {
+                int decimalColumn = Conversion.TryCastInteger(fieldIndex);
+
+                if (decimalColumn < 0 || decimalColumn >= table.Columns.Count)
+                {
+                    //Originally an out-of-range DecimalFieldIndices entry threw on
+                    //e.Row.Cells[index]; it is now skipped, so log to keep it diagnosable.
+                    Log.Warning(
+                        "Report {ReportPath} declares DecimalFieldIndices entry {Index}, which is outside the {ColumnCount} columns of datasource {DataSource}; ignoring it.",
+                        this.reportPath, decimalColumn, table.Columns.Count, arg);
+                    continue;
+                }
+
+                decimalColumns.Add(decimalColumn);
+            }
+        }
+
+        //----------------------------------------------------------------
+        //Header: MixERPGridView gave every auto-generated column a header css class of
+        //"text left" ("text right" for Decimal/Double/Single), and GridView_RowDataBound's
+        //header branch then replaced the header TEXT with its localized value. This is a
+        //LOCALIZATION SURFACE: every report column heading passes through it.
+        //----------------------------------------------------------------
+        string className = ConfigurationHelper.GetReportParameter("ResourceClassName");
+
+        grid.HeaderCells = new List<GridCell>();
+
+        foreach (DataColumn column in table.Columns)
+        {
+            grid.HeaderCells.Add(new GridCell
+            {
+                Text = ResourceManager.GetString(className, column.ColumnName),
+                CssClass = IsNumericColumn(column) ? "text right" : "text left"
+            });
+        }
+
+        //----------------------------------------------------------------
+        //Data rows
+        //----------------------------------------------------------------
+        grid.Rows = new List<List<GridCell>>();
+
+        foreach (DataRow row in table.Rows)
+        {
+            List<GridCell> cells = new List<GridCell>();
+
+            for (int i = 0; i < table.Columns.Count; i++)
+            {
+                DataColumn column = table.Columns[i];
+
+                //The text MixERPGridView itself produced for the cell.
+                string text = FormatCellValue(column, row);
+                string cssClass = IsNumericColumn(column) ? "text right" : null;
+
+                if (decimalColumns.Contains(i))
+                {
+                    //GridView_RowDataBound then overwrote it. NOTE: unlike
+                    //MixERPGridView, this code has NO zero-value exemption - a zero is
+                    //formatted as "0.00" here, deliberately.
+                    decimal value = Conversion.TryCastDecimal(text);
+                    text = string.Format(Thread.CurrentThread.CurrentCulture, "{0:N}", value);
+                    cssClass = "text right";
+                }
+
+                cells.Add(new GridCell { Text = text, CssClass = cssClass });
+            }
+
+            grid.Rows.Add(cells);
+        }
+
+        this.BuildFooter(grid, table, arg);
+    }
+
+    /// <summary>
+    ///     Report/Events.cs GridView_DataBound - the running-total footer.
+    ///     <para>
+    ///         The original read the already-rendered footer cells of a GridView. Because
+    ///         GridView.ShowFooter was never set, FooterRow was null and the method
+    ///         returned at that guard, so the footer did not actually reach the browser.
+    ///         The evident intent is ported here (a real &lt;tfoot&gt;); the behavioural
+    ///         difference is recorded in migration-summary.md.
+    ///     </para>
+    /// </summary>
+    private void BuildFooter(GridModel grid, DataTable table, int arg)
+    {
+        string runningTotalFieldIndices = string.Empty;
+
+        if (this.runningTotalFieldIndicesCollection != null && arg < this.runningTotalFieldIndicesCollection.Count)
+        {
+            runningTotalFieldIndices = this.runningTotalFieldIndicesCollection[arg];
+        }
+
+        if (string.IsNullOrWhiteSpace(runningTotalFieldIndices))
+        {
+            //No running totals declared for this datasource: no footer at all.
+            return;
+        }
+
+        int runningTotalTextColumnIndex = 0;
+
+        if (this.runningTotalTextColumnIndexCollection != null &&
+            arg < this.runningTotalTextColumnIndexCollection.Count)
+        {
+            runningTotalTextColumnIndex = this.runningTotalTextColumnIndexCollection[arg];
+        }
+
+        int columnCount = table.Columns.Count;
+
+        List<GridCell> footer = new List<GridCell>();
+
+        for (int i = 0; i < columnCount; i++)
+        {
+            footer.Add(new GridCell { Text = string.Empty });
+        }
+
+        //grid.FooterRow.Cells[i].Visible = false for the first N cells.
+        for (int i = 0; i < runningTotalTextColumnIndex && i < columnCount; i++)
+        {
+            footer[i].Visible = false;
+        }
+
+        if (runningTotalTextColumnIndex < columnCount)
+        {
+            GridCell textCell = footer[runningTotalTextColumnIndex];
+
+            //The original set Cells[N].ColumnSpan = N + 1 while hiding cells 0..N-1.
+            //Because the hidden cells are not rendered, a span of N+1 starting at column
+            //N reaches column 2N, which overflows the table for a wide
+            //RunningTotalTextColumnIndex and yields malformed HTML. Clamped to the number
+            //of columns actually remaining. Recorded in migration-summary.md section 4.
+            int availableColumns = columnCount - runningTotalTextColumnIndex;
+            textCell.ColumnSpan = Math.Min(runningTotalTextColumnIndex + 1, availableColumns);
+            textCell.Text = this.RunningTotalText;
+            textCell.Style = "text-align:right;font-weight:bold;";
+        }
+
+        foreach (string field in runningTotalFieldIndices.Split(','))
+        {
+            int index = Conversion.TryCastInteger(field.Trim());
+
+            decimal total = 0;
+
+            //PRESERVED BUG: the "index > 0" guard below means column 0 is NEVER totalled,
+            //even when the report declares it. Deliberately kept (see migration-summary.md).
+            if (index >= columnCount)
+            {
+                //Originally threw on grid.FooterRow.Cells[index]; now skipped, so log it.
+                Log.Warning(
+                    "Report {ReportPath} declares RunningTotalFieldIndices entry {Index}, which is outside the {ColumnCount} columns of datasource {DataSource}; ignoring it.",
+                    this.reportPath, index, columnCount, arg);
+                continue;
+            }
+
+            if (index > 0)
+            {
+                foreach (List<GridCell> row in grid.Rows)
+                {
+                    //The original summed the RENDERED cell text of each data row.
+                    total += Conversion.TryCastDecimal(row[index].Text);
+                }
+
+                GridCell cell = footer[index];
+                cell.Text = string.Format(Thread.CurrentThread.CurrentCulture, "{0:N}", total);
+                cell.CssClass = "text right";
+                cell.Style = "font-weight:bold;";
+            }
+        }
+
+        grid.FooterCells = footer;
+    }
+
+    /// <summary>
+    ///     MixERPGridView.OnRowDataBound's per-DataType cell formatting, which the original
+    ///     grid applied BEFORE Report's own handler: Decimal/Double/Single as "N" with zero
+    ///     left unformatted, DateTime as "D" (date only) or "F", everything else as-is.
+    /// </summary>
+    private static string FormatCellValue(DataColumn column, DataRow row)
+    {
+        object value = row[column];
+        string text = value == null || value == DBNull.Value ? string.Empty : value.ToString();
+
+        if (column.DataType == null)
+        {
+            return text;
+        }
+
+        switch (column.DataType.FullName)
+        {
+            case "System.Decimal":
+            case "System.Double":
+            case "System.Single":
+                decimal number = Conversion.TryCastDecimal(text);
+
+                if (!number.Equals(0))
+                {
+                    return number.ToString("N", CultureInfo.CurrentCulture);
+                }
+
+                return text;
+            case "System.DateTime":
+                DateTime date = Conversion.TryCastDate(text);
+
+                if (date.Date == date)
+                {
+                    return date.ToString("D", CultureInfo.CurrentCulture);
+                }
+
+                return date.ToString("F", CultureInfo.CurrentCulture);
+            default:
+                return text;
+        }
+    }
+
+    private static bool IsNumericColumn(DataColumn column)
+    {
+        if (column.DataType == null)
+        {
+            return false;
+        }
+
+        switch (column.DataType.FullName)
+        {
+            case "System.Decimal":
+            case "System.Double":
+            case "System.Single":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    //=====================================================================
+    // Report/Intializer.cs CleanUp() and Report/IDisposable.cs
+    //=====================================================================
+
+    /// <summary>
+    ///     Report/Intializer.cs CleanUp(). NOTE THE BOUND: the loop runs to
+    ///     <c>Count - 1</c> exclusive, so the LAST table is deliberately left alive
+    ///     (the bottom section and the grids still read from the collection after this
+    ///     point). Preserved exactly; recorded in migration-summary.md.
+    /// </summary>
+    private void CleanUp()
+    {
+        for (int i = 0; i < this.dataTableCollection.Count - 1; i++)
+        {
+            DataTable table = this.dataTableCollection[i];
+            if (table != null)
+            {
+                table.Dispose();
+            }
+        }
+    }
+
+}

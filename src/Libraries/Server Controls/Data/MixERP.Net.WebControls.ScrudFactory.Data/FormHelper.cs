@@ -21,19 +21,36 @@ using MixERP.Net.Common;
 using MixERP.Net.DbFactory;
 using MixERP.Net.Framework;
 using Npgsql;
+using NpgsqlTypes;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
+using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Threading;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Data
 {
     public static class FormHelper
     {
+        /// <summary>
+        /// Adds a SQL NULL parameter.
+        /// Npgsql 6+ no longer infers a parameter type from a bare <see cref="DBNull" /> handed to
+        /// <c>AddWithValue</c>, so the parameter is created explicitly with
+        /// <see cref="NpgsqlDbType.Unknown" />. That is the same wire behaviour the legacy
+        /// <c>AddWithValue(name, DBNull.Value)</c> produced: an untyped NULL whose type PostgreSQL
+        /// resolves from the surrounding statement.
+        /// </summary>
+        private static void AddNullParameter(NpgsqlCommand command, string parameterName)
+        {
+            command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.Unknown)
+            {
+                Value = DBNull.Value
+            });
+        }
+
         public static bool DeleteRecord(string catalog, string tableSchema, string tableName, string keyColumn, string keyColumnValue)
         {
             string sql = "DELETE FROM @TableSchema.@TableName WHERE @KeyColumn=@KeyValue";
@@ -185,7 +202,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Data
                 {
                     if (!string.IsNullOrWhiteSpace(column))
                     {
-                        command.Parameters.AddWithValue("@" + DbFactory.Sanitizer.SanitizeIdentifierName(column.Trim()), "%" + values[counter].ToLower(Thread.CurrentThread.CurrentCulture) + "%");
+                        command.Parameters.AddWithValue("@" + DbFactory.Sanitizer.SanitizeIdentifierName(column.Trim()), "%" + values[counter].ToLower(CultureInfo.CurrentCulture) + "%");
                         counter++;
                     }
                 }
@@ -281,7 +298,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Data
                 {
                     if (pair.Value == null)
                     {
-                        command.Parameters.AddWithValue("@" + pair.Key, DBNull.Value);
+                        AddNullParameter(command, "@" + pair.Key);
                     }
                     else
                     {
@@ -300,7 +317,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Data
                         {
                             if (pair.Value == null)
                             {
-                                command.Parameters.AddWithValue("@" + pair.Key, DBNull.Value);
+                                AddNullParameter(command, "@" + pair.Key);
                             }
                             else
                             {
@@ -316,10 +333,19 @@ namespace MixERP.Net.WebControls.ScrudFactory.Data
                 {
                     return Conversion.TryCastLong(DbOperation.GetScalarValue(catalog, command));
                 }
-                catch (NpgsqlException ex)
+                catch (PostgresException ex)
                 {
+                    // Npgsql 6+ moved ConstraintName from NpgsqlException onto PostgresException
+                    // (the server-reported error), so the constraint name is read from there.
                     Log.Warning("{Sql}/{Data}/{Exception}.", sql, data, ex);
                     throw new MixERPException(ex.Message, ex, ex.ConstraintName);
+                }
+                catch (NpgsqlException ex)
+                {
+                    // Client/transport-side Npgsql failures carry no constraint name — the legacy
+                    // ConstraintName was null for these too.
+                    Log.Warning("{Sql}/{Data}/{Exception}.", sql, data, ex);
+                    throw new MixERPException(ex.Message, ex);
                 }
             }
         }
@@ -373,7 +399,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Data
                     {
                         if (pair.Value == null)
                         {
-                            command.Parameters.AddWithValue("@" + pair.Key, DBNull.Value);
+                            AddNullParameter(command, "@" + pair.Key);
                         }
                         else
                         {
@@ -407,10 +433,17 @@ namespace MixERP.Net.WebControls.ScrudFactory.Data
                 {
                     return DbOperation.ExecuteNonQuery(catalog, command);
                 }
-                catch (NpgsqlException ex)
+                catch (PostgresException ex)
                 {
+                    // Npgsql 6+ moved ConstraintName from NpgsqlException onto PostgresException.
                     Log.Warning("{Sql}/{Data}/{Exception}.", sql, data, ex);
                     throw new MixERPException(ex.Message, ex, ex.ConstraintName);
+                }
+                catch (NpgsqlException ex)
+                {
+                    // Client/transport-side Npgsql failures carry no constraint name.
+                    Log.Warning("{Sql}/{Data}/{Exception}.", sql, data, ex);
+                    throw new MixERPException(ex.Message, ex);
                 }
             }
         }

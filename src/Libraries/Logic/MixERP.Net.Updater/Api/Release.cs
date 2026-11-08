@@ -1,3 +1,4 @@
+using Markdig;
 using MixERP.Net.Common;
 using System;
 using System.Collections.Generic;
@@ -42,11 +43,18 @@ namespace MixERP.Net.Updater.Api
 
         private static string ParseMarkdown(string markdown)
         {
-            var md = new MarkdownDeep.Markdown();
-            md.ExtraMode = true;
-            md.SafeMode = false;
+            if (string.IsNullOrEmpty(markdown))
+            {
+                return markdown;
+            }
 
-            return md.Transform(markdown);
+            //MarkdownDeep (net35 only) → Markdig. "ExtraMode = true" (Markdown Extra: tables,
+            //fenced code, definition lists, footnotes, attributes) maps onto
+            //UseAdvancedExtensions(); "SafeMode = false" means no HTML sanitization, which is
+            //Markdig's default, so no sanitizing extension is enabled.
+            MarkdownPipeline pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+
+            return Markdig.Markdown.ToHtml(markdown, pipeline);
         }
     }
 }

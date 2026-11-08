@@ -1,0 +1,320 @@
+@* ComponentBase is not CLS-compliant; this assembly is CLSCompliant(true). *@
+@attribute [System.CLSCompliant(false)]
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Blazor replacement for the former WebForms CompositeControl
+    "MixERP.Net.WebControls.AttachmentFactory.Attachment", which was assembled from
+    eleven partial-class files. The markup below is the one-for-one port of the
+    control's render tree, in the exact order CreateChildControls() built it:
+
+      Attachment/Control.cs      CreateChildControls()  -> this template
+        UploadPanel.cs           CreateUploadPanel()    -> #FileUploads + "ui table"
+          Upload Panel/HeaderRow.cs CreateHeaderRow()   -> the <thead> row
+          Upload Panel/Row.cs    CreateRow()            -> the @for row loop
+        Buttons.cs               CreateButtons()        -> the "vpad8" div
+        WarningLabel.cs          CreateWarningLabel()   -> #WarningLabel
+        HiddenFields.cs          CreateHiddenFields()   -> #UploadedFilesHidden
+        Persmission.cs           CheckPermission()      -> OnParametersSet (below)
+        Javascript.cs            RegisterJavascript()/AddJavascript()
+                                                        -> OnAfterRenderAsync (below)
+
+    DOM / WIRE CONTRACT: AttachmentFactory.js and ajax-file-upload.js select every
+    element by LITERAL id (#FileUploads, #UploadButton, #UndoButton, #SaveButton,
+    #UploadedFilesHidden, #WarningLabel, and the indexed #CommentTextBox{i},
+    #FileUpload{i}, #BrowseButton{i}, #Progress{i}, #FilePath{i}) and by css class
+    (.comment, .upload, .browse, .path). The <input type="file"> must keep
+    name="file" because ajax-file-upload.js posts the field under the element's name.
+    Any change to an id, a class or that name leaves this control compiling green
+    while silently doing nothing at runtime.
+
+    The former Attachment/IDisposable.cs is intentionally gone: its whole
+    Dispose/disposed/placeHolder/warningLabel pattern existed only to release
+    WebForms child-control instances. A Blazor component owns no child-control tree
+    and no unmanaged resource, so there is nothing to dispose and an empty Dispose()
+    would only pretend to do work.
+*@
+
+@namespace MixERP.Net.WebControls.AttachmentFactory
+@using System
+@using System.Globalization
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.i18n.Resources
+@using Microsoft.Extensions.Logging
+@using Microsoft.JSInterop
+@using ConfigurationHelper = MixERP.Net.WebControls.AttachmentFactory.Helpers.ConfigurationHelper
+@inject IJSRuntime JSRuntime
+@*
+    Optional: a host that has not registered logging still resolves this to null, which the
+    call site null-guards. The control must never fail to render because of its diagnostics.
+*@
+@inject ILogger<Attachment> Logger
+
+<div>
+    @* ---------- CreateUploadPanel() ---------- *@
+    <div id="FileUploads">
+        <table class="ui table" style="width:100%">
+            @* ---------- CreateHeaderRow() / AddHeaderCell() ---------- *@
+            <thead>
+                <tr>
+                    <th style="width:340px"><span>@Titles.Comment</span></th>
+                    <th style="width:50px" class="nopadding"><span>@Titles.Upload</span></th>
+                    <th style="width:240px"><span>@Titles.Progress</span></th>
+                    <th><span>@Titles.FilePath</span></th>
+                </tr>
+            </thead>
+            @* ---------- CreateRow(): this.Count rows, defaulted to 5 in OnParametersSet ---------- *@
+            @for (int i = 0; i < this.Count; i++)
+            {
+                <tr class="ui form">
+                    @* CreateCommentCell() *@
+                    <td><input type="text" id="CommentTextBox@(i)" class="comment" /></td>
+                    @* CreateUploadCell() *@
+                    <td>
+                        <input type="file" id="FileUpload@(i)" class="hidden upload" name="file" />
+                        <input type="button" id="BrowseButton@(i)" class="browse ui small blue button" value="@Titles.Browse" />
+                    </td>
+                    @* CreateProgressCell() *@
+                    <td><progress id="Progress@(i)" value="0" max="100" style="width: 100%;"></progress></td>
+                    @* CreateFilePathCell() *@
+                    <td><p id="FilePath@(i)" class="path"></p></td>
+                </tr>
+            }
+        </table>
+    </div>
+
+    @*
+        ---------- CreateButtons() ----------
+        The original added the "vpad8" container to the page BEFORE appending the save
+        button, but because the append targeted that same container the resulting DOM
+        still had all three buttons inside it. The final DOM is replicated here, not
+        the ordering quirk.
+    *@
+    <div class="vpad8">
+        @* CreateUploadButton() *@
+        <input type="button" id="UploadButton" class="ui small blue button" value="@Titles.Upload" />
+        @* CreateUndoButton() *@
+        <input type="button" id="UndoButton" class="ui small red button" value="@Titles.Undo" />
+        @* CreatSaveButton(): Visible = ShowSaveButton, and an invisible WebForms control emitted nothing *@
+        @if (this.ShowSaveButton)
+        {
+            <input type="button" id="SaveButton" class="ui small green button" value="@Titles.Save" />
+        }
+    </div>
+
+    @*
+        ---------- CreateWarningLabel() ----------
+        Rendered unconditionally even when the text is empty: AttachmentFactory.js
+        writes the duplicate-file warning into #WarningLabel, so the element has to
+        exist before the script runs.
+    *@
+    <p><span id="WarningLabel" class="big error">@this.warningText</span></p>
+
+    @* ---------- CreateHiddenFields() ---------- *@
+    <input type="hidden" id="UploadedFilesHidden" name="UploadedFilesHidden" value="" />
+</div>
+
+@code {
+    /// <summary>
+    ///     Port of Attachment/Properties.cs. Renders the save button when true.
+    /// </summary>
+    [Parameter]
+    public bool ShowSaveButton { get; set; }
+
+    /// <summary>
+    ///     Port of Attachment/Properties.cs. The number of upload rows to render.
+    ///     Zero is treated as five, exactly as CreateRow() did.
+    /// </summary>
+    [Parameter]
+    public int Count { get; set; }
+
+    /// <summary>
+    ///     Port of Attachment/Properties.cs. The catalog (tenant database) whose
+    ///     attachment configuration is read.
+    ///     <para>
+    ///         SIGNATURE CHANGE: this was the single constructor argument of the WebForms
+    ///         control (<c>new Attachment(AppUsers.GetCurrentUserDB())</c>). Blazor
+    ///         instantiates components itself and cannot pass constructor arguments, so it
+    ///         becomes a required parameter that consumers supply as an attribute:
+    ///         <c>&lt;Attachment Catalog="@AppUsers.GetCurrentUserDB()" /&gt;</c>.
+    ///     </para>
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public string Catalog { get; set; }
+
+    /// <summary>
+    ///     Backs #WarningLabel. Replaces the WebForms <c>warningLabel.InnerText</c>
+    ///     assignment made by CheckPermission().
+    /// </summary>
+    private string warningText;
+
+    /// <summary>
+    ///     Port of Attachment/Upload Panel/Row.cs CreateRow()'s row-count default and of
+    ///     Attachment/Persmission.cs CheckPermission(). CreateChildControls() ran both once
+    ///     per control instantiation, after the parameters had been assigned, which is
+    ///     OnParametersSet here. The count default is applied here rather than inside the
+    ///     render loop so the loop stays a pure projection of state.
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        if (this.Count.Equals(0))
+        {
+            this.Count = 5;
+        }
+
+        this.CheckPermission();
+
+        base.OnParametersSet();
+    }
+
+    /// <summary>
+    ///     Port of Attachment/Persmission.cs. The message text and the
+    ///     CultureInfo.CurrentUICulture formatting are preserved verbatim; the string was
+    ///     never resourced in the original and is deliberately not changed here.
+    /// </summary>
+    private void CheckPermission()
+    {
+        string folder = ConfigurationHelper.GetAttachmentsDirectory(this.Catalog);
+        bool writable = FileSystemHelper.IsDirectoryWritable(folder);
+
+        if (!writable)
+        {
+            this.warningText = String.Format(CultureInfo.CurrentUICulture,
+                "The directory \"{0}\" is write protected", folder);
+        }
+    }
+
+    /// <summary>
+    ///     Port of Attachment/Javascript.cs RegisterJavascript() and AddJavascript().
+    ///     CreateChildControls() ran both during control creation; JS interop is only legal
+    ///     after the first render in Blazor, so they move here.
+    ///     <para>
+    ///         ORDER IS LOAD-BEARING. The three globals (allowedExtensions,
+    ///         undoUploadServiceUrl, uploadHandlerUrl) are registered FIRST because both
+    ///         scripts read them, then ajax-file-upload.js (which defines $.fn.upload),
+    ///         then AttachmentFactory.js (which calls $.fn.upload).
+    ///     </para>
+    ///     <para>
+    ///         The former [AspNetHostingPermission(SecurityAction.Demand, Level = Minimal)]
+    ///         demand on AddJavascript is intentionally dropped: Code Access Security does
+    ///         not exist on modern .NET. It was a host-trust demand, never an application
+    ///         authorization rule, so no authorization behaviour is lost.
+    ///     </para>
+    ///     <para>
+    ///         Likewise the two [assembly: WebResource(...)] declarations are gone with the
+    ///         WebForms UI namespace. The scripts are still EmbeddedResources and are served by
+    ///         JSUtility.GetWebResourceUrl / the host's JSUtility.WebResourceRoutePrefix
+    ///         endpoint, which is what resolves them now.
+    ///     </para>
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            this.RegisterJavascript();
+            this.AddJavascript();
+
+            //AttachmentFactory.js wires its handlers at $(window).load / $(function(){}),
+            //neither of which re-fires on a Blazor re-render, and AddJSReference injects
+            //the script element only once per key for the whole circuit. initAttachment()
+            //restores the per-instantiation wiring WebForms got from a full page load. It
+            //is idempotent (see the element-keyed guard in AttachmentFactory.js), so the
+            //self-initialisation that runs when the script first loads and this call
+            //cannot stack duplicate handlers.
+            //
+            //The function is PROBED rather than called inside a blanket catch. AddJSReference
+            //is a void, fire-and-forget API, so on the very first instantiation the script
+            //element may not have finished loading and "initAttachment" is not defined yet -
+            //that case needs no retry, because the script wires itself up as soon as it loads.
+            //Swallowing every JSException instead would also hide a genuine throw from INSIDE
+            //initAttachment (missing jQuery, undefined Resources), leaving a control that
+            //renders and silently does nothing - the exact failure mode this port is guarding
+            //against. So the "not loaded yet" case is detected explicitly and anything else is
+            //logged.
+            bool ready = false;
+
+            try
+            {
+                ready = await this.JSRuntime.InvokeAsync<bool>("eval",
+                    "typeof window.initAttachment === 'function'");
+            }
+            catch (JSException)
+            {
+                //The circuit cannot evaluate script at all; the self-initialisation path in
+                //AttachmentFactory.js is the remaining route and needs no action here.
+            }
+
+            if (ready)
+            {
+                try
+                {
+                    await this.JSRuntime.InvokeVoidAsync("initAttachment");
+                }
+                catch (JSException ex)
+                {
+                    //A real failure inside initAttachment. It must not be silent.
+                    this.Logger?.LogError(ex,
+                        "initAttachment() failed; the attachment control will render but its upload, undo and browse handlers will not be wired.");
+                }
+            }
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    /// <summary>
+    ///     Port of Attachment/Javascript.cs RegisterJavascript(). Builds the same script
+    ///     string from the same four fragments.
+    /// </summary>
+    private void RegisterJavascript()
+    {
+        string script = JSUtility.GetVar("allowedExtensions",
+            ConfigurationHelper.GetAllowedExtensions(this.Catalog));
+
+        script += "allowedExtensions = allowedExtensions.split(',');";
+        script += JSUtility.GetVar("undoUploadServiceUrl",
+            ConfigurationHelper.GetUndoUploadServiceUrl(this.Catalog));
+        script += JSUtility.GetVar("uploadHandlerUrl",
+            ConfigurationHelper.GetUploadHandlerUrl(this.Catalog));
+
+        PageUtility.RegisterJavascript("AttachmentUserControl_Resources", script, this.JSRuntime, true);
+    }
+
+    /// <summary>
+    ///     Port of Attachment/Javascript.cs AddJavascript(). Keeps the original reference
+    ///     order: ajax-file-upload.js defines $.fn.upload, AttachmentFactory.js calls it.
+    /// </summary>
+    private void AddJavascript()
+    {
+        JSUtility.AddJSReference(this.JSRuntime,
+            "MixERP.Net.WebControls.AttachmentFactory.ajax-file-upload.js",
+            "AttachmentAjaxFileUpload",
+            typeof(Attachment));
+
+        JSUtility.AddJSReference(this.JSRuntime,
+            "MixERP.Net.WebControls.AttachmentFactory.AttachmentFactory.js",
+            "Attachment",
+            typeof(Attachment));
+    }
+}

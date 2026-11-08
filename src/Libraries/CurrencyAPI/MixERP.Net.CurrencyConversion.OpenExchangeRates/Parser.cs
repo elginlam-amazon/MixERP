@@ -22,6 +22,11 @@ namespace MixERP.Net.CurrencyConversion.OpenExchangeRates
         {
             List<CurrencyConversionResult> result = new List<CurrencyConversionResult>();
 
+            if (this.Response == null)
+            {
+                return result;
+            }
+
             dynamic response = this.Response[this.ResultSubKey];
 
             if (response == null)

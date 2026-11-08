@@ -17,50 +17,66 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using System.Text;
+using MixERP.Net.Common.Models;
 
 namespace MixERP.Net.Common.Helpers
 {
+    /// <summary>
+    ///     Grid column factory.
+    ///     <para>
+    ///         SIGNATURE CHANGE: the WebForms <c>GridView</c> / <c>BoundField</c> / <c>ITemplate</c>
+    ///         types do not exist on modern .NET. The column model is now
+    ///         <see cref="GridViewModel" /> + <see cref="GridColumn" />, which a Blazor grid
+    ///         component binds against; the data-format string and the right-align CSS classes are
+    ///         carried through unchanged.
+    ///     </para>
+    /// </summary>
     public static class GridViewHelper
     {
-        public static void AddDataBoundControl(GridView grid, string dataField, string headerText, string dataFormatString = "", bool alignRight = false)
+        public static void AddDataBoundControl(GridViewModel grid, string dataField, string headerText, string dataFormatString = "", bool alignRight = false)
         {
-            BoundField field = new BoundField();
+            if (grid == null)
+            {
+                return;
+            }
+
+            GridColumn field = new GridColumn();
             field.DataField = dataField;
             field.HeaderText = headerText;
             field.DataFormatString = dataFormatString;
 
             if (alignRight)
             {
-                field.HeaderStyle.CssClass = "text right";
-                field.ItemStyle.CssClass = "text right";
+                field.HeaderCssClass = "text right";
+                field.ItemCssClass = "text right";
             }
 
             grid.Columns.Add(field);
         }
 
-        public class GridViewSelectTemplate : ITemplate
+        /// <summary>
+        ///     The row-select column template: a Semantic-UI toggle checkbox.
+        ///     <para>
+        ///         SIGNATURE CHANGE: <c>ITemplate.InstantiateIn(Control)</c> became
+        ///         <c>InstantiateIn(StringBuilder)</c> — the template appends its markup to the
+        ///         supplied accumulator (and returns it) instead of adding controls to a parent.
+        ///         The rendered markup is identical to what WebForms produced:
+        ///         <c>&lt;div class="ui toggle checkbox"&gt;&lt;input type="checkbox" /&gt;&lt;label&gt;&lt;/label&gt;&lt;/div&gt;</c>.
+        ///     </para>
+        /// </summary>
+        public class GridViewSelectTemplate
         {
-            public void InstantiateIn(Control container)
+            public string InstantiateIn(StringBuilder container)
             {
-                using (HtmlGenericControl toggleCheckBox = new HtmlGenericControl("div"))
+                string markup = HtmlControlHelper.GetToggleCheckBox("<input type=\"checkbox\" /><label></label>");
+
+                if (container != null)
                 {
-                    toggleCheckBox.Attributes.Add("class", "ui toggle checkbox");
-
-                    using (HtmlInputCheckBox checkBox = new HtmlInputCheckBox())
-                    {
-                        toggleCheckBox.Controls.Add(checkBox);
-                    }
-
-                    using (HtmlGenericControl label = new HtmlGenericControl("label"))
-                    {
-                        toggleCheckBox.Controls.Add(label);
-                    }
-
-                    container.Controls.Add(toggleCheckBox);
+                    container.Append(markup);
                 }
+
+                return markup;
             }
         }
     }

@@ -19,16 +19,21 @@ namespace MixERP.Net.Framework.Contracts.Currency
         {
             Type type = typeof (ICurrencyConverter);
 
-            return AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(s => s.GetTypes())
+            return DiscoveryAssemblies.GetTypes()
                 .Where(p => type.IsAssignableFrom(p))
                 .Where(p => p.Name != type.Name)
-                .Select(p => new CurrencyConverter
+                .Select(p =>
                 {
-                    Name = GetPropValue(Activator.CreateInstance(p), "ConverterName").ToString(),
-                    AssemblyQualifiedName = p.AssemblyQualifiedName,
-                    Enabled = bool.Parse(GetPropValue(Activator.CreateInstance(p), "Enabled"))
-                });
+                    object instance = Activator.CreateInstance(p);
+
+                    return new CurrencyConverter
+                    {
+                        Name = GetPropValue(instance, "ConverterName"),
+                        AssemblyQualifiedName = p.AssemblyQualifiedName,
+                        Enabled = bool.Parse(GetPropValue(instance, "Enabled"))
+                    };
+                })
+                .ToList();
         }
 
         private static string GetPropValue(object src, string propName)

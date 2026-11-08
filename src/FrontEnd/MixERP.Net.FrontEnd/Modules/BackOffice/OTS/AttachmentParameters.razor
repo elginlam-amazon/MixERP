@@ -1,0 +1,77 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+
+@* Ported from OTS/AttachmentParameters.ascx + .ascx.cs + .ascx.designer.cs.
+   OnControlLoad built a Scrud over config.attachment_factory and added it to
+   <asp:PlaceHolder ID="ScrudPlaceholder">, which is this markup now.
+
+   AccessLevel.AdminOnly IS PRESERVED. The host's
+   ModuleHost.razor reads the surface properties off an Activator.CreateInstance PROBE on which
+   no lifecycle method runs, and MixERPUserControl.RunAuthorizationChecksAsync then enforces the
+   value through MixERPAuthorization.CheckAccessLevelAsync - which, for AdminOnly, requires
+   View.IsAdmin and logs "Access to {Control} is denied to {User} from {IP}." on refusal. Losing
+   it would expose this setup screen to every signed-in user.
+
+   This is one of the eight OTS (one-time-setup) parameter editors. They are all the same
+   shape and all deliberately so: the key column is the literal column "key", ExcludeEdit="key"
+   stops a key being renamed, DenyDelete="true" stops a parameter row being removed (the code
+   that reads it would then fall back to an empty value), and the VIEW IS THE TABLE ITSELF -
+   there is no *_scrud_view for the config schema. All four of those choices are preserved.
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme, IsLandingPage or
+   IsRestrictedMode override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.WebControls.ScrudFactory
+@using MixERP.Net.i18n.Resources
+
+<Scrud KeyColumn="key"
+       TableSchema="config"
+       Table="attachment_factory"
+       ViewSchema="config"
+       View="attachment_factory"
+       ExcludeEdit="key"
+       DenyDelete="true"
+       Text="@Titles.AttachmentParameters" />
+
+@code {
+    /// <summary>
+    ///     The legacy <c>public override AccessLevel AccessLevel</c>, carried across unchanged.
+    ///     <para>
+    ///         <c>MixERPUserControlBase.AccessLevel</c> is an ABSTRACT GET-ONLY property, so it is
+    ///         overridden rather than assigned - which is also what the probe needs:
+    ///         <c>ModuleHost.razor</c> reads the surface off an <c>Activator.CreateInstance</c>
+    ///         instance on which no lifecycle method runs, and a getter answers there.
+    ///     </para>
+    /// </summary>
+    public override AccessLevel AccessLevel
+    {
+        get { return AccessLevel.AdminOnly; }
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY built the Scrud above, which is markup now, so there is
+    ///     nothing procedural left to run.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+}

@@ -1,0 +1,216 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from EODOperation.ascx + .ascx.cs + .ascx.designer.cs - the END-OF-DAY OPERATION
+   console: the two-step Initialize / Perform EOD workflow, its two explanatory popups, the
+   progress bar and the live notice list.
+
+   The whole screen was built procedurally (eight Create* methods using HtmlGenericControl /
+   HtmlButton / Literal) into <asp:PlaceHolder ID="Placeholder1">. It is markup now, emitted in
+   the IDENTICAL child order the control tree produced:
+     h1                        (title + " (" + value date + ")")
+     div.ui.divider            (HtmlControlHelper.GetDivider())
+     div > button#InitializeButton, button#PerformEODButton
+     div.ui.large.popup.initialize  (About initializing + button#StartButton)
+     div.ui.large.popup.eod         (Performing EOD + button#OKButton)
+     div.ui.teal.progress > div.bar > div.progress
+     h2.ui.blue.header.initially.hidden   (the EOD console heading)
+     div.ui.celled.list                   (empty - the notice list the hub fills)
+
+   ⚠ EVERY ONE OF THOSE IS A JAVASCRIPT CONTRACT, and wwwroot/js/EODOperation.js owns all of
+   the behaviour:
+     * `[data-popup]` on the two top buttons is what it turns into the Semantic-UI popups, so
+       both the attribute and the `.initialize` / `.eod` popup classes are exact;
+     * it enables #StartButton and #OKButton by REMOVING the "disabled loading" classes, so
+       both must RENDER with `ui ... loading disabled button` exactly as built;
+     * #StartButton posts to /services/finance/eodoperation/initializeeodoperation and
+       #OKButton invokes the ported DayOperationHub's PerformEOD;
+     * it appends every notice into `.ui.celled.list` and drives `.progress`, so those two
+       elements are left EMPTY here - the server never filled them;
+     * the `h2` keeps `initially hidden`, which the script removes when the run starts.
+   All four buttons keep their literal `onclick="return false;"` HTML ATTRIBUTE rather than an
+   @@onclick handler: they never had a server handler, the attribute is what suppresses the
+   default submit, and `onclick` + `@@onclick` on one element is Razor error RZ10008.
+
+   The Initialize/Perform buttons' enabled-ness is the one piece of SERVER state on this
+   screen: it comes from Data.EODOperation.GetStatus(catalog, officeId).IsInitialized - before
+   initialization only Initialize is enabled, after it only Perform EOD. That query needs the
+   catalog, which is asynchronous, so it runs in OnInitializedAsync (AppUsers.GetCurrentUserDB()
+   would have returned an EMPTY catalog over a circuit and the status would always have looked
+   uninitialized).
+
+   REVIEW - behaviour inferred where the original would have crashed: CreateInitializeButton
+   dereferenced this.status.IsInitialized with no null check (GetValueDateString, two methods
+   away, DOES check), so a null status threw. Here a null status renders both buttons in their
+   not-initialized state and an empty value date, which is what GetValueDateString already did
+   for the heading - verify against the intended behaviour if GetStatus can legitimately
+   return null.
+
+   PRESERVED SURFACE: the class implements ITransaction, which the host reads to enforce
+   RestrictedTransactionMode. The original declared no OverridePath, AccessLevel, MasterPageId,
+   RemoveTheme or IsLandingPage override. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@implements MixERP.Net.Entities.Contracts.ITransaction
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Core.Modules.Finance.Internal
+@using MixERP.Net.i18n.Resources
+@inject IJSRuntime JS
+
+@* CreateHeader() *@
+<h1>@(Titles.EndOfDayOperation + " (" + this.GetValueDateString() + ")")</h1>
+
+@* CreateDivider() *@
+@((MarkupString)HtmlControlHelper.GetDivider())
+
+@* CreateButtons() *@
+<div>
+    <button id="InitializeButton" class="@this.GetInitializeButtonCssClass()" onclick="return false;"
+            data-popup=".initialize">
+        <i class="icon alarm"></i>@Titles.InitializeDayEnd
+    </button>
+    <button id="PerformEODButton" class="@this.GetPerformEODButtonCssClass()" onclick="return false;"
+            data-popup=".eod">
+        <i class="icon wizard"></i>@Titles.PerformEODOperation
+    </button>
+</div>
+
+@* CreateAboutInitializing() - note the two <span> elements: the header's icon and content were
+   built with `new HtmlGenericControl()`, whose default tag is span. *@
+<div class="ui large popup initialize">
+    <div class="ui blue header">
+        <span class="icon alarm"></span><span class="content">@Titles.AboutInitializingDayEnd</span>
+    </div>
+    @((MarkupString)HtmlControlHelper.GetDivider())
+    <div>
+        <p>@Messages.EODLogsOffUsers</p>
+        <p>@Messages.EODElevatedPriviledgeCanLogIn</p>
+        @* Built as a <p> with a header css class - the local variable was named h4, but the
+           element is a p. Preserved. *@
+        <p class="ui horizontal red header divider"><i class="warning sign icon"></i>@Titles.Warning</p>
+        <p>@Messages.EODDoNotCloseWindow</p>
+        <button id="StartButton" class="ui blue loading disabled button" onclick="return false;">@Titles.Start</button>
+    </div>
+</div>
+
+@* CreatePerformingEOD() *@
+<div class="ui large popup eod">
+    <div class="ui red header">
+        <i class="alarm icon"></i>
+        <div class="content">@Titles.PerformingEODOperation</div>
+    </div>
+    @((MarkupString)HtmlControlHelper.GetDivider())
+    <div>
+        <p>@Messages.EODTransactionPosting</p>
+        <p>@Messages.EODRoutineTasks</p>
+        <p>@Messages.EODProcessIsIrreversible</p>
+        <button id="OKButton" class="ui small red loading disabled button" onclick="return false;">@Titles.OK</button>
+    </div>
+</div>
+
+@* CreateProgress() *@
+<div class="ui teal progress">
+    <div class="bar">
+        <div class="progress"></div>
+    </div>
+</div>
+
+@* CreateEODConsole() *@
+<h2 class="ui blue header initially hidden">@Titles.EODConsole</h2>
+
+@* CreateList() - filled by the hub's getNotification callback. *@
+<div class="ui celled list"></div>
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.Finance/js/EODOperation.js";
+
+    private Data.EODStatus status;
+    private bool loaded;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body called InitializeEODStatus() and then the eight Create* builders; the
+    ///     builders are the markup above, and the status query needs the catalog, which is
+    ///     asynchronous - so it runs in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it. For an
+        //ITransaction control that includes the restricted-transaction-mode check.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        //Port of InitializeEODStatus().
+        this.status = Data.EODOperation.GetStatus(catalog, login.OfficeId);
+        this.loaded = true;
+    }
+
+    /// <summary>
+    ///     Port of GetValueDateString(), null check included.
+    /// </summary>
+    private string GetValueDateString()
+    {
+        if (this.status != null)
+        {
+            return this.status.ValueDate.ToString("d");
+        }
+
+        return string.Empty;
+    }
+
+    private bool IsInitialized()
+    {
+        return this.status != null && this.status.IsInitialized;
+    }
+
+    private string GetInitializeButtonCssClass()
+    {
+        return this.IsInitialized() ? "ui blue disabled button" : "ui blue button";
+    }
+
+    private string GetPerformEODButtonCssClass()
+    {
+        return this.IsInitialized() ? "ui red button" : "ui red disabled button";
+    }
+
+    /// <summary>
+    ///     The .ascx carried &lt;script src="js/EODOperation.js"&gt;, which a .razor file may
+    ///     not. It is loaded on the render AFTER the status query, because its top-level block
+    ///     attaches the Semantic-UI popups to the `[data-popup]` buttons and opens the SignalR
+    ///     connection to /hubs/finance/dayoperation - both of which need the final markup.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!this.loaded)
+        {
+            return;
+        }
+
+        await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+    }
+}

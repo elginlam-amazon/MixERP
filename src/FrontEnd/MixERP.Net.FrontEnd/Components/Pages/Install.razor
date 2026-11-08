@@ -1,0 +1,243 @@
+@* ---------------------------------------------------------------------------------------------
+   Install.aspx (+ Install.aspx.cs) -> Components/Pages/Install.razor (checklist task 84).
+
+   THE DOM CONTRACT IS LOAD-BEARING. wwwroot/js/Pages/Install.aspx.js drives the whole wizard and
+   posts to /services/install/saveoffice, addressing these LITERAL ids: #OfficeNameInputText,
+   #OfficeCodeInputText, #NickNameInputText, #RegistrationDateInputText, #CurrencyCodeInputText,
+   #CurrencySymbolInputText, #CurrencyNameInputText, #HundredthNameInputText,
+   #FiscalYearCodeInputText, #FiscalYearNameInputText, #StartsFromInputText, #EndsOnInputText,
+   #AdminNameInputText, #UsernameInputText, #PasswordInputPassword,
+   #ConfirmPasswordInputPassword, #SaveButton — plus the .form / .dimmer classes and the two
+   InstallPage_Vars globals it alerts with. On success it navigates to /SignIn.
+
+   The page's own <head> references (semantic.min.css, jquery, semantic.min.js, libraries.js) are
+   all carried by App.razor now; only its inline "body { background-color: #FFF; }" rule needed a
+   home, which is wwwroot/css/pages/install.css.
+   --------------------------------------------------------------------------------------------- *@
+@page "/Install"
+@layout BlankLayout
+@inherits MixERPPageBase
+@using MixERP.Net.FrontEnd.Data.Office
+@inject IJSRuntime JS
+
+<PageTitle></PageTitle>
+
+<HeadContent>
+    <link href="/css/pages/install.css" rel="stylesheet" />
+</HeadContent>
+
+<div class="ui page grid">
+    <div class="column">
+        <img src="/static/images/mixerp-logo-light.png" />
+        <div class="ui header">
+            <div class="content">
+                @Titles.InstallMixERP
+            </div>
+        </div>
+
+        <div class="ui small form segment" style="width: 700px;">
+            <div class="ui header">
+                <div class="content">
+                    @Titles.AboutYourOffice
+                </div>
+            </div>
+            <div class="ui divider"></div>
+            <div class="field">
+                <label for="OfficeNameInputText">
+                    @Titles.OfficeName
+                </label>
+                <input type="text" maxlength="150" id="OfficeNameInputText" />
+            </div>
+            <div class="three fields">
+                <div class="field">
+                    <label for="OfficeCodeInputText">
+                        @Titles.OfficeCode
+                    </label>
+                    <input type="text" maxlength="12" id="OfficeCodeInputText" />
+                </div>
+                <div class="field">
+                    <label for="NickNameInputText">
+                        @Titles.OfficeNickName
+                    </label>
+                    <input type="text" maxlength="50" id="NickNameInputText" />
+                </div>
+                <div class="field">
+                    <label for="RegistrationDateInputText">
+                        @Titles.RegistrationDate
+                    </label>
+                    <input type="text" maxlength="50" id="RegistrationDateInputText" placeholder="yyyy-mm-dd" />
+                </div>
+            </div>
+            <div class="ui header">
+                <div class="content">
+                    @Questions.WhatIsYourHomeCurrency
+                </div>
+            </div>
+            <div class="ui divider"></div>
+            <div class="four fields">
+                <div class="field">
+                    <label for="CurrencyCodeInputText">
+                        @Titles.CurrencyCode
+                    </label>
+                    <input type="text" maxlength="12" id="CurrencyCodeInputText" />
+                </div>
+                <div class="field">
+                    <label for="CurrencySymbolInputText">
+                        @Titles.CurrencySymbol
+                    </label>
+                    <input type="text" maxlength="48" id="CurrencySymbolInputText" />
+                </div>
+                <div class="field">
+                    <label for="CurrencyNameInputText">
+                        @Titles.CurrencyName
+                    </label>
+                    <input type="text" maxlength="48" id="CurrencyNameInputText" />
+                </div>
+                <div class="field">
+                    <label for="HundredthNameInputText">
+                        @Titles.HundredthName
+                    </label>
+                    <input type="text" maxlength="48" id="HundredthNameInputText" />
+                </div>
+            </div>
+
+            <div class="ui header">
+                <div class="content">
+                    @Titles.FiscalYear
+                </div>
+            </div>
+            <div class="ui divider"></div>
+            <div class="four fields">
+                <div class="field">
+                    <label for="FiscalYearCodeInputText">
+                        @ScrudResource.fiscal_year_code
+                    </label>
+                    <input type="text" maxlength="12" id="FiscalYearCodeInputText" />
+                </div>
+                <div class="field">
+                    <label for="FiscalYearNameInputText">
+                        @ScrudResource.fiscal_year_name
+                    </label>
+                    <input type="text" maxlength="48" id="FiscalYearNameInputText" />
+                </div>
+                <div class="field">
+                    <label for="StartsFromInputText">
+                        @ScrudResource.starts_from
+                    </label>
+                    <input type="text" maxlength="48" id="StartsFromInputText" placeholder="yyyy-mm-dd" />
+                </div>
+                <div class="field">
+                    <label for="EndsOnInputText">
+                        @ScrudResource.ends_on
+                    </label>
+                    <input type="text" maxlength="48" id="EndsOnInputText" placeholder="yyyy-mm-dd" />
+                </div>
+            </div>
+
+            <div class="ui header">
+                <div class="content">
+                    @Titles.CreateaUserAccountforYourself
+                </div>
+            </div>
+            <div class="ui divider"></div>
+            <div class="two fields">
+                <div class="field">
+                    <label for="AdminNameInputText">
+                        @Titles.YourName
+                    </label>
+                    <input type="text" maxlength="100" id="AdminNameInputText" />
+                </div>
+                <div class="field">
+                    <label for="UsernameInputText">
+                        @Titles.Username
+                    </label>
+                    <input type="text" maxlength="50" id="UsernameInputText" />
+                </div>
+            </div>
+            <div class="two fields">
+                <div class="field">
+                    <label for="PasswordInputPassword">
+                        @Titles.Password
+                    </label>
+                    <input type="password" maxlength="50" id="PasswordInputPassword" />
+                </div>
+                <div class="field">
+                    <label for="ConfirmPasswordInputPassword">
+                        @Titles.ConfirmPassword
+                    </label>
+                    <input type="password" maxlength="50" id="ConfirmPasswordInputPassword" />
+                </div>
+            </div>
+
+            <button type="button" class="ui small red button" id="SaveButton">
+                @Titles.Save
+            </button>
+        </div>
+        <div class="ui page dimmer">
+            <div class="content">
+                <div class="center">
+                    <div class="ui yellow huge icon header">
+                        <i class="ui inverted yellow setting loading icon"></i>
+                        @Titles.Saving
+                        <div class="ui yellow sub header">
+                            @Labels.JustAMomentPlease
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    ///     The script Install.aspx declared at the bottom of its body. Its library dependencies are
+    ///     already loaded by App.razor.
+    /// </summary>
+    private static readonly string[] PageScripts = { "/js/Pages/Install.aspx.js" };
+
+    /// <summary>
+    ///     The legacy SkipLoginCheck flag: installation happens before any user exists (Specialist
+    ///     4's note — this page inherits MixERPPageBase, not MixERPAuthorizedPageBase).
+    /// </summary>
+    public Install()
+    {
+        this.SkipLoginCheck = true;
+    }
+
+    /// <summary>
+    ///     Page_Init: an instance that already has an office is installed, so the visitor belongs on
+    ///     the sign-in page.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync().ConfigureAwait(true);
+
+        if (Offices.GetOffices(AppUsers.GetCurrentUserDB()).Any())
+        {
+            this.NavigationManager.NavigateTo(MixERPAuthentication.LoginPath, true);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender).ConfigureAwait(true);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        //RegisterJavascript(): the InstallPage_Vars globals, byte-identical to the original.
+        string script = JSUtility.GetVar("allFieldsRequiredLocalized", Labels.AllFieldsRequired);
+        script += JSUtility.GetVar("confirmedPasswordDoesNotMatch", Labels.ConfirmedPasswordDoesNotMatch);
+
+        PageUtility.RegisterJavascript("InstallPage_Vars", script, this.JS, true);
+
+        IJSObjectReference module = await this.JS
+            .InvokeAsync<IJSObjectReference>("import", "/js/mixerp/page-interop.js").ConfigureAwait(true);
+
+        //Loaded after the globals: Install.aspx.js alerts with both of them.
+        await module.InvokeVoidAsync("loadScripts", (object)PageScripts).ConfigureAwait(true);
+    }
+}

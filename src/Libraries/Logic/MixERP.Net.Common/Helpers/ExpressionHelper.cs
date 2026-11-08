@@ -17,93 +17,54 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using Microsoft.CSharp;
-
-/********************************************************************************
-Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
-
-This file is part of MixERP.
-
-MixERP is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-MixERP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
-***********************************************************************************/
-
 using System;
-using System.CodeDom.Compiler;
-using System.Reflection;
-using System.Text;
+using System.Data;
+using System.Xml;
+using Microsoft.CodeAnalysis.CSharp.Scripting;
+using Microsoft.CodeAnalysis.Scripting;
 
 namespace MixERP.Net.Common.Helpers
 {
     public static class ExpressionHelper
     {
+        //System.CodeDom runtime compilation (CSharpCodeProvider/CompilerParameters) is not supported
+        //on modern .NET. The expression is now evaluated with Roslyn scripting, which keeps the
+        //original semantics: evaluate the expression, return its string form, and return
+        //string.Empty when the expression cannot be compiled, throws, or evaluates to null.
+        private static readonly ScriptOptions Options = ScriptOptions.Default
+            .WithImports("System", "System.Math", "System.Xml", "System.Data")
+            .WithReferences(
+                typeof(object).Assembly,          //System.Private.CoreLib / System.Runtime
+                typeof(Math).Assembly,
+                typeof(XmlDocument).Assembly,     //System.Private.Xml
+                typeof(DataTable).Assembly);      //System.Data.Common
+
         public static string Eval(string expression)
         {
-            using (CSharpCodeProvider provider = new CSharpCodeProvider())
+            if (string.IsNullOrWhiteSpace(expression))
             {
-                CompilerParameters parameters = new CompilerParameters();
+                return string.Empty;
+            }
 
-                parameters.ReferencedAssemblies.Add("system.dll");
-                parameters.ReferencedAssemblies.Add("system.xml.dll");
-                parameters.ReferencedAssemblies.Add("system.data.dll");
-                parameters.ReferencedAssemblies.Add("system.windows.forms.dll");
-                parameters.ReferencedAssemblies.Add("system.drawing.dll");
+            try
+            {
+                //The public signature is frozen synchronous, so the async Roslyn API is bridged here.
+                object output = CSharpScript.EvaluateAsync<object>(expression, Options).GetAwaiter().GetResult();
 
-                parameters.CompilerOptions = "/t:library";
-                parameters.GenerateInMemory = true;
-
-                StringBuilder sourceBuilder = new StringBuilder("");
-                sourceBuilder.Append("using System;\n");
-                sourceBuilder.Append("using System.Xml;\n");
-                sourceBuilder.Append("using System.Data;\n");
-                sourceBuilder.Append("using System.Data.SqlClient;\n");
-                sourceBuilder.Append("using System.Windows.Forms;\n");
-                sourceBuilder.Append("using System.Drawing;\n");
-
-                sourceBuilder.Append("namespace CSCodeEvaler{ \n");
-                sourceBuilder.Append("public class CSCodeEvaler{ \n");
-                sourceBuilder.Append("public object EvalCode(){\n");
-                sourceBuilder.Append("return " + expression + "; \n");
-                sourceBuilder.Append("} \n");
-                sourceBuilder.Append("} \n");
-                sourceBuilder.Append("}\n");
-
-                try
+                if (output == null)
                 {
-                    CompilerResults results = provider.CompileAssemblyFromSource(parameters, sourceBuilder.ToString());
-                    if (results.Errors.Count > 0)
-                    {
-                        return string.Empty;
-                    }
-
-                    Assembly assembly = results.CompiledAssembly;
-                    object assemblyInstance = assembly.CreateInstance("CSCodeEvaler.CSCodeEvaler");
-
-                    if (assemblyInstance == null)
-                    {
-                        return string.Empty;
-                    }
-
-                    Type assemblyInstanceType = assemblyInstance.GetType();
-                    MethodInfo info = assemblyInstanceType.GetMethod("EvalCode");
-
-                    object output = info.Invoke(assemblyInstance, null);
-                    return output.ToString();
+                    return string.Empty;
                 }
-                catch
-                {
-                    //Swallow
-                }
+
+                return output.ToString();
+            }
+            catch (CompilationErrorException)
+            {
+                //Swallow: the CodeDom version returned string.Empty on compiler errors.
+            }
+            catch
+            {
+                //Swallow
             }
 
             return string.Empty;

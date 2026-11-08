@@ -18,6 +18,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.DbFactory;
+using System;
 using Npgsql;
 using System.Collections.ObjectModel;
 
@@ -47,9 +48,9 @@ namespace MixERP.Net.TransactionGovernor.Data
                 {
                     command.Parameters.AddWithValue("@UserId", userId);
                     command.Parameters.AddWithValue("@FlagTypeId", flagTypeId);
-                    command.Parameters.AddWithValue("@Resource", resourceName);
-                    command.Parameters.AddWithValue("@ResourceKey", resourceKey);
-                    command.Parameters.AddWithValue("@ResourceId", resourceId);
+                    command.Parameters.AddWithValue("@Resource", (object)resourceName ?? DBNull.Value);
+                    command.Parameters.AddWithValue("@ResourceKey", (object)resourceKey ?? DBNull.Value);
+                    command.Parameters.AddWithValue("@ResourceId", (object)resourceId ?? DBNull.Value);
 
                     DbOperation.ExecuteNonQuery(catalog, command);
                 }

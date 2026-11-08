@@ -1,0 +1,200 @@
+@* ---------------------------------------------------------------------------------------------
+   MixERPMaster.Master  ->  Components/Layout/MixERPLayout.razor   (checklist task 61)
+
+   PLACEHOLDER MAPPING
+     ScriptContentPlaceholder       -> <SectionOutlet SectionName="@LayoutSections.ScriptContent" />
+     StyleSheetContentPlaceholder   -> <SectionOutlet SectionName="@LayoutSections.StyleSheetContent" />
+     BodyContentPlaceholder         -> @Body (wrapped in <AuthorizationOutlet>)
+     BottomScriptContentPlaceholder -> <SectionOutlet SectionName="@LayoutSections.BottomScriptContent" />
+
+   A layout is NOT a document: <!DOCTYPE>/<html>/<head>/<body>, <HeadOutlet>, the master-page
+   bundles and blazor.web.js all live in Components/App.razor. The <head> markup of the master
+   page (meta tags, the master-page bundles, the Titillium Web font, the IE conditional comments
+   and the two inline <style> blocks) therefore moved there as well; the IE 8/9 shims
+   (html5shiv/respond) were dropped because those browsers cannot run Blazor at all.
+
+   The inline bottom <script> (the SignalR end-of-day "terminate" listener) moved to
+   wwwroot/js/mixerp/master-page/eod.js and is started below through JS interop, because Blazor
+   strips <script> elements inside .razor files.
+   --------------------------------------------------------------------------------------------- *@
+@inherits LayoutComponentBase
+@inject MasterPageScriptService MasterPageScript
+@inject CurrentLoginProvider CurrentLogin
+@inject IJSRuntime JS
+
+<SectionOutlet SectionName="@LayoutSections.StyleSheetContent" />
+<SectionOutlet SectionName="@LayoutSections.ScriptContent" />
+
+<div class="ui celled grid" id="container">
+    <div class="row" id="ContentRow">
+        <div class="three wide column sidebar" id="MenuContainer">
+            <a href="/Dashboard/Index">
+                <img src="/static/images/mixerp-logo.png" />
+            </a>
+            <div id="Search">
+                <div class="ui icon  input" style="width: 100%;">
+                    <input type="text" id="SearchInput" autocomplete="off">
+                    <i class="search link icon"></i>
+                </div>
+            </div>
+            <div id="ContentMenu">
+                @* Former <asp:Literal ID="ContentMenuLiteral" />. The original NEVER assigned this
+                   literal from anywhere in the solution (re-grepped: the only references are the
+                   designer field and the markup), so it rendered empty and the sidebar tree was
+                   built on the client by /js/mixerp/master-page/menu.js + js-tree.js from the
+                   same policy.get_menu data. The container id is kept so those scripts keep their
+                   insertion point. The server-side builder is still available as
+                   MixERPPageBase.GetMenu(menuId) (checklist task 74). *@
+            </div>
+        </div>
+        <div class="ui thirteen wide column" id="right">
+            <div id="TopMenu" class="ui menu attached inverted theme">
+                <a class="item" @onclick="ToggleMenuContainerAsync">
+                    <i class="options icon"></i>
+                </a>
+                <a class="item">
+                    <i class="database icon"></i>
+                    @this.Catalog
+                </a>
+                <a class="item">
+                    <i class="home icon"></i>
+                    @this.BranchName
+                </a>
+                <div class="ui simple dropdown item" id="NotificationMenu">
+                    <i class="mail icon"></i>
+                    @Titles.Notifications
+                    <span></span>
+                    <i class="dropdown icon"></i>
+                    <div id="Notification" class="ui vertical menu">
+                    </div>
+                </div>
+                <a class="item" href="http://docs.mixerp.org/" target="_blank">
+                    <i class="book basic icon"></i>
+                    @Titles.MixERPDocumentation
+                </a>
+                <div class="right menu">
+                    <div class="ui simple dropdown item">
+                        <i class="icon smile"></i>
+                        @this.UserGreeting
+                        <i class="dropdown icon"></i>
+                        <div class="ui menu">
+                            <a class="item" href="/Site/Account/ChangePassword">
+                                <i class="flag icon"></i>
+                                @Titles.ChangePassword
+                            </a>
+                            <a class="item" href="/Site/Account/UserProfile">
+                                <i class="edit icon"></i>
+                                @Titles.ManageProfile
+                            </a>
+                            <a class="item" href="@SignOutUrl">
+                                <i class="sign out icon"></i>
+                                @Titles.SignOut
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="MainContent">
+                <AuthorizationOutlet>
+                    @Body
+                </AuthorizationOutlet>
+            </div>
+        </div>
+    </div>
+    <div class="row" id="FooterRow">
+        <footer class="sixteen wide relaxed column">
+            <p>
+                Copyright © 2013-2105, MixERP Inc. All rights reserved. Powered by <a href="http://mixerp.org/" target="_blank">MixERP Community Edition @this.Version</a>.
+            </p>
+        </footer>
+    </div>
+</div>
+<div class="ui small modal" id="EODModal">
+    <i class="close icon"></i>
+    <div class="ui icon header">
+        <i class="loading spinner icon"></i>
+        @Titles.EODBegun
+    </div>
+    <div class="content">
+        <p>
+            @Labels.EODBegunSaveYourWork
+        </p>
+        <div style="margin-left: 150px;">
+            <div class="ui circular segment" style="width: 120px; height: 120px;">
+                <h2 class="ui large header" style="font-size: 36px;"></h2>
+            </div>
+        </div>
+    </div>
+    <div class="actions">
+        <div class="ui button">
+            @Titles.Cancel
+        </div>
+        <div class="ui button">
+            @Titles.OK
+        </div>
+    </div>
+</div>
+
+<SectionOutlet SectionName="@LayoutSections.BottomScriptContent" />
+
+@code {
+    /// <summary>
+    ///     The sign-out url. The legacy "/Site/Account/SignOut.aspx" page became the routable
+    ///     SignOut component, which force-loads the /_auth/signout endpoint.
+    /// </summary>
+    private const string SignOutUrl = "/Site/Account/SignOut";
+
+    private string Catalog { get; set; } = string.Empty;
+    private string BranchName { get; set; } = string.Empty;
+    private string UserGreeting { get; set; } = string.Empty;
+    private string Version { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Port of MixERPMaster.Page_Load. CurrentLoginProvider is used instead of
+    ///     AppUsers.GetCurrent(), which returns an EMPTY login over a circuit.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync().ConfigureAwait(true);
+
+        this.Catalog = await this.CurrentLogin.GetCatalogAsync().ConfigureAwait(true);
+
+        MetaLogin login = await this.CurrentLogin.GetCurrentAsync().ConfigureAwait(true);
+
+        if (login != null && login.View != null)
+        {
+            this.BranchName = login.View.OfficeName;
+            this.UserGreeting = string.Format(CultureInfo.CurrentCulture, Labels.UserGreeting,
+                login.View.UserName);
+        }
+
+        this.Version = ProductVersion.GetProductVersion();
+    }
+
+    /// <summary>
+    ///     MixERPMasterPage.RegisterJavascript() ran in the master page's OnLoad, i.e. on every page
+    ///     rendered through it. JS interop is only available after the first render.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender).ConfigureAwait(true);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await this.MasterPageScript.RegisterAsync(this.JS).ConfigureAwait(true);
+
+        await this.JS.InvokeVoidAsync("mixerpInitializeEod", Titles.EODBegun, SignOutUrl)
+            .ConfigureAwait(true);
+    }
+
+    /// <summary>
+    ///     Former inline onclick=" $('#MenuContainer').toggle(100); ".
+    /// </summary>
+    private async Task ToggleMenuContainerAsync()
+    {
+        await this.JS.InvokeVoidAsync("mixerpToggleElement", "#MenuContainer", 100).ConfigureAwait(true);
+    }
+}

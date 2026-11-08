@@ -1,0 +1,413 @@
+@* ComponentBase is not CLS-compliant; this assembly is CLSCompliant(true). *@
+@attribute [System.CLSCompliant(false)]
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Blazor replacement for the former WebForms GridView subclass
+    "MixERP.Net.WebControls.Common.MixERPGridView" (MixERPGridView.cs).
+
+    The markup below is the one-for-one port of the control's behaviour:
+      Initialize()       -> the root <table> css class + the empty-data text
+      OnDataBound()      -> the <thead> header row, emitted only when there ARE rows
+      OnRowDataBound()   -> GetCellCssClass/GetHeaderCssClass/FormatCellValue below,
+                            the per-DataType formatting of auto-generated columns
+
+    GridLines.None had no visual output of its own (it suppressed the border
+    attributes a GridView would otherwise emit), so the equivalent here is simply to
+    emit no border attributes - see migration-summary.md section 2.
+*@
+
+@namespace MixERP.Net.WebControls.Common
+@using System
+@using System.Collections
+@using System.Collections.Generic
+@using System.Data
+@using System.Globalization
+@using System.Linq
+@using MixERP.Net.Common
+@using MixERP.Net.i18n.Resources
+
+@if (this.rows.Count.Equals(0))
+{
+    @* Initialize(): this.EmptyDataText = CommonResource.NoRecordFound.
+       A GridView rendered its EmptyDataText in a single-cell table when the data
+       source had no rows; OnDataBound() returned early so no header was produced. *@
+    <table id="@this.ID" class="@this.GetTableCssClass()">
+        <tr>
+            <td>@this.EmptyDataText</td>
+        </tr>
+    </table>
+}
+else
+{
+    <table id="@this.ID" class="@this.GetTableCssClass()">
+        @* OnDataBound(): HeaderRow.TableSection = TableRowSection.TableHeader *@
+        <thead>
+            <tr>
+                @foreach (MixERPGridViewColumn column in this.columns)
+                {
+                    <th class="@this.GetHeaderCssClass(column)">@column.HeaderText</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (object row in this.rows)
+            {
+                <tr>
+                    @foreach (MixERPGridViewColumn column in this.columns)
+                    {
+                        <td class="@this.GetCellCssClass(column)">
+                            @if (column.Template != null)
+                            {
+                                @column.Template(row)
+                            }
+                            else if (this.IsRawHtml(column))
+                            {
+                                @* field.HtmlEncode = false - the DatabaseBackup consumer
+                                   constructs the grid with htmlEncode: false so its cells
+                                   keep rendering the markup they contain. *@
+                                @((MarkupString)this.FormatCellValue(column, row))
+                            }
+                            else
+                            {
+                                @this.FormatCellValue(column, row)
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    //----------------------------------------------------------------------------------
+    // Parameters - the public member names MixERPGridView exposed are preserved.
+    //----------------------------------------------------------------------------------
+
+    /// <summary>The rendered table id (former GridView.ID).</summary>
+    [Parameter]
+    public string ID { get; set; }
+
+    /// <summary>
+    ///     Former <c>CssClass</c>. Initialize() did <c>this.CssClass += "ui striped table "</c>,
+    ///     so the suite's class list is always appended to whatever the consumer set - the
+    ///     trailing space is part of that contract because consumers concatenate further
+    ///     (for example <c>this.grid.CssClass += "relaxed"</c> in DatabaseBackup).
+    /// </summary>
+    [Parameter]
+    public string CssClass { get; set; }
+
+    /// <summary>
+    ///     Former <c>EmptyDataText</c>, defaulted by Initialize() to
+    ///     CommonResource.NoRecordFound.
+    /// </summary>
+    [Parameter]
+    public string EmptyDataText { get; set; }
+
+    /// <summary>
+    ///     Former <c>htmlEncode</c> constructor argument (<c>new MixERPGridView()</c> =&gt; true,
+    ///     <c>new MixERPGridView(false)</c> =&gt; false). Blazor components cannot take
+    ///     constructor arguments, so it is a parameter with the same default; recorded in
+    ///     migration-summary.md section 4.
+    /// </summary>
+    [Parameter]
+    public bool HtmlEncode { get; set; } = true;
+
+    /// <summary>
+    ///     Former <c>GridView.DataSource</c>. Accepts the shapes the consumer call sites
+    ///     bind: a <see cref="DataTable" />, a <see cref="DataView" /> or any
+    ///     <see cref="IEnumerable" /> of entities. Assigning it replaces the legacy
+    ///     DataSource + DataBind() pair - Blazor re-renders on parameter change, so there
+    ///     is no separate bind step.
+    /// </summary>
+    [Parameter]
+    public object DataSource { get; set; }
+
+    /// <summary>
+    ///     Former <c>GridView.AutoGenerateColumns</c>. When true (the default, and what
+    ///     MixERPGridView's own formatting logic was written for) the columns are
+    ///     discovered from DataSource, replacing <c>AutoGeneratedField</c>.
+    /// </summary>
+    [Parameter]
+    public bool AutoGenerateColumns { get; set; } = true;
+
+    /// <summary>
+    ///     Former <c>GridView.Columns</c>, for the consumers that set
+    ///     AutoGenerateColumns = false and declared their columns explicitly
+    ///     (TrialBalance, TransactionViewFactory, ScrudFactory). Supplying this keeps
+    ///     that capability available to them when they migrate.
+    /// </summary>
+    [Parameter]
+    public IReadOnlyList<MixERPGridViewColumn> Columns { get; set; }
+
+    //----------------------------------------------------------------------------------
+    // Resolved render state
+    //----------------------------------------------------------------------------------
+
+    private readonly List<MixERPGridViewColumn> columns = new List<MixERPGridViewColumn>();
+    private readonly List<object> rows = new List<object>();
+
+    protected override void OnParametersSet()
+    {
+        if (string.IsNullOrEmpty(this.EmptyDataText))
+        {
+            //Initialize(): this.EmptyDataText = CommonResource.NoRecordFound;
+            this.EmptyDataText = CommonResource.NoRecordFound;
+        }
+
+        this.Resolve();
+
+        base.OnParametersSet();
+    }
+
+    /// <summary>
+    ///     Replaces GridView's DataBind()/AutoGeneratedField machinery: flattens the data
+    ///     source into rows and works out the column set (name + CLR type), which is what
+    ///     OnRowDataBound() keyed its formatting off through
+    ///     <c>field.DataType.FullName</c>.
+    /// </summary>
+    private void Resolve()
+    {
+        this.rows.Clear();
+        this.columns.Clear();
+
+        DataTable table = this.GetDataTable();
+
+        if (table != null)
+        {
+            foreach (DataColumn column in table.Columns)
+            {
+                this.columns.Add(new MixERPGridViewColumn(column.ColumnName, column.ColumnName, column.DataType));
+            }
+
+            foreach (DataRow row in table.Rows)
+            {
+                this.rows.Add(row);
+            }
+        }
+        else
+        {
+            IEnumerable items = this.DataSource as IEnumerable;
+
+            if (items != null)
+            {
+                foreach (object item in items)
+                {
+                    this.rows.Add(item);
+                }
+            }
+            else if (this.DataSource != null)
+            {
+                this.rows.Add(this.DataSource);
+            }
+
+            object first = this.rows.FirstOrDefault();
+
+            if (first != null)
+            {
+                foreach (System.Reflection.PropertyInfo property in first.GetType().GetProperties())
+                {
+                    if (property.GetIndexParameters().Length.Equals(0))
+                    {
+                        this.columns.Add(new MixERPGridViewColumn(property.Name, property.Name, property.PropertyType));
+                    }
+                }
+            }
+        }
+
+        //AutoGenerateColumns = false: the consumer owns the column set entirely.
+        if (!this.AutoGenerateColumns)
+        {
+            this.columns.Clear();
+        }
+
+        if (this.Columns != null)
+        {
+            this.columns.AddRange(this.Columns);
+        }
+    }
+
+    private DataTable GetDataTable()
+    {
+        DataTable table = this.DataSource as DataTable;
+
+        if (table != null)
+        {
+            return table;
+        }
+
+        DataView view = this.DataSource as DataView;
+
+        if (view != null)
+        {
+            return view.Table;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    ///     Port of Initialize(): <c>this.CssClass += "ui striped table "</c>.
+    ///     <para>
+    ///         ORDER MATTERS. Initialize() ran at CONSTRUCTION, so the suite's classes were
+    ///         already in the string by the time a consumer appended to it
+    ///         (<c>grid.CssClass += "relaxed"</c> in DatabaseBackup yielded
+    ///         "ui striped table relaxed"). The literal therefore goes FIRST here, and its
+    ///         trailing space is what keeps the consumer's value a separate class token
+    ///         instead of merging into "relaxedui".
+    ///     </para>
+    /// </summary>
+    private string GetTableCssClass()
+    {
+        return "ui striped table " + this.CssClass;
+    }
+
+    /// <summary>
+    ///     Port of OnRowDataBound()'s header styling: every auto-generated field got
+    ///     <c>HeaderStyle.CssClass = "text left"</c>, overwritten with "text right" for the
+    ///     Decimal/Double/Single cases.
+    /// </summary>
+    private string GetHeaderCssClass(MixERPGridViewColumn column)
+    {
+        if (column.HeaderCssClass != null)
+        {
+            return column.HeaderCssClass;
+        }
+
+        return this.IsNumeric(column) ? "text right" : "text left";
+    }
+
+    /// <summary>
+    ///     Port of OnRowDataBound()'s cell styling: <c>cell.CssClass = "text right"</c> for
+    ///     the Decimal/Double/Single cases only.
+    /// </summary>
+    private string GetCellCssClass(MixERPGridViewColumn column)
+    {
+        if (column.CssClass != null)
+        {
+            return column.CssClass;
+        }
+
+        return this.IsNumeric(column) ? "text right" : null;
+    }
+
+    private bool IsNumeric(MixERPGridViewColumn column)
+    {
+        if (column.DataType == null)
+        {
+            return false;
+        }
+
+        switch (column.DataType.FullName)
+        {
+            case "System.Decimal":
+            case "System.Double":
+            case "System.Single":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    ///     Port of the <c>case "System.String": field.HtmlEncode = this.htmlEncode;</c>
+    ///     branch. A GridView HTML-encoded auto-generated string cells unless HtmlEncode
+    ///     was cleared; Razor encodes by default, so only the opt-out needs expressing.
+    /// </summary>
+    private bool IsRawHtml(MixERPGridViewColumn column)
+    {
+        if (this.HtmlEncode)
+        {
+            return false;
+        }
+
+        return column.DataType == null || column.DataType.FullName.Equals("System.String", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Port of OnRowDataBound()'s per-DataType cell formatting, case for case:
+    ///     <list type="bullet">
+    ///         <item>Decimal/Double/Single: "N" in the current culture, but zero is left
+    ///         UNFORMATTED - the original's <c>if (!value.Equals(0))</c> guard, which is
+    ///         what renders a blank-looking zero in every MixERP report.</item>
+    ///         <item>DateTime: "D" when the value has no time component
+    ///         (<c>date.Date == date</c>), otherwise "F".</item>
+    ///         <item>Everything else: the value as-is.</item>
+    ///     </list>
+    /// </summary>
+    private string FormatCellValue(MixERPGridViewColumn column, object row)
+    {
+        object value = this.GetCellValue(column, row);
+        string text = value == null || value == DBNull.Value ? string.Empty : value.ToString();
+
+        if (column.DataType == null)
+        {
+            return text;
+        }
+
+        switch (column.DataType.FullName)
+        {
+            case "System.Decimal":
+            case "System.Double":
+            case "System.Single":
+                decimal number = Conversion.TryCastDecimal(text);
+
+                if (!number.Equals(0))
+                {
+                    return number.ToString("N", CultureInfo.CurrentCulture);
+                }
+
+                return text;
+            case "System.DateTime":
+                DateTime date = Conversion.TryCastDate(text);
+
+                if (date.Date == date)
+                {
+                    return date.ToString("D", CultureInfo.CurrentCulture);
+                }
+
+                return date.ToString("F", CultureInfo.CurrentCulture);
+            default:
+                return text;
+        }
+    }
+
+    private object GetCellValue(MixERPGridViewColumn column, object row)
+    {
+        if (string.IsNullOrEmpty(column.DataField))
+        {
+            return null;
+        }
+
+        DataRow dataRow = row as DataRow;
+
+        if (dataRow != null)
+        {
+            return dataRow.Table.Columns.Contains(column.DataField) ? dataRow[column.DataField] : null;
+        }
+
+        System.Reflection.PropertyInfo property = row.GetType().GetProperty(column.DataField);
+
+        return property == null ? null : property.GetValue(row, null);
+    }
+}

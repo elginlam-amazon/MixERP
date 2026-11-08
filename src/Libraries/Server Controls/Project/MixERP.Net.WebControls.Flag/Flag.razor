@@ -1,0 +1,286 @@
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Blazor replacement for the former WebForms CompositeControl
+    "MixERP.Net.WebControls.Flag.FlagControl".
+
+    The markup below is the one-for-one port of the control's render tree:
+      FlagControl.CreateChildControls()   -> this template + OnInitialized/OnAfterRenderAsync
+        Initialize()                      -> the outer div .. button paragraph below
+        BindFlagTypeDropDownList()        -> LoadFlagTypes() + the <select> @foreach
+        AddScript()                       -> OnAfterRenderAsync(firstRender)
+      FlagControl/Properties.cs           -> the [Parameter] properties in @code
+      FlagControl/Events.cs               -> Updated (EventCallback), ButtonOnClick, GetFlagTypeId
+      FlagControl.Render(HtmlTextWriter)  -> implicit (the template IS the render output)
+
+    DOM CONTRACT (compiles green if broken, fails SILENTLY):
+      * The outer div id is the component's ElementId. The registered script resolves
+        $('#<ElementId>') as the popunder and $('#<AssociatedControlId>') as the EXTERNAL
+        trigger button, which this component does NOT render - it belongs to the consumer
+        (TransactionViewFactory passes "FlagButton").
+      * The <select> id MUST stay "<ElementId>DropDownList", and its option value/text MUST
+        stay FlagTypeId/FlagTypeName (the original DataValueField/DataTextField).
+      * The "panel-title" class, style="width:300px;z-index:2;", "ui buttons",
+        "green small ui button", "red small ui button" and the toggle(500) close handler are
+        all part of the original render output and must stay byte-identical.
+      * popUnder(popunder, button) is HOST-provided (mixerp-core.min.js); the host must also
+        already serve jQuery before this component renders. This project ships no .js.
+*@
+
+@namespace MixERP.Net.WebControls.Flag
+@using System
+@using System.Collections.Generic
+@using System.Globalization
+@using System.Linq
+@using System.Threading.Tasks
+@using MixERP.Net.Common
+@using MixERP.Net.i18n.Resources
+@using MixERP.Net.WebControls.Flag.Data
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
+
+@* ---------- Initialize(): HtmlGenericControl("div") ---------- *@
+<div id="@this.ElementId" style="width:300px;z-index:2;" class="@(this.CssClass ?? string.Empty)">
+    @* ---------- Initialize(): HtmlGenericControl("h3") ---------- *@
+    <h3 class="panel-title">@Titles.FlagThisTransaction</h3>
+
+    @* ---------- Initialize(): HtmlGenericControl("div") contents ---------- *@
+    <div>@Labels.FlagLabel</div>
+
+    @* ---------- Initialize(): HtmlGenericControl("p") selectParagraph ---------- *@
+    <p>@Labels.SelectAFlag</p>
+
+    @* ---------- BindFlagTypeDropDownList(): the former DropDownList ---------- *@
+    <select id="@(this.ElementId + "DropDownList")"
+            name="@(this.ElementId + "DropDownList")"
+            @bind="this.selectedFlagTypeId">
+        @foreach (Entities.Core.FlagType flagType in this.flagTypes)
+        {
+            <option value="@flagType.FlagTypeId.ToString(CultureInfo.InvariantCulture)">@flagType.FlagTypeName</option>
+        }
+    </select>
+
+    @* ---------- Initialize(): HtmlGenericControl("p") buttonContainer ---------- *@
+    <p class="ui buttons">
+        @*
+            The former updateButton (a WebForms Button server control). type="button" is
+            REQUIRED: the WebForms Button lived inside the page's single server <form>,
+            whereas a bare <button> in Blazor defaults to type="submit" and would navigate.
+        *@
+        <button type="button" class="green small ui button" @onclick="this.ButtonOnClick">@Titles.Update</button>
+
+        @*
+            The former Close HtmlInputButton. This stays a PLAIN client-side onclick
+            attribute (not @onclick): it is pure jQuery show/hide with no server
+            round-trip, and routing it through the circuit would change behaviour.
+        *@
+        <input type="button" class="red small ui button" value="@Titles.Close"
+               onclick="@(string.Format(CultureInfo.InvariantCulture, "$('#{0}').toggle(500);", this.ElementId))" />
+    </p>
+</div>
+
+@code {
+    //Port of FlagControl/Properties.cs.
+    //"private DropDownList flagDropDownlist" becomes the two fields below: the bound
+    //selection (what the original read back as SelectedValue on postback) and the bound
+    //data source (what DataBind() materialised).
+    private string selectedFlagTypeId = string.Empty;
+
+    private IEnumerable<Entities.Core.FlagType> flagTypes = Enumerable.Empty<Entities.Core.FlagType>();
+
+    /// <summary>
+    ///     The database catalog the flag types are read from. Required: FlagType.GetFlagTypes
+    ///     cannot work without it.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public string Catalog { get; set; }
+
+    /// <summary>
+    ///     The client id of the EXTERNAL trigger button that opens this popunder. The
+    ///     element belongs to the consumer's markup - this component never renders or owns
+    ///     it - and the registered script binds its click to popUnder().
+    /// </summary>
+    [Parameter]
+    public string AssociatedControlId { get; set; }
+
+    /// <summary>
+    ///     Css class of the rendered outer div (the former WebControl.CssClass override).
+    /// </summary>
+    [Parameter]
+    public string CssClass { get; set; }
+
+    /// <summary>
+    ///     Replaces the former "public override string ID". A Blazor component cannot
+    ///     override ID, and what the javascript/DOM contract actually depends on is the
+    ///     rendered id attribute - so the value is carried explicitly here and is used for
+    ///     the outer div id, the "&lt;ElementId&gt;DropDownList" select id and the close
+    ///     button's toggle selector, exactly as the original used this.ID for all three.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public string ElementId { get; set; }
+
+    /// <summary>
+    ///     Port of the former Button.OnClientClick. The original rendered
+    ///     onclick="return getSelectedItems();" on the update button, where a false return
+    ///     CANCELLED the postback - it is a gate, not decoration. See ButtonOnClick.
+    /// </summary>
+    [Parameter]
+    public string OnClientClick { get; set; }
+
+    /// <summary>
+    ///     Port of FlagControl/Events.cs: "public event FlagUpdated Updated". The delegate
+    ///     type and FlagUpdatedEventArgs payload are unchanged; the WebForms event becomes
+    ///     an EventCallback so a parent component can subscribe with Updated="...".
+    /// </summary>
+    [Parameter]
+    public EventCallback<FlagUpdatedEventArgs> Updated { get; set; }
+
+    /// <summary>
+    ///     Port of FlagControl.BindFlagTypeDropDownList(). The original bound the
+    ///     DropDownList during CreateChildControls; the data is loaded once per parameter
+    ///     set here and rendered by the @@foreach above with FlagTypeId as the option value
+    ///     (DataValueField) and FlagTypeName as its text (DataTextField).
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        this.BindFlagTypeDropDownList();
+        base.OnParametersSet();
+    }
+
+    private void BindFlagTypeDropDownList()
+    {
+        this.flagTypes = FlagType.GetFlagTypes(this.Catalog) ?? Enumerable.Empty<Entities.Core.FlagType>();
+
+        //The WebForms DropDownList always had a selection (the first bound item) once it was
+        //data-bound, and GetFlagTypeId() read it back on postback. An unselected <select>
+        //posts nothing, so seed the bound field with the first item to keep that behaviour.
+        if (string.IsNullOrEmpty(this.selectedFlagTypeId))
+        {
+            Entities.Core.FlagType first = this.flagTypes.FirstOrDefault();
+
+            if (first != null)
+            {
+                this.selectedFlagTypeId = first.FlagTypeId.ToString(CultureInfo.InvariantCulture);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Port of FlagControl.ButtonOnClick(). The original's "if (this.Updated != null)"
+    ///     null-guard becomes EventCallback.HasDelegate.
+    ///     <para>
+    ///         OnClientClick is honoured FIRST and is load-bearing: under WebForms it was
+    ///         rendered as the button's onclick attribute and returning false cancelled the
+    ///         postback, so TransactionViewFactory's "return getSelectedItems();" prevented
+    ///         flagging when nothing was selected. Silently dropping it would let a user
+    ///         flag with an empty selection. The expression is evaluated through the
+    ///         mixerpFlagEvalClientClick helper registered in OnAfterRenderAsync and only a
+    ///         strict false cancels, matching the DOM's own "return false cancels" rule.
+    ///     </para>
+    /// </summary>
+    private async Task ButtonOnClick()
+    {
+        if (!await this.EvaluateOnClientClickAsync())
+        {
+            return;
+        }
+
+        if (this.Updated.HasDelegate)
+        {
+            await this.Updated.InvokeAsync(new FlagUpdatedEventArgs(this.GetFlagTypeId()));
+        }
+    }
+
+    private async Task<bool> EvaluateOnClientClickAsync()
+    {
+        if (string.IsNullOrWhiteSpace(this.OnClientClick))
+        {
+            return true;
+        }
+
+        //The evaluated script is this component's own server-set OnClientClick parameter -
+        //never request input - which is exactly the trust level the original onclick
+        //attribute had. A client that fails to evaluate it must not block flagging, which
+        //is also what a browser did with a broken inline handler: RegisterJavascript is a
+        //fire-and-forget API, so the helper may not have landed (or CSP/module load may
+        //have failed) when the user clicks, and the gate must then fail OPEN rather than
+        //throw out of the event handler and kill the circuit.
+        try
+        {
+            return await this.JSRuntime.InvokeAsync<bool>("mixerpFlagEvalClientClick", this.OnClientClick);
+        }
+        catch (JSException)
+        {
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            //Interop is not available yet (prerendering).
+            return true;
+        }
+    }
+
+    /// <summary>
+    ///     Port of FlagControl.GetFlagTypeId(), reading back what the original read from
+    ///     DropDownList.SelectedValue. Conversion.TryCastInteger is unchanged.
+    /// </summary>
+    private int GetFlagTypeId()
+    {
+        int flagTypeId = Conversion.TryCastInteger(this.selectedFlagTypeId);
+        return flagTypeId;
+    }
+
+    /// <summary>
+    ///     Port of FlagControl/JavaScript.cs AddScript(). The original ran during
+    ///     CreateChildControls; JS interop is only legal after the first render in Blazor,
+    ///     so it moves to OnAfterRenderAsync(firstRender). The "flag" registration key
+    ///     means the script is injected once per circuit, reproducing the old WebForms
+    ///     de-duplication by registration key.
+    ///     <para>
+    ///         PageUtility.RegisterJavascript's third parameter is now IJSRuntime (it was
+    ///         Page under WebForms); the script body itself is unchanged apart from the
+    ///         prepended mixerpFlagEvalClientClick helper that ButtonOnClick needs.
+    ///     </para>
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            string script = "window.mixerpFlagEvalClientClick = window.mixerpFlagEvalClientClick || function (code) {" +
+                            "try { return (new Function(code))() !== false; } catch (e) { return true; }};" +
+                            "$(document).ready(function() {" +
+                            string.Format(CultureInfo.InvariantCulture,
+                                "var flagPopunder = $('#{0}');var flagButton = $('#{1}');",
+                                this.ElementId, this.AssociatedControlId) +
+                            "flagButton.click(function () {" +
+                            "popUnder(flagPopunder, flagButton);" +
+                            "});});";
+
+            PageUtility.RegisterJavascript("flag", script, this.JSRuntime, true);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+}

@@ -1,106 +1,69 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{D29B7B60-76B2-4A00-A8FA-7654519AFCD4}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>MixERP.Net.Messaging.Email</RootNamespace>
     <AssemblyName>MixERP.Net.Messaging.Email</AssemblyName>
-    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile>
-    </TargetFrameworkProfile>
-    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\..\</SolutionDir>
-    <RestorePackages>true</RestorePackages>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <CodeAnalysisRuleSet>..\..\..\MixERP.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <SignAssembly>true</SignAssembly>
-  </PropertyGroup>
-  <PropertyGroup>
     <AssemblyOriginatorKeyFile>Mix Open Foundation.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <CodeAnalysisRuleSet>..\..\..\MixERP.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+
+  <!-- Assembly metadata migrated from the former Properties/AssemblyInfo.cs -->
+  <PropertyGroup>
+    <AssemblyTitle>MixERP.Net.Messaging</AssemblyTitle>
+    <Description></Description>
+    <Company>MixERP Inc.</Company>
+    <Product>MixERP.Net.Messaging</Product>
+    <Copyright>Copyright ©  2014-2015</Copyright>
+    <NeutralLanguage>en</NeutralLanguage>
+    <AssemblyVersion>1.2.0.1</AssemblyVersion>
+    <FileVersion>1.2.0.1</FileVersion>
+    <InformationalVersion>1.2.0.1 RC</InformationalVersion>
+  </PropertyGroup>
+
   <ItemGroup>
-    <Reference Include="Serilog">
-      <HintPath>..\..\..\packages\Serilog.1.5.7\lib\net45\Serilog.dll</HintPath>
-    </Reference>
-    <Reference Include="Serilog.FullNetFx">
-      <HintPath>..\..\..\packages\Serilog.1.5.7\lib\net45\Serilog.FullNetFx.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Web" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
+    <AssemblyAttribute Include="System.CLSCompliantAttribute">
+      <_Parameter1>true</_Parameter1>
+      <_Parameter1_TypeName>System.Boolean</_Parameter1_TypeName>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.InteropServices.ComVisibleAttribute">
+      <_Parameter1>false</_Parameter1>
+      <_Parameter1_TypeName>System.Boolean</_Parameter1_TypeName>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.InteropServices.GuidAttribute">
+      <_Parameter1>23c56849-5c0f-4684-9b23-01171cd0787b</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
+
   <ItemGroup>
-    <Compile Include="Status.cs" />
-    <Compile Include="Type.cs" />
-    <Compile Include="ICredentials.cs" />
-    <Compile Include="EmailMessage.cs" />
-    <Compile Include="SmtpCredentials.cs" />
-    <Compile Include="SmtpHost.cs" />
-    <Compile Include="IMessage.cs" />
-    <Compile Include="Helpers\Config.cs" />
-    <Compile Include="Validator.cs" />
-    <Compile Include="Helpers\AttachmentFactory.cs" />
-    <Compile Include="Processor.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
+    <!-- Serilog 1.5.7 (bare Reference) -> solution pin. Serilog.FullNetFx has no modern
+         equivalent; the Log static API it was used for ships in the Serilog package. -->
+    <PackageReference Include="Serilog" Version="4.3.0" />
+    <!-- Replaces the obsolete System.Net.Mail.SmtpClient / MailMessage send path. -->
+    <PackageReference Include="MailKit" Version="4.18.0" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <!-- IOptions-based SMTP host/credentials. -->
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
   </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\MixERP.net.Common\MixERP.Net.Common.csproj">
-      <Project>{d5a09c22-8f48-4fb2-a14d-c62c8c8fcec0}</Project>
-      <Name>MixERP.Net.Common</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\MixERP.Net.Entities\MixERP.Net.Entities.csproj">
-      <Project>{BDE918B1-DD9B-41C9-A41F-F3DDEC18B6D8}</Project>
-      <Name>MixERP.Net.Entities</Name>
-    </ProjectReference>
+    <ProjectReference Include="..\MixERP.Net.Common\MixERP.Net.Common.csproj" />
+    <ProjectReference Include="..\MixERP.Net.Entities\MixERP.Net.Entities.csproj" />
   </ItemGroup>
+
   <ItemGroup>
     <None Include="..\..\..\mixerp.licenseheader">
       <Link>mixerp.licenseheader</Link>
     </None>
-    <None Include="app.config" />
     <None Include="Mix Open Foundation.snk" />
-    <None Include="packages.config" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
-  </Target>
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+
 </Project>

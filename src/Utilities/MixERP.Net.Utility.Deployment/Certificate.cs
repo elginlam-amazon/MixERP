@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security;
 
@@ -83,7 +82,6 @@ namespace MixERP.Net.Utility.Installer
             IntPtr certStore = IntPtr.Zero;
             IntPtr storeCertContext = IntPtr.Zero;
             IntPtr passwordPtr = IntPtr.Zero;
-            RuntimeHelpers.PrepareConstrainedRegions();
             try
             {
                 Check(NativeMethods.CryptAcquireContextW(

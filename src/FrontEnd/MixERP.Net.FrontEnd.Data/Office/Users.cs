@@ -18,7 +18,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System.Linq;
-using System.Web;
+using Microsoft.AspNetCore.Http;
 using MixERP.Net.Entities.Office;
 using MixERP.Net.Framework;
 using Npgsql;
@@ -65,16 +65,37 @@ namespace MixERP.Net.FrontEnd.Data.Office
             return null;
         }
 
+        /// <summary>
+        /// DI-friendly overload: resolves the current request's HttpContext from the
+        /// injected accessor and delegates to the HttpContext overload below. This
+        /// replaces the legacy ambient static context accessor, which does not
+        /// exist in ASP.NET Core. A null accessor or no active request yields 0,
+        /// exactly as the legacy null-context path did.
+        /// </summary>
+        public static long SignIn(string catalog, int officeId, string userName, string password, string culture,
+            bool remember,
+            string challenge, IHttpContextAccessor accessor)
+        {
+            return SignIn(catalog, officeId, userName, password, culture, remember, challenge, accessor?.HttpContext);
+        }
+
         public static long SignIn(string catalog, int officeId, string userName, string password, string culture,
             bool remember,
             string challenge, HttpContext context)
         {
             if (context != null)
             {
-                string remoteAddress = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
-                string remoteUser = HttpContext.Current.Request.ServerVariables["REMOTE_USER"];
+                // The legacy code read the IIS server variables REMOTE_ADDR/REMOTE_USER off the
+                // ambient legacy static context. ASP.NET Core exposes the same two values on the
+                // PASSED context. Connection.RemoteIpAddress is the direct peer address; when the
+                // app sits behind a reverse proxy the host must enable the forwarded-headers
+                // middleware, which rewrites this property - no X-Forwarded-For parsing here.
+                string remoteAddress = context.Connection?.RemoteIpAddress?.ToString();
+                string remoteUser = context.User?.Identity?.Name;
 
-                DbSignInResult result = SignIn(catalog, officeId, userName, password, context.Request.UserAgent,
+                string browser = context.Request.Headers.UserAgent.ToString();
+
+                DbSignInResult result = SignIn(catalog, officeId, userName, password, browser,
                     remoteAddress,
                     remoteUser, culture, challenge);
 

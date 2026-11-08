@@ -31,7 +31,7 @@ $(document).ready(function () {
 });
 
 okButton.click(function() {
-    emailHidden.val("");
+    setEmailTemplate("");
 });
 
 cancelButton.click(function () {
@@ -42,6 +42,23 @@ function prepareEmail(url) {
     $.get(
         url,
         function (response) {
-            emailHidden.val(response);
+            setEmailTemplate(response);
         });
+};
+
+//Writes the email template into #EmailHidden and notifies the server of the new value.
+//jQuery's .val() mutates the DOM property WITHOUT raising an "input" event, so the Blazor
+//component that owns this element would never observe the write and would mail an empty
+//body. Dispatching a bubbling native "input" event is what makes the component's
+//@bind:event="oninput" pick the value up. The dispatch is deliberately done here, next to
+//the only two writers, rather than read back from C# through script evaluation - which
+//would break under a Content-Security-Policy that withholds 'unsafe-eval'.
+function setEmailTemplate(value) {
+    emailHidden.val(value);
+
+    var element = emailHidden[0];
+
+    if (element) {
+        element.dispatchEvent(new Event("input", { bubbles: true }));
+    }
 };

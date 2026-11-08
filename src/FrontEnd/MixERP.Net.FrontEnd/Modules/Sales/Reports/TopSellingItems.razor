@@ -1,0 +1,65 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/TopSellingItems.ascx + .ascx.cs + .ascx.designer.cs.
+
+   This control is a THIN WRAPPER: its whole purpose is to show the report-master-page
+   screen Reports/TopSellingItemsFrame inside a full-width, full-height, border-less
+   iframe. The .ascx consisted of that one <iframe> element plus an inline <script> that
+   sized it; the code-behind's OnControlLoad body was EMPTY (verified against
+   TopSellingItems.ascx.cs) and the designer file declared no fields, so the iframe below
+   plus the moved script are the whole control.
+
+   The sizing script moved VERBATIM to wwwroot/js/reports/TopSellingItems.js - a .razor file
+   may not contain <script>. It depends on getDocHeight(), which the host's
+   mixerp-core.js defines globally.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Core.Modules.Sales.Internal
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<iframe src="/Modules/Sales/Reports/TopSellingItemsFrame.mix" scrolling="no" seamless="seamless"></iframe>
+
+@code {
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy override had an EMPTY body - this control's entire server-side behaviour is
+    ///     the base class's logging and the two authorization checks, which MixERPUserControl
+    ///     runs - so an empty body here is the faithful port, not a stub.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            await ModuleScripts.LoadAsync(this.JS,
+                "_content/MixERP.Net.Core.Modules.Sales/js/reports/TopSellingItems.js");
+        }
+    }
+}

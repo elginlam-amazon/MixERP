@@ -1,0 +1,166 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Widgets/OfficeInformationWidget.ascx + .ascx.cs + .ascx.designer.cs - the
+   dashboard widget showing the signed-in user's office, role, department and sign-in audit
+   trail.
+
+   The whole widget was built procedurally (CreateWidget / CreateHeader / CreateContent with
+   HtmlGenericControl + HtmlControlHelper) into <asp:PlaceHolder ID="Placeholder1">. It is
+   markup now, in the IDENTICAL child order and with the identical ids and css classes the
+   control tree rendered:
+
+     div#OfficeInformationWidget.four.wide.column.widget
+       > div.ui.attached.segment             (HtmlControlHelper.GetSegment("ui attached segment"))
+           > div.ui.left.floated.column > div.ui.header   (the title)
+           > div.ui.right.floated.column > the four icons, in order:
+                 expand disabled icon, move icon, help icon, close icon
+       > div.ui.attached.segment > ul > eight <li>
+
+   The id and the "widget" class matter: the host's dashboard script finds, drags and closes a
+   widget by them.
+
+   The eight list items are HtmlControlHelper.AddListItem(ul, key, value), which renders
+   `<li>key : value</li>` - that exact "key : value" text, the colon spacing included, is
+   reproduced by calling the SAME helper (its first parameter became a StringBuilder when the
+   library was migrated), so the rendered markup is unchanged. Their ORDER is the original's:
+   office, logged-in-to, last login IP, last login on, current IP, current login on, role,
+   department.
+
+   ⚠ AccessLevel.Everyone IS PRESERVED. This is the only AccessLevel.Everyone in the module and
+   it is deliberate: the dashboard renders this widget for every signed-in user, and the default
+   MixERPWidgetBase level is PolicyBased, which would have made the widget subject to the menu
+   policy and would have hidden it from users whose policy does not name it.
+
+   ⚠ A WIDGET DOES NOT INHERIT CurrentLogin. MixERPWidget derives from MixERPUserControlBase,
+   not from MixERPUserControl, so the [Inject] ICurrentLogin / IMixERPAuthorization properties
+   are absent - this component injects ICurrentLogin itself. Both of the legacy reads it needs
+   (AppUsers.GetCurrent().View.UserId and AppUsers.GetCurrentUserDB()) return an EMPTY login
+   inside a circuit, which would have made userId == 0 and therefore rendered an EMPTY widget
+   for everyone, so both come from ICurrentLogin.
+
+   THE `userId == 0` EARLY RETURN IS PRESERVED: the original returned from CreateContent before
+   adding the <ul>, so a widget with no resolvable user rendered its header and its chrome but
+   NO list. That is reproduced - the <ul> is emitted empty in that case, which is the same
+   rendering (an <asp:PlaceHolder>-built <ul> that was never added produced nothing inside the
+   segment).
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme or IsLandingPage override
+   and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPWidget
+@using System.Text
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Core.Modules.BackOffice.Data
+@using MixERP.Net.Entities.Audit
+@using MixERP.Net.i18n.Resources
+@inject MixERP.Net.Framework.Security.ICurrentLogin CurrentLogin
+
+<div id="OfficeInformationWidget" class="four wide column widget">
+    <div class="ui attached segment">
+        <div class="ui left floated column">
+            <div class="ui header">@Titles.OfficeInformation</div>
+        </div>
+        <div class="ui right floated column">
+            @((MarkupString)HtmlControlHelper.GetIcon("expand disabled icon"))
+            @((MarkupString)HtmlControlHelper.GetIcon("move icon"))
+            @((MarkupString)HtmlControlHelper.GetIcon("help icon"))
+            @((MarkupString)HtmlControlHelper.GetIcon("close icon"))
+        </div>
+    </div>
+    <div class="ui attached segment">
+        @if (!string.IsNullOrEmpty(this.listItems))
+        {
+            <ul>
+                @((MarkupString)this.listItems)
+            </ul>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    ///     The legacy <c>public override AccessLevel AccessLevel</c>, carried across unchanged.
+    ///     <para>
+    ///         <c>MixERPUserControlBase.AccessLevel</c> is an ABSTRACT GET-ONLY property (which
+    ///         <c>MixERPWidgetBase</c> overrides as <c>PolicyBased</c>), so it is overridden
+    ///         rather than assigned - which is also what the probe needs: the dashboard resolves
+    ///         widgets through <c>ModuleComponentResolver</c> and reads this off an instance on
+    ///         which no lifecycle method has run, and a getter answers there.
+    ///     </para>
+    /// </summary>
+    public override AccessLevel AccessLevel
+    {
+        get { return AccessLevel.Everyone; }
+    }
+
+    private string listItems = string.Empty;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY called CreateWidget(), which built the markup above; its one
+    ///     non-markup part - the GetOfficeInformationModel query - needs the user id and the
+    ///     catalog, both of which are asynchronous.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        MixERP.Net.Framework.Security.LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.listItems = GetListItems(catalog, login.UserId);
+    }
+
+    /// <summary>
+    ///     Port of CreateContent(): the same <c>userId == 0</c> early return, the same query and
+    ///     the same eight items in the same order.
+    /// </summary>
+    private static string GetListItems(string catalog, int userId)
+    {
+        if (userId.Equals(0))
+        {
+            return string.Empty;
+        }
+
+        DbGetOfficeInformationModelResult model = Audit.GetOfficeInformationModel(catalog, userId);
+
+        if (model == null)
+        {
+            return string.Empty;
+        }
+
+        StringBuilder list = new StringBuilder();
+
+        HtmlControlHelper.AddListItem(list, Titles.YourOffice, model.Office);
+        HtmlControlHelper.AddListItem(list, Titles.LoggedInTo, model.LoggedInTo);
+        HtmlControlHelper.AddListItem(list, Titles.LastLoginIP, model.LastLoginIp);
+        HtmlControlHelper.AddListItem(list, Titles.LastLoginOn, model.LastLoginOn);
+        HtmlControlHelper.AddListItem(list, Titles.CurrentIP, model.CurrentIp);
+        HtmlControlHelper.AddListItem(list, Titles.CurrentLoginOn, model.CurrentLoginOn);
+        HtmlControlHelper.AddListItem(list, Titles.Role, model.Role);
+        HtmlControlHelper.AddListItem(list, Titles.Department, model.Department);
+
+        return list.ToString();
+    }
+}

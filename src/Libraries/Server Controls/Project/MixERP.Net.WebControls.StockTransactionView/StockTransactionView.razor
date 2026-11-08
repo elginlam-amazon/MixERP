@@ -1,0 +1,952 @@
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Blazor replacement for the former WebForms composite server control
+    "MixERP.Net.WebControls.StockTransactionViewFactory.StockTransactionView"
+    (the sealed partial class formerly spread over the 25 files under Control/**).
+
+    One component, markup + @code, no .razor.cs sidecar and NO @page: this is a
+    library control, so the consuming host owns the render mode.
+
+    The template below is the port of Control/Control.cs CreateChildControls(), in
+    the SAME DOM order it produced:
+
+        CreateTitle          -> <h2>
+        CreateButtons        -> div.basic ui buttons (7 buttons)
+        CreateErrorLabel     -> div.big error
+        CreateFilterSegment  -> div#FilterDiv > div.ui form > div.nine fields (9 fields)
+        AddGridView          -> div[overflow:auto] > <MixERPGridView ID="ProductViewGridView" />
+        AddFlag              -> <Flag ElementId="FlagPopUnder" />
+        LoadGridView         -> OnAfterRenderAsync(firstRender) + ShowButton/flag update
+        AddJavascript        -> OnAfterRenderAsync(firstRender)
+        CreateHiddenFields   -> input#SelectedValuesHidden (two-way bound)
+
+    RecreateChildControls()/EnsureChildControls()/Render(HtmlTextWriter), the
+    PlaceHolder wrapper and [ToolboxData] are dropped - see migration-summary.md
+    section 2.
+
+    *** LOAD-BEARING DOM CONTRACT - StockTransactionView.js binds by LITERAL id ***
+    #PrintButton, #ShowButton, #OfficeTextBox, #SelectedValuesHidden,
+    #ProductViewGridView, h2 (the print title), #FlagButton/#FlagPopUnder, plus the
+    grid's column POSITIONS 2 (select checkbox) and 3 (id) - which is why the grid
+    is rendered with AutoGenerateColumns="false" and the column set produced by
+    GridViewColumnHelper.AddColumns. Auto-generated columns would prepend and shift
+    those positions, compiling green and silently killing every selection / merge /
+    flag feature.
+*@
+
+@namespace MixERP.Net.WebControls.StockTransactionViewFactory
+
+@using System
+@using System.Collections.Generic
+@using System.Collections.ObjectModel
+@using System.Data
+@using System.Linq
+@using System.Threading.Tasks
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+@using Microsoft.Extensions.Logging
+@using Microsoft.JSInterop
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Entities
+@using MixERP.Net.Entities.Helpers
+@using MixERP.Net.Framework
+@using MixERP.Net.i18n.Resources
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.WebControls.Flag
+@using MixERP.Net.WebControls.StockTransactionViewFactory.Data
+@using MixERP.Net.WebControls.StockTransactionViewFactory.Data.Helpers
+@using MixERP.Net.WebControls.StockTransactionViewFactory.Data.Models
+@using MixERP.Net.WebControls.StockTransactionViewFactory.Helpers
+
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject ProtectedSessionStorage SessionStorage
+@inject ILogger<StockTransactionView> Logger
+
+@* Control/Title.cs - MUST stay an h2: the print script reads $("h2").html(). *@
+<h2>@this.Text</h2>
+
+@* Control/Buttons.cs *@
+<div class="basic ui buttons">
+    @* Control/Buttons/AddButton.cs *@
+    @if (!string.IsNullOrWhiteSpace(this.AddNewUrl))
+    {
+        <input type="button" id="AddNewButton" class="ui button" value="@Titles.AddNew"
+               onclick="@("window.location='" + PageUtility.ResolveAbsoluteUrl(this.NavigationManager, this.AddNewUrl) + "'")" />
+    }
+
+    @* Control/Buttons/MergeToOrderButton.cs *@
+    @if (this.ShowMergeToOrderButton)
+    {
+        <button type="button" id="MergeToOrderButton" class="ui button"
+                @onclick="this.MergeToOrderButton_Click">@Titles.MergeBatchToSalesOrder</button>
+    }
+
+    @* Control/Buttons/MergeToDeliveryButton.cs *@
+    @if (this.ShowMergeToDeliveryButton)
+    {
+        <button type="button" id="MergeToDeliveryButton" class="ui button"
+                @onclick="this.MergeToDeliveryButton_Click">@Titles.MergeBatchToSalesDelivery</button>
+    }
+
+    @* Control/Buttons/MergeToGRNButton.cs *@
+    @if (this.ShowMergeToGRNButton)
+    {
+        <button type="button" id="MergeToGRNButton" class="ui button"
+                @onclick="this.MergeToGRNButton_Click">@Titles.MergeBatchToGRN</button>
+    }
+
+    @* Control/Buttons/ReturnButton.cs *@
+    @if (this.ShowReturnButton)
+    {
+        <button type="button" id="ReturnButton" class="ui button"
+                @onclick="this.ReturnButton_Click">@Titles.Return</button>
+    }
+
+    @* Control/Buttons/FlagButton.cs - the Flag component binds its popunder to this id. *@
+    <input type="button" id="FlagButton" class="ui button" value="@Titles.Flag" />
+
+    @* Control/Buttons/PrintButton.cs - the embedded JS binds the click -> printGridView. *@
+    <input type="button" id="PrintButton" class="ui button" value="@Titles.Print" />
+</div>
+
+@* Control/ErrorLabel.cs - the former errorLabel HtmlGenericControl("div"). *@
+<div class="big error">@this.errorMessage</div>
+
+@* Control/Form.cs - CreateFilterSegment. *@
+<div id="FilterDiv" class="ui segment">
+    <div class="ui form" margin-left="8px;">
+        <div class="nine fields">
+            @* Control/Form/DateFrom.cs *@
+            <div class="field">
+                <DateTextBox ID="DateFromDateTextBox" CssClass="date" Mode="FrequencyType.FiscalYearStartDate"
+                             Required="true" Catalog="@this.Catalog" OfficeId="@this.OfficeId"
+                             @bind-Text="this.dateFrom" @ref="this.dateFromDateTextBox" />
+            </div>
+
+            @* Control/Form/DateTo.cs *@
+            <div class="field">
+                <DateTextBox ID="DateToDateTextBox" CssClass="date" Mode="FrequencyType.MonthEndDate"
+                             Required="true" Catalog="@this.Catalog" OfficeId="@this.OfficeId"
+                             @bind-Text="this.dateTo" @ref="this.dateToDateTextBox" />
+            </div>
+
+            @* Control/Form/Office.cs - ALT+O focuses #OfficeTextBox. *@
+            <div class="field">
+                <input type="text" id="OfficeTextBox" placeholder="@Titles.Office" @bind="this.office" @bind:event="oninput" />
+            </div>
+
+            @* Control/Form/Party.cs *@
+            <div class="field">
+                <input type="text" id="PartyTextBox" placeholder="@Titles.Party" @bind="this.party" @bind:event="oninput" />
+            </div>
+
+            @* Control/Form/PriceType.cs - rendered only when SubBook != Receipt. *@
+            @if (this.SubBook != SubTranBook.Receipt)
+            {
+                <div class="field">
+                    <input type="text" id="PriceTypeTextBox" placeholder="@Titles.PriceType" @bind="this.priceType" @bind:event="oninput" />
+                </div>
+            }
+
+            @* Control/Form/User.cs *@
+            <div class="field">
+                <input type="text" id="UserTextBox" placeholder="@Titles.User" @bind="this.user" @bind:event="oninput" />
+            </div>
+
+            @* Control/Form/ReferenceNumber.cs *@
+            <div class="field">
+                <input type="text" id="ReferenceNumberTextBox" placeholder="@Titles.ReferenceNumber" @bind="this.referenceNumber" @bind:event="oninput" />
+            </div>
+
+            @* Control/Form/StatementReference.cs *@
+            <div class="field">
+                <input type="text" id="StatementReferenceTextBox" placeholder="@Titles.StatementReference" @bind="this.statementReference" @bind:event="oninput" />
+            </div>
+
+            @* Control/Form/ShowButton.cs - ServerClick -> @onclick; CTRL+ENTER clicks it. *@
+            <button type="button" id="ShowButton" class="blue ui button" @onclick="this.LoadGridView">@Titles.Show</button>
+        </div>
+    </div>
+</div>
+
+@* Control/Grid.cs - AddGridView. GridLines.None is dropped (no border attributes emitted). *@
+<div style="width:100%;overflow:auto;">
+    <MixERPGridView ID="ProductViewGridView" CssClass="ui nowrap table" AutoGenerateColumns="false"
+                    Columns="@this.columns" DataSource="@this.dataSource" />
+</div>
+
+@* Control/Flag.cs - AddFlag. ID -> ElementId, Updated event -> EventCallback. *@
+<Flag ElementId="FlagPopUnder" AssociatedControlId="FlagButton" OnClientClick="return getSelectedItems();"
+      CssClass="ui form segment initially hidden" Catalog="@this.Catalog" Updated="@this.Flag_Updated" />
+
+@*
+    Control/HiddenFields.cs - the former HiddenField.
+
+    LOAD BEARING, and NOT bound. getSelectedItems() in StockTransactionView.js publishes the
+    selection with $("#SelectedValuesHidden").val(...), and jQuery's .val() raises no
+    input/change event, so a Blazor @bind on this element would never fire - the selection
+    would never reach the server and every merge, the Return button and flag creation would
+    silently operate on an empty collection. The element is therefore left unbound (so a
+    re-render can never overwrite what the script wrote) and the server reads its value
+    through the readSelectedValuesHidden() interop function - see GetSelectedItemsAsync()
+    and RefreshSelectedValuesAsync().
+*@
+<input type="hidden" id="SelectedValuesHidden" name="SelectedValuesHidden" />
+
+@code {
+    #region Properties - Control/Properties.cs
+
+    //All 21 public property names and types are FROZEN (8 dependent projects) and
+    //become [Parameter]s. See migration-summary.md section 4.
+
+    [Parameter]
+    public string AddNewUrl { get; set; }
+
+    [Parameter]
+    public string Catalog { get; set; }
+
+    [Parameter]
+    public TranBook Book { get; set; }
+
+    [Parameter]
+    public string ChecklistUrl { get; set; }
+
+    [Parameter]
+    public string PreviewUrl { get; set; }
+
+    [Parameter]
+    public bool ShowMergeToDeliveryButton { get; set; }
+
+    [Parameter]
+    public string MergeToDeliveryButtonUrl { get; set; }
+
+    [Parameter]
+    public bool ShowMergeToGRNButton { get; set; }
+
+    [Parameter]
+    public string MergeToGRNButtonUrl { get; set; }
+
+    [Parameter]
+    public bool ShowMergeToOrderButton { get; set; }
+
+    [Parameter]
+    public string MergeToOrderButtonUrl { get; set; }
+
+    [Parameter]
+    public SubTranBook SubBook { get; set; }
+
+    [Parameter]
+    public string Text { get; set; }
+
+    [Parameter]
+    public string DbTableName { get; set; }
+
+    [Parameter]
+    public string PrimaryKey { get; set; }
+
+    [Parameter]
+    public bool IsNonGlTransaction { get; set; }
+
+    [Parameter]
+    public bool ShowReturnButton { get; set; }
+
+    [Parameter]
+    public string ReturnButtonUrl { get; set; }
+
+    [Parameter]
+    public int UserId { get; set; }
+
+    [Parameter]
+    public int OfficeId { get; set; }
+
+    #endregion
+
+    #region State - Control/IDisposable.cs
+
+    //The 18 private WebForms child-control fields become ordinary component state.
+    //No Dispose() is reproduced: a Blazor component owns no child-control tree and no
+    //unmanaged resource (see migration-summary.md section 2). The PlaceHolder field is
+    //gone with the composite-control render tree.
+
+    private DateTextBox dateFromDateTextBox;
+    private DateTextBox dateToDateTextBox;
+
+    private string dateFrom;
+    private string dateTo;
+    //Text filters start as string.Empty (WebForms TextBox.Text was never null); the SQL
+    //view filters with LIKE '%' || lower(x) || '%', so a NULL filter would match no rows.
+    private string office = string.Empty;
+    private string party = string.Empty;
+
+    //Stays string.Empty when the PriceType field is not rendered (the ported null-guard
+    //of "if (this.priceTypeInputText != null)").
+    private string priceType = string.Empty;
+
+    private string user = string.Empty;
+    private string referenceNumber = string.Empty;
+    private string statementReference = string.Empty;
+    private string selectedValues;
+    private string errorMessage;
+
+    private object dataSource;
+    private readonly List<MixERPGridViewColumn> columns = new List<MixERPGridViewColumn>();
+
+    #endregion
+
+    #region Javascript - Control/Javascript.cs
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     ALL JS interop runs from OnAfterRenderAsync and NEVER from OnInitialized:
+    ///     StockTransactionView.js binds #ProductViewGridView and #PrintButton, which must
+    ///     be in the DOM first. Registering it earlier is legal C#, raises no error and
+    ///     leaves every client feature dead.
+    ///     <para>
+    ///         LoadGridView() is called on the first render (CreateChildControls() called it
+    ///         before AddJavascript()), because the two DateTextBox children only publish
+    ///         their initialised dates through @bind-Text after their own first render.
+    ///     </para>
+    ///     <para>
+    ///         The re-init call is NOT inside the firstRender branch, and that is
+    ///         deliberate. StateHasChanged() only QUEUES a re-render - it does not flush one
+    ///         - so on the first pass the grid still has no data rows when this handler
+    ///         runs. More importantly Blazor REPLACES the grid's &lt;tr&gt; set on every
+    ///         later re-render (Show, a flag update, any LoadGridView()), and the script
+    ///         element is injected only once per circuit, so any row binding made once at
+    ///         load time is attached to rows that do not exist yet or are later discarded.
+    ///         initStockTransactionView() re-wires the row click handler and re-runs
+    ///         updateFlagColor() after EVERY render; it is idempotent (namespaced
+    ///         .off().on(), no cached lookups), so repeat calls rebind instead of stacking
+    ///         handlers. Without this, row-click selection and the flag row colours render
+    ///         and silently do nothing - see migration-summary.md section 3.6a.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            this.LoadGridView();
+            this.StateHasChanged();
+
+            this.AddJavascript();
+        }
+
+        await this.InitClientWiringAsync();
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Calls the idempotent window.initStockTransactionView() so the grid's current rows
+    ///     carry their click handler and their flag colours.
+    /// </summary>
+    /// <remarks>
+    ///     The function is PROBED rather than called inside a blanket catch, following the
+    ///     AttachmentFactory precedent. JSUtility.AddJSReference is a void, fire-and-forget
+    ///     API, so on the first render the script element may not have finished loading and
+    ///     "initStockTransactionView" is not defined yet - that case needs no retry, because
+    ///     the script's own $(document).ready self-initialisation wires the control as soon
+    ///     as it loads, and the next render calls this again. Swallowing every JSException
+    ///     instead would hide a genuine throw from INSIDE the function (missing jQuery,
+    ///     undefined Resources), leaving a control that renders and silently does nothing.
+    /// </remarks>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private async Task InitClientWiringAsync()
+    {
+        bool ready = false;
+
+        try
+        {
+            ready = await this.JSRuntime.InvokeAsync<bool>("eval",
+                "typeof window.initStockTransactionView === 'function'");
+        }
+        catch (JSException)
+        {
+            //The circuit cannot evaluate script at all; the self-initialisation path in
+            //StockTransactionView.js is the remaining route and needs no action here.
+            return;
+        }
+
+        if (!ready)
+        {
+            return;
+        }
+
+        try
+        {
+            await this.JSRuntime.InvokeVoidAsync("initStockTransactionView");
+        }
+        catch (JSException ex)
+        {
+            //A real failure INSIDE initStockTransactionView (missing jQuery, undefined
+            //Resources, absent toogleSelection/createFlaggedRows). It must not be silent -
+            //that is the exact failure mode this guard exists to prevent.
+            //
+            //It is reported through ILogger, following the AttachmentFactory precedent,
+            //NOT through this.errorMessage: OnAfterRenderAsync does not trigger a re-render,
+            //so a field assigned here would never be painted. Calling StateHasChanged() to
+            //force one is not an option either - this path runs after EVERY render, so a
+            //persistent client fault would loop re-render -> re-init -> throw -> re-render.
+            //The logger works from this lifecycle phase and needs no render.
+            this.Logger?.LogError(ex,
+                "initStockTransactionView() failed; the StockTransactionView grid will render but its row-click selection and flag row colours will not be wired.");
+        }
+    }
+
+    private void AddJavascript()
+    {
+        JSUtility.AddJSReference(this.JSRuntime, "MixERP.Net.WebControls.StockTransactionViewFactory.StockTransactionView.js", "StockTransactionView", typeof(StockTransactionView));
+    }
+
+    #endregion
+
+    #region Buttons - Control/Buttons/**
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     The former OnClientClick guard, "if(!getSelectedItems()){return false;};", carried
+    ///     by all four merge/return buttons. Blazor attaches its @onclick through event
+    ///     delegation at the document root, and returning false from an inline onclick
+    ///     attribute only prevents the default action - it does NOT stop propagation - so the
+    ///     inline attribute cannot cancel the server call and is not emitted. The guard is
+    ///     evaluated here instead, by calling the very same client function, which both
+    ///     publishes the selection into #SelectedValuesHidden and raises the "nothing
+    ///     selected" notification, exactly as the original client-side cancel did, and exactly
+    ///     once per click.
+    /// </summary>
+    /// <remarks>
+    ///     The selection is then READ BACK over interop. jQuery's .val() raises no input
+    ///     event, so the hidden field cannot be @bind-ed; reading it explicitly is what makes
+    ///     the selection visible to GetSelectedValues() on the server.
+    /// </remarks>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private async Task<bool> GetSelectedItemsAsync()
+    {
+        //JSUtility.AddJSReference is void/fire-and-forget, so on a very early click the
+        //script element may not have finished loading and "getSelectedItems" would not be
+        //defined - an unguarded invoke would throw JSException straight out of the click
+        //handler and tear down the circuit. Treat "not loaded yet" as "no selection": the
+        //user has not been able to tick a row either, which is exactly what the original
+        //client-side guard reported.
+        bool ready;
+
+        try
+        {
+            ready = await this.JSRuntime.InvokeAsync<bool>("eval",
+                "typeof window.getSelectedItems === 'function'");
+        }
+        catch (JSException)
+        {
+            return false;
+        }
+
+        if (!ready)
+        {
+            this.errorMessage = Warnings.CouldNotRegisterJavascript;
+            return false;
+        }
+
+        if (!await this.JSRuntime.InvokeAsync<bool>("getSelectedItems"))
+        {
+            return false;
+        }
+
+        await this.RefreshSelectedValuesAsync();
+        return true;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Reads #SelectedValuesHidden - what getSelectedItems() wrote on the client - into
+    ///     the component's state, so GetSelectedValues() parses the current selection.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private async Task RefreshSelectedValuesAsync()
+    {
+        try
+        {
+            this.selectedValues = await this.JSRuntime.InvokeAsync<string>("readSelectedValuesHidden");
+        }
+        catch (JSException)
+        {
+            //The reader is not available yet (fire-and-forget script injection). Leave the
+            //previous value rather than tearing down the circuit; the caller's guard reports
+            //"nothing selected", which is the original behaviour when no row was ticked.
+            this.errorMessage = Warnings.CouldNotRegisterJavascript;
+        }
+    }
+
+    private async Task MergeToOrderButton_Click()
+    {
+        if (!await this.GetSelectedItemsAsync())
+        {
+            return;
+        }
+
+        Collection<long> values = this.GetSelectedValues();
+
+        if (this.IsValid(this.Catalog))
+        {
+            if (string.IsNullOrWhiteSpace(this.MergeToOrderButtonUrl))
+            {
+                throw new Exception(Warnings.CannotMergeUrlNull);
+            }
+
+            await this.Merge(values, this.MergeToOrderButtonUrl);
+        }
+    }
+
+    private async Task MergeToDeliveryButton_Click()
+    {
+        if (!await this.GetSelectedItemsAsync())
+        {
+            return;
+        }
+
+        Collection<long> values = this.GetSelectedValues();
+
+        if (this.IsValid(this.Catalog))
+        {
+            if (string.IsNullOrWhiteSpace(this.MergeToDeliveryButtonUrl))
+            {
+                throw new Exception(Warnings.CannotMergeUrlNull);
+            }
+
+            await this.Merge(values, this.MergeToDeliveryButtonUrl);
+        }
+    }
+
+    private async Task MergeToGRNButton_Click()
+    {
+        if (!await this.GetSelectedItemsAsync())
+        {
+            return;
+        }
+
+        Collection<long> values = this.GetSelectedValues();
+
+        if (this.IsValid(this.Catalog))
+        {
+            if (string.IsNullOrWhiteSpace(this.MergeToGRNButtonUrl))
+            {
+                throw new Exception(Warnings.CannotMergeUrlNull);
+            }
+
+            await this.Merge(values, this.MergeToGRNButtonUrl);
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Control/Buttons/ReturnButton.cs ReturnButton_Click.
+    ///     The values[0] indexing is the ORIGINAL behaviour and is preserved as-is
+    ///     (only the first selected transaction is returned).
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private async Task ReturnButton_Click()
+    {
+        if (!await this.GetSelectedItemsAsync())
+        {
+            return;
+        }
+
+        Collection<long> values = this.GetSelectedValues();
+
+        if (string.IsNullOrWhiteSpace(this.ReturnButtonUrl))
+        {
+            throw new MixERPException(Warnings.ReturnButtonUrlNull);
+        }
+
+        this.NavigationManager.NavigateTo(PageUtility.ResolveAbsoluteUrl(this.NavigationManager, this.ReturnButtonUrl) + "?TranId=" + values[0]);
+    }
+
+    #endregion
+
+    #region Grid - Control/Grid.cs
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Replaces ProductViewGridView_RowDataBound, which dug the per-row anchors back
+    ///     out of e.Row.Cells[0] with FindControl("PrintAnchor") and read the transaction
+    ///     id from e.Row.Cells[2].Text. The row object is now the id source and the url is
+    ///     supplied to the Actions column template. A blank id - or a blank PreviewUrl -
+    ///     leaves the print anchor unwired, exactly as before.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private string GetPreviewUrl(object row)
+    {
+        string id = GetRowId(row);
+
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(this.PreviewUrl))
+        {
+            return null;
+        }
+
+        return PageUtility.ResolveAbsoluteUrl(this.NavigationManager, this.PreviewUrl + "?TranId=" + id);
+    }
+
+    private string GetChecklistUrl(object row)
+    {
+        string id = GetRowId(row);
+
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(this.ChecklistUrl))
+        {
+            return null;
+        }
+
+        return PageUtility.ResolveAbsoluteUrl(this.NavigationManager, this.ChecklistUrl + "?TranId=" + id);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     The row's Id - the value the former handler read as e.Row.Cells[2].Text (the
+    ///     third cell, which is the Id column). Supports both data-source shapes
+    ///     MixERPGridView accepts: a DataRow or an entity.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private static string GetRowId(object row)
+    {
+        if (row == null)
+        {
+            return null;
+        }
+
+        DataRow dataRow = row as DataRow;
+
+        if (dataRow != null)
+        {
+            return dataRow.Table.Columns.Contains("Id") ? Conversion.TryCastString(dataRow["Id"]) : null;
+        }
+
+        System.Reflection.PropertyInfo property = row.GetType().GetProperty("Id");
+
+        return property == null ? null : Conversion.TryCastString(property.GetValue(row, null));
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Control/Grid.cs LoadGridView, ported verbatim.
+    ///     <para>
+    ///         The three-branch data-source selection ORDER is behavioural:
+    ///         (a) IsNonGlTransaction, (b) Sales + Receipt, (c) everything else.
+    ///     </para>
+    ///     <para>
+    ///         DataBind() disappears - MixERPGridView re-renders on a parameter change.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private void LoadGridView()
+    {
+        // The WebForms control was rebuilt on every postback, so the error div started
+        // blank on each request. errorMessage is component state and survives re-renders,
+        // so it is cleared explicitly to reproduce that per-request reset - otherwise a
+        // validation message would persist through every later successful interaction.
+        this.errorMessage = null;
+
+        DateTime dateFromValue = Conversion.TryCastDate(this.dateFrom);
+        DateTime dateToValue = Conversion.TryCastDate(this.dateTo);
+        string officeValue = this.office;
+        string partyValue = this.party;
+
+        //The PriceType field is not rendered for SubTranBook.Receipt; the value then
+        //stays string.Empty, which is the ported "if (this.priceTypeInputText != null)"
+        //null-guard.
+        string priceTypeValue = this.SubBook == SubTranBook.Receipt ? string.Empty : this.priceType;
+
+        string userValue = this.user;
+        string referenceNumberValue = this.referenceNumber;
+        string statementReferenceValue = this.statementReference;
+        string bookName = TransactionBookHelper.GetInvariantTransactionBookName(this.Book, this.SubBook);
+
+        int userId = this.UserId;
+        int officeId = this.OfficeId;
+
+        GridViewColumnHelper.AddColumns(this.columns, this.SubBook, this.GetPreviewUrl, this.GetChecklistUrl);
+
+        if (this.IsNonGlTransaction)
+        {
+            this.dataSource = NonGlStockTransaction.GetView(this.Catalog, userId, bookName, officeId, dateFromValue,
+                dateToValue, officeValue, partyValue, priceTypeValue, userValue, referenceNumberValue, statementReferenceValue);
+            return;
+        }
+
+        if (this.Book == TranBook.Sales && this.SubBook == SubTranBook.Receipt)
+        {
+            this.dataSource = CustomerReceipts.GetView(this.Catalog, userId, officeId, dateFromValue, dateToValue,
+                officeValue, partyValue, userValue, referenceNumberValue, statementReferenceValue);
+            return;
+        }
+
+        this.dataSource = GLStockTransaction.GetView(this.Catalog, userId, bookName, officeId, dateFromValue,
+            dateToValue, officeValue, partyValue, priceTypeValue, userValue, referenceNumberValue, statementReferenceValue);
+    }
+
+    #endregion
+
+    #region Hidden fields - Control/HiddenFields.cs
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Ported verbatim, including the Conversion.TryCastInteger parse and the val > 0
+    ///     filter, reading what getSelectedItems() wrote into #SelectedValuesHidden.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private Collection<long> GetSelectedValues()
+    {
+        string selected = this.selectedValues;
+
+        if (string.IsNullOrWhiteSpace(selected))
+        {
+            return new Collection<long>();
+        }
+
+        Collection<long> values = new Collection<long>();
+
+        foreach (string value in selected.Split(','))
+        {
+            int val = Conversion.TryCastInteger(value);
+
+            if (val > 0)
+            {
+                values.Add(val);
+            }
+        }
+
+        return values;
+    }
+
+    #endregion
+
+    #region Flag - Control/Flag.cs
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Control/Flag.cs Flag_Updated.
+    ///     <para>
+    ///         The Flag component's OnClientClick ("return getSelectedItems();") publishes the
+    ///         selection into #SelectedValuesHidden on the client, but jQuery's .val() raises
+    ///         no event, so the selection is read back over interop here before
+    ///         GetSelectedValues() parses it. Without the refresh the flag would be created
+    ///         against an empty collection and report success.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private async Task Flag_Updated(FlagUpdatedEventArgs e)
+    {
+        if (e == null)
+        {
+            return;
+        }
+
+        await this.RefreshSelectedValuesAsync();
+
+        int flagTypeId = e.FlagId;
+
+        string resource = this.DbTableName;
+        string resourceKey = this.PrimaryKey;
+
+        if (string.IsNullOrWhiteSpace(resource))
+        {
+            throw new MixERPException(Warnings.CannotCreateFlagTransactionTableNull);
+        }
+
+        if (string.IsNullOrWhiteSpace(resourceKey))
+        {
+            throw new MixERPException(Warnings.CannotCreateFlagTransactionTablePrimaryKeyNull);
+        }
+
+        Flags.CreateFlag(this.Catalog, this.UserId, flagTypeId, resource, resourceKey, this.GetSelectedValues().Select(t => Conversion.TryCastString(t)).ToList().ToCollection());
+
+        this.LoadGridView();
+    }
+
+    #endregion
+
+    #region Merger - Control/Merger.cs
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Control/Merger.cs Merge(ids, link).
+    ///     <para>
+    ///         HttpContext.Current is NULL over the SignalR circuit, so
+    ///         Session["Product"] = model becomes
+    ///         ProtectedSessionStorage.SetAsync("Product", model) and
+    ///         Response.Redirect(link) becomes NavigationManager.NavigateTo(link).
+    ///         The storage KEY is unchanged ("Product") - see migration-summary.md
+    ///         section 5: the Entry pages that used to read Session["Product"] must read
+    ///         it back with ProtectedSessionStorage.GetAsync&lt;MergeModel&gt;("Product").
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private async Task Merge(Collection<long> ids, string link)
+    {
+        MergeModel model = ModelFactory.GetMergeModel(this.Catalog, ids, this.Book, this.SubBook);
+
+        if (model.View == null)
+        {
+            return;
+        }
+
+        if (model.View.Count.Equals(0))
+        {
+            return;
+        }
+
+        await this.SessionStorage.SetAsync("Product", model);
+
+        // Consumers pass app-relative targets ("~/Modules/Sales/Entry/Order.mix"). The
+        // original Response.Redirect resolved "~/"; NavigationManager does not, so resolve
+        // it here or the browser is sent to a literal "~/..." path.
+        this.NavigationManager.NavigateTo(PageUtility.ResolveAbsoluteUrl(this.NavigationManager, link));
+    }
+
+    #endregion
+
+    #region Validation - Control/Validation.cs
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     The short-circuit ORDER is behavioural and preserved exactly:
+    ///     nothing-selected -> BelongToSameParty -> AreAlreadyMerged -> ContainsIncompatibleTaxes.
+    ///     Every former "errorLabel.InnerText = ..." assignment now sets errorMessage,
+    ///     which div.big error renders.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private bool IsValid(string catalog)
+    {
+        // Per-request reset - see LoadGridView(). A stale message from an earlier failed
+        // attempt must not survive into a later successful one.
+        this.errorMessage = null;
+
+        Collection<long> values = this.GetSelectedValues();
+
+        if (values.Count.Equals(0))
+        {
+            this.errorMessage = Warnings.NothingSelected;
+            return false;
+        }
+
+        if (!this.BelongToSameParty(catalog, values))
+        {
+            return false;
+        }
+
+        if (this.AreAlreadyMerged(catalog, values))
+        {
+            return false;
+        }
+
+        if (this.ContainsIncompatibleTaxes(catalog, values))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool BelongToSameParty(string catalog, Collection<long> values)
+    {
+        bool belongToSameParty = NonGlStockTransaction.TransactionIdsBelongToSameParty(catalog, values);
+
+        if (!belongToSameParty)
+        {
+            this.errorMessage = Warnings.CannotMergeDifferentPartyTransaction;
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool AreAlreadyMerged(string catalog, Collection<long> values)
+    {
+        if (this.AreSalesQuotationsAlreadyMerged(catalog, values))
+        {
+            return true;
+        }
+
+        if (this.AreSalesOrdersAlreadyMerged(catalog, values))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool AreSalesQuotationsAlreadyMerged(string catalog, Collection<long> values)
+    {
+        if (this.Book == TranBook.Sales && this.SubBook == SubTranBook.Quotation)
+        {
+            if (NonGlStockTransaction.AreSalesQuotationsAlreadyMerged(catalog, values))
+            {
+                this.errorMessage = Warnings.CannotMergeAlreadyMerged;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool AreSalesOrdersAlreadyMerged(string catalog, Collection<long> values)
+    {
+        if (this.Book == TranBook.Sales && this.SubBook == SubTranBook.Order)
+        {
+            if (NonGlStockTransaction.AreSalesOrdersAlreadyMerged(catalog, values))
+            {
+                this.errorMessage = Warnings.CannotMergeAlreadyMerged;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool ContainsIncompatibleTaxes(string catalog, Collection<long> values)
+    {
+        if (this.Book == TranBook.Sales)
+        {
+            if (NonGlStockTransaction.ContainsIncompatibleTaxes(catalog, values))
+            {
+                this.errorMessage = Warnings.CannotMergeIncompatibleTax;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    #endregion
+}

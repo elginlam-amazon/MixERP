@@ -18,6 +18,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MixERP.Net.Framework.Contracts.Currency
 {
@@ -28,6 +30,18 @@ namespace MixERP.Net.Framework.Contracts.Currency
         string ConverterName { get; }
         string BaseCurrency { get; set; }
         List<string> CurrencyCodes { get; set; }
-        IEnumerable<CurrencyConversionResult> GetResult();
+
+        /// <summary>
+        ///     Fetches the current exchange rates from the provider's remote API.
+        ///     <para>
+        ///         This replaces the former synchronous <c>GetResult()</c>. The providers call an
+        ///         external HTTP endpoint, which on modern .NET is an asynchronous operation:
+        ///         keeping the method synchronous would force every implementation to block on
+        ///         the HTTP call (<c>.Result</c>), which starves the ASP.NET Core thread pool and
+        ///         can deadlock under load. Callers should await this method.
+        ///     </para>
+        /// </summary>
+        Task<IEnumerable<CurrencyConversionResult>> GetResultAsync(
+            CancellationToken cancellationToken);
     }
 }

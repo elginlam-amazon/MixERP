@@ -1,0 +1,69 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+
+@* Ported from Policy/StoreAccess.ascx + .ascx.cs + .ascx.designer.cs.
+
+   ⚠ CONTENT-FREE BY ORIGIN - this is a VERIFIED FACT, not an omission. The `.ascx` file
+   contained ONLY the license comment and the <%@ Control %> directive (no placeholder, no
+   markup), its `.ascx.designer.cs` declared NO fields at all, and its `OnControlLoad` body
+   was ALREADY EMPTY. The legacy screen therefore rendered an empty region; emitting markup
+   here would ADD a screen the module never had, and inventing a <Scrud> would mean guessing
+   a table/view and would newly expose a table through a CRUD form.
+
+   What the screen DOES carry is its AccessLevel override, and that is preserved below -
+   it is the only server-side behaviour in the file.
+
+   Beyond that, the whole behaviour is the base class's: Log.Verbose("{Control} initialized.")
+   plus CheckAccessLevelAsync + CheckTransactionPostingStatusAsync, which MixERPUserControl
+   runs for every control.
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme, IsLandingPage or
+   IsRestrictedMode override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+
+@code {
+    /// <summary>
+    ///     The legacy <c>public override AccessLevel AccessLevel</c>, carried across unchanged.
+    ///     <para>
+    ///         ⚠ THIS IS THE SCREEN'S ENTIRE SERVER-SIDE BEHAVIOUR, so it is the one thing that
+    ///         must not be lost. <c>MixERPUserControlBase.AccessLevel</c> is an ABSTRACT GET-ONLY
+    ///         property, so it is overridden rather than assigned - which is also what the probe
+    ///         needs: <c>ModuleHost.razor</c> reads the surface off an
+    ///         <c>Activator.CreateInstance</c> instance on which no lifecycle method runs, and a
+    ///         getter answers there. <c>MixERPAuthorization.CheckAccessLevelAsync</c> then
+    ///         enforces it and logs "Access to {Control} is denied to {User} from {IP}." on
+    ///         refusal.
+    ///     </para>
+    /// </summary>
+    public override AccessLevel AccessLevel
+    {
+        get { return AccessLevel.AdminOnly; }
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control must
+    ///     declare it. The legacy body was ALREADY EMPTY (see the header), so an empty body
+    ///     here is the base-class contract being satisfied, not a stub.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+}

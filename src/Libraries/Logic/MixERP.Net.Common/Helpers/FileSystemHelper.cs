@@ -18,10 +18,9 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
+using System.IO;
 using System.IO.Compression;
 using System.Security;
-using System.Security.Permissions;
-using System.Web.Hosting;
 
 namespace MixERP.Net.Common.Helpers
 {
@@ -34,11 +33,39 @@ namespace MixERP.Net.Common.Helpers
                 return false;
             }
 
-            FileIOPermission permission = new FileIOPermission(FileIOPermissionAccess.Write, HostingEnvironment.MapPath(directory));
-            PermissionSet permissionSet = new PermissionSet(PermissionState.None);
-            permissionSet.AddPermission(permission);
+            string path = MixERPConfiguration.MapPath(directory);
 
-            return permissionSet.IsSubsetOf(AppDomain.CurrentDomain.PermissionSet);
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+            {
+                return false;
+            }
+
+            //Code Access Security (FileIOPermission/PermissionSet) is removed on modern .NET
+            //and always reported success. Probe the directory for real instead.
+            string probe = Path.Combine(path, "mixerp-write-probe-" + Guid.NewGuid().ToString("N") + ".tmp");
+
+            try
+            {
+                using (FileStream stream = new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.None))
+                {
+                    stream.WriteByte(0);
+                }
+
+                File.Delete(probe);
+                return true;
+            }
+            catch (IOException)
+            {
+                return false;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return false;
+            }
+            catch (SecurityException)
+            {
+                return false;
+            }
         }
 
         public static void Unzip(string archive, string destnation)

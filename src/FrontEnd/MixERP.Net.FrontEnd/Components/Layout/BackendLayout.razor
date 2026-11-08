@@ -1,0 +1,198 @@
+@* ---------------------------------------------------------------------------------------------
+   BackendMaster.Master  ->  Components/Layout/BackendLayout.razor   (checklist task 62)
+
+   PLACEHOLDER MAPPING (identical to MixERPLayout)
+     ScriptContentPlaceholder       -> <SectionOutlet SectionName="@LayoutSections.ScriptContent" />
+     StyleSheetContentPlaceholder   -> <SectionOutlet SectionName="@LayoutSections.StyleSheetContent" />
+     BodyContentPlaceholder         -> @Body (wrapped in <AuthorizationOutlet>)
+     BottomScriptContentPlaceholder -> <SectionOutlet SectionName="@LayoutSections.BottomScriptContent" />
+
+   The document shell (<html data-ng-app="MixERPApp">, the meta tags, the master-page bundles,
+   /Resources.js and the inline <style> block) lives in Components/App.razor; the inline
+   end-of-day <script> moved to wwwroot/js/mixerp/master-page/eod.js. The Page_Load literal set
+   and the version literal are identical to MixERPMaster's.
+   --------------------------------------------------------------------------------------------- *@
+@inherits LayoutComponentBase
+@inject MasterPageScriptService MasterPageScript
+@inject CurrentLoginProvider CurrentLogin
+@inject IJSRuntime JS
+
+<SectionOutlet SectionName="@LayoutSections.StyleSheetContent" />
+<SectionOutlet SectionName="@LayoutSections.ScriptContent" />
+
+<div id="wrapper">
+    <div class="brand theme">
+        <div class="logo">
+            <a href="/">
+                <img src="/static/images/mixerp-logo.png" alt="MixERP" />
+            </a>
+
+            @* Right Menu Start *@
+            <div class="right-menu">
+                <div class="ui inverted contrast theme menu">
+                    <a class="item" href="http://mixerp.org/" target="_blank">
+                        <i class="anchor icon"></i>
+                        MixERP
+                        @this.Version
+                    </a>
+                    <a class="item">
+                        <i class="database icon"></i>
+                        @this.Catalog
+                    </a>
+                    <a class="item">
+                        <i class="home icon"></i>
+                        @this.BranchName
+                    </a>
+                    <div class="ui simple dropdown item" id="NotificationMenu">
+                        <i class="mail icon"></i>
+                        @Titles.Notifications
+                        <span></span>
+                        <i class="dropdown icon"></i>
+                        <div id="Notification" class="ui vertical menu">
+                        </div>
+                    </div>
+                    <a class="item" href="http://docs.mixerp.org/" target="_blank">
+                        <i class="book basic icon"></i>
+                        @Titles.MixERPDocumentation
+                    </a>
+                    <div class="right menu">
+                        <div class="ui simple dropdown item">
+                            <i class="icon smile"></i>
+                            @this.UserGreeting
+                            <i class="dropdown icon"></i>
+                            <div class="ui menu">
+                                <a class="item" href="/Site/Account/ChangePassword">
+                                    <i class="flag icon"></i>
+                                    @Titles.ChangePassword
+                                </a>
+                                <a class="item" href="/Site/Account/UserProfile">
+                                    <i class="edit icon"></i>
+                                    @Titles.ManageProfile
+                                </a>
+                                <a class="item" href="@SignOutUrl">
+                                    <i class="sign out icon"></i>
+                                    @Titles.SignOut
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @* Right Menu End *@
+        </div>
+        <div style="clear: both;"></div>
+        @* Top Menu Start *@
+        <div id="top-menu" class="ui attached menu">
+            <a class="item" @onclick="ToggleSidebarAsync">
+                <i class="options icon"></i>
+            </a>
+            <a class='initially hidden item' id="reset-menu" href="javascript:void(0);">
+                <i class='red remove icon'></i>
+            </a>
+        </div>
+        @* Top Menu End *@
+
+        <div class="sidebar">
+            <div id="search">
+                <div class="ui icon  input" style="width: 100%;">
+                    <input type="text" id="SearchInput" autocomplete="off">
+                    <i class="search link icon"></i>
+                </div>
+            </div>
+            <div id="tree" style='display: none;'>
+                <ul id='treeData'></ul>
+            </div>
+        </div>
+    </div>
+    <div id="page-wrapper">
+        <div class="ui grid">
+            <div class="one column row">
+                <div class="column">
+                    <div id="MainContent">
+                        <AuthorizationOutlet>
+                            @Body
+                        </AuthorizationOutlet>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<SectionOutlet SectionName="@LayoutSections.BottomScriptContent" />
+
+<div class="ui small modal" id="EODModal">
+    <i class="close icon"></i>
+    <div class="ui icon header">
+        <i class="loading spinner icon"></i>
+        @Titles.EODBegun
+    </div>
+    <div class="content">
+        <p>
+            @Labels.EODBegunSaveYourWork
+        </p>
+        <div style="margin-left: 150px;">
+            <div class="ui circular segment" style="width: 120px; height: 120px;">
+                <h2 class="ui large header" style="font-size: 36px;"></h2>
+            </div>
+        </div>
+    </div>
+    <div class="actions">
+        <div class="ui button">
+            @Titles.Cancel
+        </div>
+        <div class="ui button">
+            @Titles.OK
+        </div>
+    </div>
+</div>
+
+@code {
+    private const string SignOutUrl = "/Site/Account/SignOut";
+
+    private string Catalog { get; set; } = string.Empty;
+    private string BranchName { get; set; } = string.Empty;
+    private string UserGreeting { get; set; } = string.Empty;
+    private string Version { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Port of BackendMaster.Page_Load — the same literal set as MixERPMaster.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync().ConfigureAwait(true);
+
+        this.Catalog = await this.CurrentLogin.GetCatalogAsync().ConfigureAwait(true);
+
+        MetaLogin login = await this.CurrentLogin.GetCurrentAsync().ConfigureAwait(true);
+
+        if (login != null && login.View != null)
+        {
+            this.BranchName = login.View.OfficeName;
+            this.UserGreeting = string.Format(CultureInfo.CurrentCulture, Labels.UserGreeting,
+                login.View.UserName);
+        }
+
+        this.Version = ProductVersion.GetProductVersion();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender).ConfigureAwait(true);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await this.MasterPageScript.RegisterAsync(this.JS).ConfigureAwait(true);
+
+        await this.JS.InvokeVoidAsync("mixerpInitializeBackendEod", Titles.EODBegun, SignOutUrl)
+            .ConfigureAwait(true);
+    }
+
+    private async Task ToggleSidebarAsync()
+    {
+        await this.JS.InvokeVoidAsync("mixerpToggleSidebar").ConfigureAwait(true);
+    }
+}

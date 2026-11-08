@@ -1,0 +1,156 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Flags.ascx + .ascx.cs + .ascx.designer.cs - the flag-type (row colour) editor.
+   OnControlLoad built a Scrud over core.flag_types and added it to
+   <asp:PlaceHolder ID="ScrudPlaceholder">, which is this markup now.
+
+   THIS .ascx CARRIED REAL MARKUP, and all of it is reproduced:
+
+     * THE LIVE PREVIEW PANEL. The fixed-position `div.ui.small.segment.center.initially.hidden
+       .lorem.ipsum` and its lorem-ipsum paragraph are NOT decoration - they are the colour
+       preview, and `js/Flags.ascx.js` addresses the element BY THE ".lorem.ipsum" CLASS PAIR:
+       displayPreview() sets its background-color and color from the two colour textboxes,
+       the colorpicker's open/select callbacks show it and repaint it, and
+       scrudCustomValidator() hides it on save. The inline `style` (left 980px / top 250px /
+       z-index 2) and the "initially hidden" class are what place it beside the form and keep
+       it hidden until a picker opens, so both are preserved byte-for-byte, as is the
+       paragraph text (it is the sample the colours are previewed on).
+
+     * THE EIGHT COLORPICKER ASSETS. The .ascx loaded the jQuery-UI colorpicker plug-in, its
+       stylesheet, its Dutch i18n file, the Pantone swatches, the RGB-slider and memory parts
+       and the two CMYK parsers - all from the HOST's /js/colorpicker/ tree (the asset pass
+       repointed those paths). Blazor strips <script> inside a .razor file, so the seven
+       scripts are loaded through the host's page-interop loadScripts helper, which appends
+       them SEQUENTIALLY - THE ORDER IS LOAD-BEARING: jquery.colorpicker.js must be appended
+       before its own parts/swatches/parsers/i18n register themselves against it, and
+       js/Flags.ascx.js (which calls .colorpicker()) must come last. The ORIGINAL DOCUMENT
+       ORDER is reproduced exactly, with Flags.ascx.js in its original trailing position.
+       The STYLESHEET is a <link>, not a script, so it stays in the markup where it was.
+
+   ⚠ THE #FormGridView COLOUR PASS IS A JAVASCRIPT CONTRACT. loadColor() in Flags.ascx.js
+   reads `td:nth-child(4)` and `td:nth-child(5)` of every row of #FormGridView for the
+   background/foreground values and paints the rows with them. That grid is rendered by the
+   SCRUD COMPONENT, not by this file, so there is nothing to emit here - but it is why the
+   script must run after the Scrud has rendered, which is what loading it from
+   OnAfterRenderAsync guarantees.
+
+   ⚠ ONE FUNCTION IN Flags.ascx.js IS NOW DEAD, AND IS DELIBERATELY LEFT THERE: AsyncListener()
+   was called by the WebForms ScriptManager during partial page rendering, which has no ASP.NET
+   Core counterpart. It is not deleted because it is a plain global function that nothing calls
+   - harmless, and removing it would discard the record of what re-painted the grid after a
+   partial postback. Its PURPOSE is covered instead by re-invoking the three functions it
+   called from OnAfterRenderAsync on every render (see below), so the colours and the pickers
+   survive a Scrud re-render exactly as they did before.
+
+   NOTE the class carried [SuppressMessage("Microsoft.Naming", "CA1726:UsePreferredTerms",
+   MessageId = "Flags")]; that is an FxCop suppression for the type NAME, which is unchanged,
+   and it is reapplied below.
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme, IsLandingPage or
+   IsRestrictedMode override, no AccessLevel override, and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using System.Diagnostics.CodeAnalysis
+@using MixERP.Net.Core.Modules.BackOffice.Internal
+@using MixERP.Net.WebControls.ScrudFactory
+@using MixERP.Net.i18n.Resources
+@attribute [SuppressMessage("Microsoft.Naming", "CA1726:UsePreferredTerms", MessageId = "Flags")]
+@inject IJSRuntime JS
+
+<link href="/js/colorpicker/jquery.colorpicker.css" rel="stylesheet" type="text/css" />
+
+<div style="position: fixed; left: 980px; top: 250px; z-index: 2;" class="ui small segment center initially hidden lorem ipsum">
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+</div>
+
+<Scrud KeyColumn="flag_type_id"
+       TableSchema="core"
+       Table="flag_types"
+       ViewSchema="core"
+       View="flag_type_scrud_view"
+       Text="@Titles.Flags" />
+
+@code {
+    /// <summary>
+    ///     The seven <c>&lt;script src&gt;</c> elements of the legacy markup, IN THE ORIGINAL
+    ///     DOCUMENT ORDER. <c>ModuleScripts.LoadAsync</c> appends them sequentially, which is
+    ///     required: the plug-in must be registered before its parts, swatches, parsers and
+    ///     i18n file attach to it, and <c>Flags.ascx.js</c> - which calls
+    ///     <c>.colorpicker(...)</c> - must come last.
+    /// </summary>
+    private static readonly string[] ScriptUrls =
+    {
+        "/js/colorpicker/jquery.colorpicker.js",
+        "/js/colorpicker/i18n/jquery.ui.colorpicker-nl.js",
+        "/js/colorpicker/swatches/jquery.ui.colorpicker-pantone.js",
+        "/js/colorpicker/parts/jquery.ui.colorpicker-rgbslider.js",
+        "/js/colorpicker/parts/jquery.ui.colorpicker-memory.js",
+        "/js/colorpicker/parsers/jquery.ui.colorpicker-cmyk-parser.js",
+        "/js/colorpicker/parsers/jquery.ui.colorpicker-cmyk-percentage-parser.js",
+        "_content/MixERP.Net.Core.Modules.BackOffice/js/Flags.ascx.js"
+    };
+
+    private bool scriptsLoaded;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY built the Scrud above, which is markup now, so there is nothing
+    ///     procedural left to run; the asset loading needs a rendered document and lives in
+    ///     OnAfterRenderAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    /// <summary>
+    ///     The three functions the dropped <c>AsyncListener()</c> called -
+    ///     <c>loadColor()</c>, <c>displayPreview()</c> and <c>addColorPicker()</c> - are
+    ///     re-invoked on EVERY render after the first. That is what keeps the row colours and
+    ///     the colour pickers alive when the Scrud replaces its grid or its form, which is
+    ///     precisely what the WebForms partial-render hook did.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            await ModuleScripts.LoadAsync(this.JS, ScriptUrls);
+            this.scriptsLoaded = true;
+            return;
+        }
+
+        if (!this.scriptsLoaded)
+        {
+            return;
+        }
+
+        try
+        {
+            await this.JS.InvokeVoidAsync("loadColor");
+            await this.JS.InvokeVoidAsync("displayPreview");
+            await this.JS.InvokeVoidAsync("addColorPicker");
+        }
+        catch (JSException)
+        {
+            //The colorpicker chain has not finished loading yet; the next render retries.
+        }
+    }
+}

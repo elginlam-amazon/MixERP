@@ -1,93 +1,64 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{0EF8A910-9603-477E-9EF7-AAE9AEA46160}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>MixERP.Net.HtmlParser</RootNamespace>
     <AssemblyName>MixERP.Net.HtmlParser</AssemblyName>
-    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile>
-    </TargetFrameworkProfile>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <CodeAnalysisRuleSet>..\..\..\MixERP.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
     <SignAssembly>true</SignAssembly>
-  </PropertyGroup>
-  <PropertyGroup>
     <AssemblyOriginatorKeyFile>Mix Open Foundation.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <CodeAnalysisRuleSet>..\..\..\MixERP.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+
+  <!-- Assembly metadata migrated from the former Properties/AssemblyInfo.cs -->
+  <PropertyGroup>
+    <AssemblyTitle>MixERP.Net.HtmlParser</AssemblyTitle>
+    <Description></Description>
+    <Company>MixERP Inc.</Company>
+    <Product>MixERP.Net.HtmlParser</Product>
+    <Copyright>Copyright ©  2014-2015</Copyright>
+    <NeutralLanguage>en</NeutralLanguage>
+    <AssemblyVersion>1.2.0.1</AssemblyVersion>
+    <FileVersion>1.2.0.1</FileVersion>
+    <InformationalVersion>1.2.0.1 RC</InformationalVersion>
+  </PropertyGroup>
+
   <ItemGroup>
-    <Reference Include="HtmlRenderer">
-      <HintPath>..\..\..\..\lib\HtmlRenderer\HtmlRenderer.dll</HintPath>
-    </Reference>
-    <Reference Include="HtmlRenderer.WinForms">
-      <HintPath>..\..\..\..\lib\HtmlRenderer\HtmlRenderer.WinForms.dll</HintPath>
-    </Reference>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Web" />
-    <Reference Include="System.Windows.Forms" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Data" />
-    <Reference Include="System.Xml" />
+    <AssemblyAttribute Include="System.CLSCompliantAttribute">
+      <_Parameter1>true</_Parameter1>
+      <_Parameter1_TypeName>System.Boolean</_Parameter1_TypeName>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.InteropServices.ComVisibleAttribute">
+      <_Parameter1>false</_Parameter1>
+      <_Parameter1_TypeName>System.Boolean</_Parameter1_TypeName>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.InteropServices.GuidAttribute">
+      <_Parameter1>8ad7603c-1846-4cc9-9090-43d2dc74310f</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
+
+  <!-- Rendering engine: the legacy bare-DLL HtmlRenderer / HtmlRenderer.WinForms references and
+       System.Windows.Forms.WebBrowser are .NET Framework + Windows only and have no net10.0 build.
+       PuppeteerSharp (headless Chromium) is the cross-platform replacement that keeps real HTML/CSS
+       layout fidelity for both serializers; SixLabors.ImageSharp (same version as MixERP.Net.Common)
+       supplies the IImageFormat/IImageEncoder surface used by ImageHelper. -->
   <ItemGroup>
-    <Compile Include="ImageSerializer\HtmlImageSerializer.cs" />
-    <Compile Include="ImageSerializer\HtmlRendererImageSerializer.cs" />
-    <Compile Include="ImageSerializer\IHtmlImageSerializer.cs" />
-    <Compile Include="ImageSerializer\WebBrowserImageSerializer.cs" />
-    <Compile Include="ImageSerializer\ImageSavedEventArgs.cs" />
-    <Compile Include="ImageSerializer\ParserType.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
+    <PackageReference Include="PuppeteerSharp" Version="25.15.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.2.0" />
   </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\MixERP.net.Common\MixERP.Net.Common.csproj">
-      <Project>{D5A09C22-8F48-4FB2-A14D-C62C8C8FCEC0}</Project>
-      <Name>MixERP.Net.Common</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\MixERP.Net.Framework\MixERP.Net.Framework.csproj">
-      <Project>{1509332F-AE98-44D9-9072-5BBC59A65FC4}</Project>
-      <Name>MixERP.Net.Framework</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\MixERP.Net.i18n\MixERP.Net.i18n.csproj">
-      <Project>{2ECD1C2E-D7D0-4A24-896A-E625B0566DB5}</Project>
-      <Name>MixERP.Net.i18n</Name>
-    </ProjectReference>
+    <ProjectReference Include="..\MixERP.Net.Common\MixERP.Net.Common.csproj" />
+    <ProjectReference Include="..\MixERP.Net.Framework\MixERP.Net.Framework.csproj" />
+    <ProjectReference Include="..\MixERP.Net.i18n\MixERP.Net.i18n.csproj" />
   </ItemGroup>
+
   <ItemGroup>
     <None Include="Mix Open Foundation.snk" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+
 </Project>

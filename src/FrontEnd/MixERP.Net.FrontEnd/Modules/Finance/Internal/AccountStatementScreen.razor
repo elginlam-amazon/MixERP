@@ -1,0 +1,510 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* The SHARED account-statement screen - the biggest control in this module (896 lines of
+   procedural WebForms).
+
+   ⚠ WHY THIS COMPONENT EXISTS - A SHARED CODE-BEHIND IN THE ORIGINAL.
+   Reports/AccountStatement.ascx AND Reports/AccountStatementPopup.ascx both declared
+       CodeBehind="AccountStatement.ascx.cs"
+       Inherits="MixERP.Net.Core.Modules.Finance.Reports.AccountStatement"
+   i.e. ONE class served BOTH .ascx files (the popup had no .cs and no .designer.cs of its
+   own). Treating the popup as "a control with no code-behind" would have silently emptied the
+   screen the balance sheet's drill-down opens. The sharing is preserved STRUCTURALLY here so
+   the two cannot drift: this component carries the whole screen, and
+   Reports/AccountStatement.razor + Reports/AccountStatementPopup.razor are thin hosts that
+   differ only in what the two .ascx files differed in (the popup's MasterPageId and its
+   padding wrapper).
+
+   It is a plain component, not a MixERPUserControl: the two HOSTS are the user controls (they
+   carry the authorization run and the probe-visible flags). It therefore injects ICurrentLogin
+   itself.
+
+   THE MARKUP IS THE CONTROL TREE, in the identical child order the eight builders produced:
+     h2                                              CreateHeader()
+     div.ui.icon.buttons.bpad16                      CreateTopPanel()
+       > button#AddNewButton / #FlagButton / #ReconcileButton / #PrintButton
+       > input#SelectedValuesHidden                  AddHiddenFields()
+     div.ui.top.attached.tabular.menu > two <a data-tab>   CreateTabs()
+     div.ui.bottom.attached.active.form.tab.segment[data-tab=first]
+       > div.fields  (account number, select, from, to, Show)   CreateFormPanel()
+       > div.auto-overflow-panel > table#StatementGridView      CreateGridPanel()
+     div.ui.bottom.attached.tab.segment[data-tab=second]        the account overview tab
+     <Flag>                                          CreateFlagPanel()
+     div#ReconcileModal.ui.small.modal               CreateReconcileModal()
+
+   ⚠ #StatementGridView IS A POSITIONAL JAVASCRIPT CONTRACT. js/reports/AccountStatement.js
+   declares checkBoxColumnPosition = "2", tranCodeColumnPosition = "3" and
+   bookDateColumnPosition = "5", the print-icon handler reads td:nth-child(3), and
+   createFlaggedRows() reads the two trailing flag colour columns. So all FIFTEEN columns are
+   emitted in the original order - the print-icon template, the select-checkbox template, then
+   the 13 bound fields ending with FlagBg and FlagFg, whose headers are deliberately EMPTY.
+   The two templates render exactly what the ITemplate/GridViewSelectTemplate produced:
+   `<i class="icon print" onclick="showPreview(this);"></i>` and
+   `<div class="ui toggle checkbox"><input type="checkbox" /><label></label></div>`.
+   "{0:d}" and "{0:N}" are applied by GridFormat, reproducing BoundField.DataFormatString
+   (current culture, and a null cell rendered empty).
+
+   THE SHOW BUTTON AND THE FLAG ARE SERVER HANDLERS and stay so:
+     * ShowButton_Click -> BindGridView() + CreateAccountOverviewPanel(), i.e. it refreshes
+       BOTH tabs - preserved;
+     * Flag_Updated -> Flags.CreateFlag(...) over the SELECTED transaction codes, then the same
+       two refreshes. Its resource/resourceKey constants ("account_statement",
+       "transaction_code") and the comma-split of #SelectedValuesHidden are verbatim; that
+       hidden field is filled by the script's getSelectedItems(), which also gates the flag
+       popup through OnClientClick - so it is read at click time through ElementValueReader
+       (the WebForms postback read of a jQuery-written field has no other equivalent).
+     * the date boxes are read the same way, because the jQuery UI datepicker writes them
+       without raising an input event.
+
+   AutoInitialize() is preserved verbatim, including its own quirk: it reads ?AccountNumber= or
+   resolves ?AccountId= through AccountHelper, applies ?From= / ?To= only when they are not
+   DateTime.MinValue, and RETURNS EARLY - binding nothing - when neither an account number nor
+   an account id was supplied. That is why the grid is empty until Show is pressed on the
+   normal screen, and pre-filled when the balance sheet opens the popup with ?AccountId=&To=.
+
+   ⚠ PRE-EXISTING BUG, PRESERVED: GetDateField() built a calendar icon
+   (`<i class="icon calendar pointer" onclick="$('#...').datepicker('show');">`) inside a
+   `using` block and NEVER ADDED IT, so that icon has never rendered. It is deliberately not
+   emitted - adding it would newly switch on a click handler the screen never had. The
+   "ui icon input" wrapper it would have lived in IS emitted, because that one was added.
+
+   StatementGridViewDataBound (HeaderRow.TableSection) is dropped with no loss - a real
+   <thead> is emitted. *@
+
+@using System.Collections.ObjectModel
+@using System.Data
+@using MixERP.Net.Common
+@using MixERP.Net.Core.Modules.Finance.Data.Helpers
+@using MixERP.Net.Entities
+@using MixERP.Net.Entities.Core
+@using MixERP.Net.Entities.Transactions
+@using MixERP.Net.Framework.Security
+@using MixERP.Net.TransactionGovernor
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.WebControls.Flag
+@using MixERP.Net.i18n.Resources
+@inject ICurrentLogin CurrentLogin
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+@* CreateHeader() *@
+<h2>@Titles.AccountStatement</h2>
+
+@* CreateTopPanel() *@
+<div class="ui icon buttons bpad16">
+    <button id="AddNewButton" class="ui button"
+            onclick="window.location='/Modules/Finance/Entry/JournalVoucher.mix';return false;">
+        <i class='icon plus'></i>@Titles.NewJournalEntry
+    </button>
+    <button id="FlagButton" class="ui button" onclick="return false;">
+        <i class='icon flag'></i>@Titles.Flag
+    </button>
+    <button id="ReconcileButton" class="ui button" onclick="return showReconcileWindow();">
+        <i class='circle notched icon'></i>@Titles.Reconcile
+    </button>
+    <button id="PrintButton" class="ui button" onclick="return false;">
+        <i class='icon print'></i>@Titles.Print
+    </button>
+    <input type="hidden" id="SelectedValuesHidden" />
+</div>
+
+@* CreateTabs() - the tab menu *@
+<div class="ui top attached tabular menu">
+    <a class="active item" data-tab="first">@Titles.TransactionStatement</a>
+    <a class="item" data-tab="second">@Titles.AccountOverview</a>
+</div>
+
+@* CreateTabs() - the first tab: the form panel and the grid panel *@
+<div class="ui bottom attached active form tab segment" data-tab="first">
+    <div class="fields">
+        <div class="field">
+            <label for="AccountNumberInputText">@Titles.AccountNumber</label>
+            <input type="text" id="AccountNumberInputText" value="@this.accountNumber" />
+        </div>
+        <div class="four wide field">
+            <label for="AccountNumberSelect">@Titles.Select</label>
+            <select id="AccountNumberSelect"></select>
+        </div>
+        @* GetDateField(Titles.From, fromDateTextBox) - see the calendar-icon note above. *@
+        <div class="field">
+            <label for="FromDateTextBox">@Titles.From</label>
+            <div class="ui icon input">
+                <DateTextBox ID="FromDateTextBox" Mode="@(FrequencyType.FiscalYearStartDate)"
+                             Catalog="@this.catalog" OfficeId="@this.officeId" @bind-Text="this.fromDate" />
+            </div>
+        </div>
+        <div class="field">
+            <label for="ToDateTextBox">@Titles.To</label>
+            <div class="ui icon input">
+                <DateTextBox ID="ToDateTextBox" Mode="@(FrequencyType.FiscalYearEndDate)"
+                             Catalog="@this.catalog" OfficeId="@this.officeId" @bind-Text="this.toDate" />
+            </div>
+        </div>
+        <div class="field">
+            <label for="ShowButton">@Titles.Prepare</label>
+            <button id="ShowButton" type="button" class="ui positive button"
+                    @onclick="this.ShowButton_Click">@Titles.Show</button>
+        </div>
+    </div>
+
+    <div class="auto-overflow-panel">
+        <table id="StatementGridView" class="ui celled table nowrap">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>@Titles.Select</th>
+                    <th>@Titles.TranCode</th>
+                    <th>@Titles.ValueDate</th>
+                    <th>@Titles.BookDate</th>
+                    <th class="text right">@Titles.Debit</th>
+                    <th class="text right">@Titles.Credit</th>
+                    <th class="text right">@Titles.Balance</th>
+                    <th>@Titles.StatementReference</th>
+                    <th>@Titles.Office</th>
+                    <th>@Titles.Book</th>
+                    <th>@Titles.AccountNumber</th>
+                    <th>@Titles.Account</th>
+                    <th></th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (this.statement != null)
+                {
+                    @foreach (DbGetAccountStatementResult row in this.statement)
+                    {
+                        <tr>
+                            @* ActionTemplate *@
+                            <td><i class="icon print" onclick="showPreview(this);"></i></td>
+                            @* GridViewHelper.GridViewSelectTemplate *@
+                            <td>
+                                <div class="ui toggle checkbox"><input type="checkbox" /><label></label></div>
+                            </td>
+                            <td>@row.TranCode</td>
+                            <td>@GridFormat.Format(row.ValueDate, "{0:d}")</td>
+                            <td>@GridFormat.Format(row.BookDate, "{0:d}")</td>
+                            <td class="text right">@GridFormat.Format(row.Debit, "{0:N}")</td>
+                            <td class="text right">@GridFormat.Format(row.Credit, "{0:N}")</td>
+                            <td class="text right">@GridFormat.Format(row.Balance, "{0:N}")</td>
+                            <td>@row.StatementReference</td>
+                            <td>@row.Office</td>
+                            <td>@row.Book</td>
+                            <td>@row.AccountNumber</td>
+                            <td>@row.Account</td>
+                            <td>@row.FlagBg</td>
+                            <td>@row.FlagFg</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@* CreateTabs() - the second tab, filled by CreateAccountOverviewPanel() *@
+<div class="ui bottom attached tab segment" data-tab="second">
+    @if (this.overview != null)
+    {
+        @* CreateAccountOverviewHeader(): an h2 carrying a Literal, then a .description div
+           carrying a Literal. The description literal was NEVER assigned by the original, so
+           it rendered empty - preserved. *@
+        <h2>@this.overview.Account</h2>
+        <div class="description"></div>
+
+        @* CreateAccountOverviewTable() *@
+        <table id="AccountOverViewGrid" class="ui definition table">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>@Titles.Definition</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>@Titles.AccountNumber</td>
+                    <td>@this.overview.AccountNumber</td>
+                </tr>
+                <tr>
+                    <td>@Titles.ExternalCode</td>
+                    <td>@this.overview.ExternalCode</td>
+                </tr>
+                <tr>
+                    <td>@Titles.BaseCurrency</td>
+                    <td>@this.overview.CurrencyCode</td>
+                </tr>
+                <tr>
+                    <td>@Titles.AccountMaster</td>
+                    <td>@this.overview.AccountMasterCode</td>
+                </tr>
+                <tr>
+                    <td>@Titles.Confidential</td>
+                    <td>@Conversion.TryCastString(this.overview.Confidential)</td>
+                </tr>
+                <tr>
+                    <td>@Titles.IsSystemAccount</td>
+                    <td>@Conversion.TryCastString(this.overview.SysType)</td>
+                </tr>
+                <tr>
+                    <td>@Titles.NormallyDebit</td>
+                    <td>@Conversion.TryCastString(this.overview.NormallyDebit)</td>
+                </tr>
+                <tr>
+                    <td>@Titles.ParentAccount</td>
+                    <td>@this.overview.ParentAccountNumber</td>
+                </tr>
+            </tbody>
+        </table>
+    }
+</div>
+
+@* CreateFlagPanel() *@
+@if (this.catalog != null)
+{
+    <Flag ElementId="FlagPopUnder"
+          AssociatedControlId="FlagButton"
+          OnClientClick="return getSelectedItems();"
+          CssClass="ui form segment initially hidden"
+          Catalog="@this.catalog"
+          Updated="@this.Flag_Updated" />
+}
+
+@* CreateReconcileModal() - every button is script-driven (reconcile() / modal("hide")), so the
+   onclick values are carried over as HTML attributes, as the originals were. *@
+<div id="ReconcileModal" class="ui small modal">
+    @((MarkupString)MixERP.Net.Common.Helpers.HtmlControlHelper.GetIcon("close icon"))
+    @((MarkupString)MixERP.Net.Common.Helpers.HtmlControlHelper.GetModalHeader(Titles.Reconcile, "circle notched icon"))
+    <div class="content">
+        <div class="ui form">
+            <div class="two fields">
+                <div class="field">
+                    <label for="TranCodeInputText">@Titles.TranCode</label>
+                    <input type="text" id="TranCodeInputText" disabled="disabled" />
+                </div>
+                <div class="field">
+                    <label for="CurrentBookDateInputText">@Titles.CurrentBookDate</label>
+                    <input type="text" id="CurrentBookDateInputText" disabled="disabled" />
+                </div>
+            </div>
+            <div class="field">
+                <label>@Titles.NewBookDate</label>
+                <div class="three fields">
+                    <div class="field">
+                        <input type="text" id="YearInputText" placeholder="@Titles.Year" class="integer" />
+                    </div>
+                    <div class="field">
+                        <input type="text" id="MonthInputText" placeholder="@Titles.Month" class="integer" />
+                    </div>
+                    <div class="field">
+                        <input type="text" id="DayInputText" placeholder="@Titles.Day" class="integer" />
+                    </div>
+                </div>
+            </div>
+            <input type="button" class="ui green button" value="@Titles.OK" onclick="reconcile();" />
+            <input type="button" class="ui red button" value="@Titles.Close"
+                   onclick="$(&quot;#ReconcileModal&quot;).modal(&quot;hide&quot;);" />
+        </div>
+    </div>
+</div>
+
+@code {
+    private const string Resource = "account_statement";
+    private const string ResourceKey = "transaction_code";
+
+    private ElementValueReader elementValues;
+
+    private string catalog;
+    private int userId;
+    private int officeId;
+
+    private string accountNumber;
+    private string fromDate;
+    private string toDate;
+
+    private IEnumerable<DbGetAccountStatementResult> statement;
+    private AccountView overview;
+
+    /// <summary>
+    ///     True once the screen has rendered its data at least once; the host component uses it
+    ///     to decide when the controller script may be loaded (it reads the rendered rows).
+    /// </summary>
+    public bool Ready { get; private set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        this.elementValues = new ElementValueReader(this.JS);
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.userId = login.UserId;
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.AutoInitialize();
+
+        this.Ready = true;
+    }
+
+    /// <summary>
+    ///     Port of AutoInitialize(), verbatim - including the EARLY RETURN when neither an
+    ///     account number nor a resolvable account id was supplied, which is what leaves the
+    ///     grid and the overview tab empty on a cold open.
+    /// </summary>
+    private void AutoInitialize()
+    {
+        string queryAccountNumber = ModuleQuery.Get(this.Navigation, "AccountNumber");
+        long accountId = Conversion.TryCastLong(ModuleQuery.Get(this.Navigation, "AccountId"));
+        DateTime from = Conversion.TryCastDate(ModuleQuery.Get(this.Navigation, "From"));
+        DateTime to = Conversion.TryCastDate(ModuleQuery.Get(this.Navigation, "To"));
+
+        if (!string.IsNullOrWhiteSpace(queryAccountNumber))
+        {
+            this.accountNumber = queryAccountNumber;
+        }
+        else
+        {
+            if (accountId > 0)
+            {
+                this.accountNumber = AccountHelper.GetAccountNumberByAccountId(this.catalog, accountId);
+            }
+            else
+            {
+                return;
+            }
+        }
+
+        if (from != DateTime.MinValue)
+        {
+            this.fromDate = from.Date.ToShortDateString();
+        }
+
+        if (to != DateTime.MinValue)
+        {
+            this.toDate = to.Date.ToShortDateString();
+        }
+
+        this.BindGridView();
+        this.CreateAccountOverviewPanel();
+    }
+
+    /// <summary>
+    ///     Port of ShowButton_Click: BOTH the grid and the overview tab are rebuilt. The three
+    ///     filter values are re-read from the DOM first, which is what the postback did.
+    /// </summary>
+    private async Task ShowButton_Click()
+    {
+        await this.ReadFiltersAsync();
+
+        this.BindGridView();
+        this.CreateAccountOverviewPanel();
+    }
+
+    /// <summary>
+    ///     Port of Flag_Updated, verbatim: the flag is recorded against the SELECTED
+    ///     transaction codes and both panels are then rebuilt.
+    /// </summary>
+    private async Task Flag_Updated(FlagUpdatedEventArgs e)
+    {
+        if (e == null)
+        {
+            return;
+        }
+
+        int flagTypeId = e.FlagId;
+
+        Collection<string> selected = await this.GetSelectedValuesAsync();
+
+        Flags.CreateFlag(this.catalog, this.userId, flagTypeId, Resource, ResourceKey, selected);
+
+        await this.ReadFiltersAsync();
+
+        this.BindGridView();
+        this.CreateAccountOverviewPanel();
+    }
+
+    /// <summary>
+    ///     Port of GetSelectedValues(): the comma-separated transaction codes the script's
+    ///     getSelectedItems() wrote into #SelectedValuesHidden. Blank means an empty
+    ///     collection, exactly as before.
+    /// </summary>
+    private async Task<Collection<string>> GetSelectedValuesAsync()
+    {
+        string selectedValues = await this.elementValues.GetValueAsync("SelectedValuesHidden");
+
+        if (string.IsNullOrWhiteSpace(selectedValues))
+        {
+            return new Collection<string>();
+        }
+
+        Collection<string> values = new Collection<string>();
+
+        foreach (string value in selectedValues.Split(','))
+        {
+            values.Add(value);
+        }
+
+        return values;
+    }
+
+    private async Task ReadFiltersAsync()
+    {
+        string account = await this.elementValues.GetValueAsync("AccountNumberInputText");
+        string from = await this.elementValues.GetValueAsync("FromDateTextBox");
+        string to = await this.elementValues.GetValueAsync("ToDateTextBox");
+
+        if (account != null)
+        {
+            this.accountNumber = account;
+        }
+
+        if (from != null)
+        {
+            this.fromDate = from;
+        }
+
+        if (to != null)
+        {
+            this.toDate = to;
+        }
+    }
+
+    /// <summary>
+    ///     Port of BindGridView(), verbatim - the same six arguments in the same order.
+    /// </summary>
+    private void BindGridView()
+    {
+        DateTime from = Conversion.TryCastDate(this.fromDate);
+        DateTime to = Conversion.TryCastDate(this.toDate);
+
+        this.statement = Data.Reports.AccountStatement.GetAccountStatement(this.catalog, from, to, this.userId,
+            this.accountNumber, this.officeId);
+    }
+
+    /// <summary>
+    ///     Port of CreateAccountOverviewPanel() + CreateTableBody(): the panel is CLEARED and
+    ///     rebuilt, and a null view leaves it empty (the original returned before setting the
+    ///     header literal).
+    /// </summary>
+    private void CreateAccountOverviewPanel()
+    {
+        this.overview = Data.Reports.AccountStatement.GetAccountOverview(this.catalog, this.accountNumber);
+    }
+}

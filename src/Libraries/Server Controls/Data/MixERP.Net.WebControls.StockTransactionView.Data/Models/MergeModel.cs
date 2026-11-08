@@ -21,13 +21,14 @@ using MixERP.Net.Entities;
 using MixERP.Net.Entities.Models.Transactions;
 using System;
 using System.Collections.ObjectModel;
+using System.Text.Json.Serialization;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory.Data.Models
 {
     public sealed class MergeModel
     {
-        private readonly Collection<long> transactionIdCollection = new Collection<long>();
-        private readonly Collection<ProductDetail> view = new Collection<ProductDetail>();
+        private Collection<long> transactionIdCollection = new Collection<long>();
+        private Collection<ProductDetail> view = new Collection<ProductDetail>();
         public int AgentId { get; set; }
         public TranBook Book { get; set; }
         public bool NonTaxableSales { get; set; }
@@ -41,16 +42,38 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory.Data.Models
         public int StoreId { get; set; }
         public SubTranBook SubBook { get; set; }
 
+        /// <summary>
+        /// The merged transaction ids.
+        /// </summary>
+        /// <remarks>
+        /// The setter exists SOLELY so that System.Text.Json can populate this collection when the
+        /// model is round-tripped as JSON through ProtectedSessionStorage (key "Product") between
+        /// StockTransactionViewFactory (writer) and StockTransactionFactory (reader). A get-only
+        /// collection property is silently skipped by System.Text.Json, which used to lose every
+        /// merged transaction id. The setter never stores null so that readers such as
+        /// string.Join(",", model.TransactionIdCollection) stay safe.
+        /// </remarks>
+        [JsonInclude]
         public Collection<long> TransactionIdCollection
         {
             get { return this.transactionIdCollection; }
+            set { this.transactionIdCollection = value ?? new Collection<long>(); }
         }
 
         public DateTime ValueDate { get; set; }
 
+        /// <summary>
+        /// The merged product lines.
+        /// </summary>
+        /// <remarks>
+        /// Settable for the same System.Text.Json round-trip reason as
+        /// <see cref="TransactionIdCollection"/>; never null.
+        /// </remarks>
+        [JsonInclude]
         public Collection<ProductDetail> View
         {
             get { return this.view; }
+            set { this.view = value ?? new Collection<ProductDetail>(); }
         }
 
         public void AddTransactionIdToCollection(long transactionId)

@@ -1,0 +1,117 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/CustomerInvoiceReport.ascx + .ascx.cs + .ascx.designer.cs - the
+   customer copy of a direct-sales invoice.
+
+   OnControlLoad built a `WebReport`, added the @transaction_master_id parameter collection
+   to it TWICE and added it to this.Controls. `MixERP.Net.FrontEnd.Controls.WebReport` NO
+   LONGER EXISTS: it was a one-property subclass of
+   MixERP.Net.WebControls.ReportEngine.Report whose only job was setting Catalog from
+   AppUsers.GetCurrentUserDB(), which returns an EMPTY catalog inside a Blazor circuit. The
+   markup therefore hosts <Report> directly and supplies Catalog from ICurrentLogin.
+
+   WHY AutoInitialize IS false HERE. The original set AutoInitialize = true AFTER it had
+   already pushed the parameter collections in, so the report was initialized WITH its
+   parameters. The migrated Report component honours AutoInitialize from OnParametersSet,
+   which runs BEFORE a parent can reach the child through @ref - initializing with an EMPTY
+   parameter collection. The parameters are therefore added and InitializeReport() called
+   explicitly once the child exists, which is the ordering the original had and the same
+   pattern the host's Components/Pages/Reports/ReportViewer.razor uses.
+
+   THE DOUBLE AddParameterToCollection(list) IS PRESERVED. ParameterCollection is a
+   collection OF datasource parameter collections, and the original added the very same list
+   twice - i.e. the report's second datasource gets the same @transaction_master_id. That is
+   what the Sales.CustomerInvoice.xml report expects, and it is carried over verbatim.
+
+   PRESERVED SURFACE: MasterPageId = "MixERPReportMaster.Master" and RemoveTheme = true,
+   both from the <%@ Control %> directive. They are assigned in the CONSTRUCTOR because the
+   host's ModuleHost.razor reads them off an Activator-created PROBE INSTANCE (they pick the
+   layout and disable the theme stylesheet), on which no lifecycle method runs. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using System.Collections.ObjectModel
+@using MixERP.Net.Core.Modules.Sales.Internal
+@using MixERP.Net.WebControls.ReportEngine
+@inject NavigationManager Navigation
+
+@if (this.loaded)
+{
+    <Report @ref="this.report" AutoInitialize="false" Catalog="@this.catalog" Path="@ReportFilePath" />
+}
+
+@code {
+    private const string ReportFilePath = "~/Modules/Sales/Reports/Source/Sales.CustomerInvoice.xml";
+
+    private Report report;
+    private bool loaded;
+    private bool initializePending;
+    private string catalog;
+
+    public CustomerInvoiceReport()
+    {
+        //<%@ Control ... MasterPageId="MixERPReportMaster.Master" RemoveTheme="true" %>
+        this.MasterPageId = "MixERPReportMaster.Master";
+        this.RemoveTheme = true;
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the report above, which is markup now, and its catalog and
+    ///     parameter binding are asynchronous / post-render, so they live in OnInitializedAsync
+    ///     and OnAfterRender.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+        this.initializePending = true;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+
+        if (!this.initializePending || this.report == null)
+        {
+            return;
+        }
+
+        this.initializePending = false;
+
+        Collection<KeyValuePair<string, object>> list = new Collection<KeyValuePair<string, object>>();
+        list.Add(new KeyValuePair<string, object>("@transaction_master_id",
+            ModuleQuery.Get(this.Navigation, "TranId")));
+
+        //A WebForms postback built a brand-new control, so its collection always started empty.
+        //A Blazor component instance survives, so it is cleared before binding.
+        this.report.ParameterCollection.Clear();
+        this.report.AddParameterToCollection(list);
+        this.report.AddParameterToCollection(list);
+        this.report.InitializeReport();
+        this.StateHasChanged();
+    }
+}

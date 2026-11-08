@@ -20,7 +20,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
-using System.Threading;
+using System.Globalization;
 using MixERP.Net.DbFactory;
 using MixERP.Net.Entities.Public;
 using Npgsql;
@@ -38,11 +38,11 @@ namespace MixERP.Net.WebControls.ScrudFactory.Data
             {
                 var exclusions = exclusion.Split(',');
                 var paramNames =
-                    exclusions.Select((s, i) => "@Parameter" + i.ToString(Thread.CurrentThread.CurrentCulture).Trim())
+                    exclusions.Select((s, i) => "@Parameter" + i.ToString(CultureInfo.CurrentCulture).Trim())
                         .ToArray();
                 var inClause = string.Join(",", paramNames);
 
-                sql = string.Format(Thread.CurrentThread.CurrentCulture,
+                sql = string.Format(CultureInfo.CurrentCulture,
                     @"SELECT * FROM scrud.mixerp_table_view WHERE table_schema=@Schema AND table_name=@TableName AND column_name NOT IN({0}) ORDER BY ordinal_position ASC;",
                     inClause);
 

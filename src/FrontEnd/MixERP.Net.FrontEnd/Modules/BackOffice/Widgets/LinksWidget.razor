@@ -1,0 +1,87 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Widgets/LinksWidget.ascx + .ascx.cs + .ascx.designer.cs - the dashboard widget
+   that links out to the MixERP documentation, source, issues, forum and Facebook page.
+
+   The whole widget was built procedurally (CreateWidget / CreateHeader / CreateList /
+   AddListItem with HtmlGenericControl + HtmlControlHelper) into
+   <asp:PlaceHolder ID="Placeholder1">. It is markup now, in the IDENTICAL child order and with
+   the identical ids and css classes the control tree rendered:
+
+     div#LinksWidget.four.wide.column.widget
+       > div.ui.attached.segment                 (HtmlControlHelper.GetSegment("ui attached segment"))
+           > div.ui.left.floated.column > div.ui.header    (the title)
+           > div.ui.right.floated.column > the four icons, in order:
+                 expand disabled icon, move icon, help icon, close icon
+       > div.ui.attached.segment > ul > five <li> > <a target="_blank">
+
+   The id and the "widget" class matter: the host's dashboard script finds, drags and closes a
+   widget by them, and the four icons are its expand/move/help/close affordances.
+
+   The five links are reproduced with their URLs, their localized texts and THEIR ORDER
+   unchanged (documentation, source code, bugs, support, Facebook), each with target="_blank" as
+   HtmlAnchor.Target set it.
+
+   ⚠ A WIDGET DOES NOT INHERIT CurrentLogin. MixERPWidget derives from MixERPUserControlBase,
+   not from MixERPUserControl, so the [Inject] ICurrentLogin / IMixERPAuthorization properties
+   are absent. This widget needs neither - it has no login-derived value and runs no query - so
+   nothing is injected, and that is deliberate rather than an omission.
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme, IsLandingPage or
+   AccessLevel override (so it keeps MixERPWidgetBase's AccessLevel.PolicyBased) and implemented
+   no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPWidget
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.i18n.Resources
+
+<div id="LinksWidget" class="four wide column widget">
+    <div class="ui attached segment">
+        <div class="ui left floated column">
+            <div class="ui header">@Titles.MixERPLinks</div>
+        </div>
+        <div class="ui right floated column">
+            @((MarkupString)HtmlControlHelper.GetIcon("expand disabled icon"))
+            @((MarkupString)HtmlControlHelper.GetIcon("move icon"))
+            @((MarkupString)HtmlControlHelper.GetIcon("help icon"))
+            @((MarkupString)HtmlControlHelper.GetIcon("close icon"))
+        </div>
+    </div>
+    <div class="ui attached segment">
+        <ul>
+            <li><a href="http://docs.mixerp.org" target="_blank">@Titles.Documentation</a></li>
+            <li><a href="https://github.com/mixerp/mixerp" target="_blank">@Titles.DownloadSourceCode</a></li>
+            <li><a href="https://github.com/mixerp/mixerp/issues" target="_blank">@Titles.SubmitBugs</a></li>
+            <li><a href="http://mixerp.org/forum/" target="_blank">@Titles.Support</a></li>
+            <li><a href="https://www.facebook.com/mixerp.official" target="_blank">@Titles.MixERPOnFacebook</a></li>
+        </ul>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY called CreateWidget(), which built the static markup above - it
+    ///     ran no query and read no login value - so there is nothing procedural left to run.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+}

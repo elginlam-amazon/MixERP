@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace MixERP.Net.CurrencyConversion.OpenExchangeRates
@@ -31,12 +33,21 @@ namespace MixERP.Net.CurrencyConversion.OpenExchangeRates
             string baseUrl = this.ApiUrl;
             IEnumerable<QueryString> keys = this.GetKeys();
 
+            // Values are percent-encoded: the API key and the comma-joined currency list are
+            // interpolated straight into the query string, so without encoding a value
+            // containing '&' or '=' would corrupt the request. Key/value layout and ordering
+            // are unchanged.
             var queryString = string.Join("&",
                 keys.Select(
-                    k => string.Format("{0}={1}", k.Name, k.Value))
+                    k => string.Format(CultureInfo.InvariantCulture, "{0}={1}", k.Name, Encode(k.Value)))
                     .ToArray());
 
             return baseUrl + "?" + queryString;
+        }
+
+        private static string Encode(string value)
+        {
+            return value == null ? string.Empty : Uri.EscapeDataString(value);
         }
 
         private IEnumerable<QueryString> GetKeys()

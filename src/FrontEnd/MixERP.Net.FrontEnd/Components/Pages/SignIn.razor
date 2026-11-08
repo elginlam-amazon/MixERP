@@ -1,0 +1,389 @@
+@* ---------------------------------------------------------------------------------------------
+   SignIn.aspx (+ SignIn.aspx.cs, 542 lines of programmatic markup) -> Components/Pages/SignIn.razor
+   (checklist task 83).
+
+   ROUTES: "/SignIn" is the cookie scheme's LoginPath and "/" is the Application/Routes.cs ""
+   MapPageRoute entry, so this component claims both.
+
+   THE DOM CONTRACT IS LOAD-BEARING. wwwroot/js/Pages/SignIn.aspx.js drives the whole form and
+   posts to the two migrated endpoints (/services/office/getoffices, /services/user/authenticate),
+   addressing these LITERAL ids: #UsernameInputText, #PasswordInputPassword,
+   #RememberInputCheckBox, #BranchSelect, #LanguageSelect, #SignInButton, #CompanySelect, plus the
+   .exception / .field / .form / .dimmer / .ui.checkbox classes and the "challenge" global. Every
+   one of them is reproduced below exactly as the programmatic markup emitted it.
+
+   The former <body id="SignInBody"> (which the theme stylesheet paints purple) is applied through
+   page-interop.js, because <body> now belongs to App.razor.
+   --------------------------------------------------------------------------------------------- *@
+@page "/SignIn"
+@page "/"
+@layout BlankLayout
+@inherits MixERPPageBase
+@implements IAsyncDisposable
+@using Microsoft.AspNetCore.Http
+@using MixERP.Net.Entities.Office
+@using MixERP.Net.FrontEnd.Data.Helpers
+@using MixERP.Net.FrontEnd.Data.Office
+@using Serilog
+@inject IHttpContextAccessor HttpContextAccessor
+@inject PersistentComponentState ApplicationState
+@inject IJSRuntime JS
+
+<PageTitle>Sign In</PageTitle>
+
+<div id="signin-form">
+    @* CreateLogo(): an anchor to the sign-in page itself wrapping the logo image. *@
+    <a href="/SignIn">
+        <img src="/static/images/mixerp-logo.png" />
+    </a>
+
+    @* CreateForm(): div.ui.form.segment with the original inline padding. *@
+    <div class="ui form segment" style="padding:24px 48px;">
+        @* CreateHeader() *@
+        <div class="ui large header" style="8px 0;">@Titles.SignIn</div>
+
+        @* AddDivider() *@
+        <div class="ui divider"></div>
+
+        @* AddUserIdField() *@
+        <div class="field">
+            <label for="UsernameInputText">@Titles.UserId</label>
+            <input type="text" id="UsernameInputText" name="UsernameInputText" placeholder="@Titles.UserId" />
+        </div>
+
+        @* AddPasswordField() *@
+        <div class="field">
+            <label for="PasswordInputPassword">@Titles.Password</label>
+            <input type="password" id="PasswordInputPassword" name="PasswordInputPassword" placeholder="@Titles.Password" />
+        </div>
+
+        @* AddRememberMeField() *@
+        <div class="field">
+            <div class="ui toggle checkbox">
+                <input type="checkbox" id="RememberInputCheckBox" name="RememberInputCheckBox" />
+                <label>@Titles.RememberMe</label>
+            </div>
+        </div>
+
+        @* AddIconDivider() *@
+        <div class="ui horizontal icon divider">
+            <i class="circular user icon"></i>
+        </div>
+
+        @* AddCompanyField(): bound to the "Catalogs" DbServer parameter, current catalog preselected. *@
+        <div class="field">
+            <label for="CompanySelect">@Titles.SelectCompany</label>
+            <select id="CompanySelect" name="CompanySelect" value="@this.SelectedCatalog">
+                @foreach (string catalog in this.Catalogs)
+                {
+                    <option value="@catalog" selected="@catalog.Equals(this.SelectedCatalog, StringComparison.OrdinalIgnoreCase)">@catalog</option>
+                }
+            </select>
+        </div>
+
+        @* AddBranchField(): DataTextField = OfficeName, DataValueField = OfficeId. *@
+        <div class="field">
+            <label for="BranchSelect">@Titles.SelectYourBranch</label>
+            <select id="BranchSelect" name="BranchSelect">
+                @foreach (DbGetOfficesResult office in this.Offices)
+                {
+                    <option value="@office.OfficeId">@office.OfficeName</option>
+                }
+            </select>
+        </div>
+
+        @* AddLanguageField(): the "Cultures" parameter x CultureInfo.GetCultures, current UI
+           culture preselected. *@
+        <div class="field">
+            <label for="LanguageSelect">@Titles.SelectLanguage</label>
+            <select id="LanguageSelect" name="LanguageSelect" value="@this.SelectedLanguage">
+                @foreach (KeyValuePair<string, string> language in this.Languages)
+                {
+                    <option value="@language.Key" selected="@language.Key.Equals(this.SelectedLanguage, StringComparison.OrdinalIgnoreCase)">@language.Value</option>
+                }
+            </select>
+        </div>
+
+        @* AddExceptionField(): SignIn.aspx.js appends the "Message" query string value here. *@
+        <div class="exception field"></div>
+
+        @* AddSignInButtonField() *@
+        <div class="field">
+            <input type="button" id="SignInButton" name="SignInButton" value="@Titles.SignIn"
+                   title="CRTL + RETURN" class="ui teal button" />
+        </div>
+    </div>
+</div>
+
+@* CreateDimmer() *@
+<div class="ui page dimmer">
+    <div class="content">
+        <div class="center">
+            <div class="ui yellow huge icon header">
+                <i class="ui inverted yellow setting loading icon"></i>@Titles.SigningIn
+                <div class="ui yellow sub header">@Labels.JustAMomentPlease</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private const string BodyId = "SignInBody";
+    private const string ChallengeStateKey = "SignIn_Challenge";
+
+    /// <summary>
+    ///     The scripts SignIn.aspx declared at the bottom of its own form, in the original order.
+    ///     libraries.min.js is already loaded by App.razor (master-page.min.js is a superset of it).
+    /// </summary>
+    private static readonly string[] PageScripts =
+    {
+        "/js/jssha1.5/src/sha.js",
+        "/js/Pages/SignIn.aspx.js"
+    };
+
+    private PersistingComponentStateSubscription subscription;
+
+    private string challenge = string.Empty;
+
+    private IList<string> Catalogs { get; set; } = new List<string>();
+    private IList<DbGetOfficesResult> Offices { get; set; } = new List<DbGetOfficesResult>();
+    private IList<KeyValuePair<string, string>> Languages { get; set; } = new List<KeyValuePair<string, string>>();
+    private string SelectedCatalog { get; set; } = string.Empty;
+    private string SelectedLanguage { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     The legacy flag: this page must be reachable without a signed-in user (Specialist 4's
+    ///     note — the page inherits MixERPPageBase, NOT MixERPAuthorizedPageBase).
+    /// </summary>
+    public SignIn()
+    {
+        this.SkipLoginCheck = true;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync().ConfigureAwait(true);
+
+        HttpContext context = this.HttpContextAccessor.HttpContext;
+
+        //AddJavascript(): the challenge handshake (task 60). The session is only writable while the
+        //initial HTTP response is open, so it is generated during the INITIAL STATIC RENDER and
+        //handed to the interactive render through the persistent component state - the interactive
+        //circuit has no HttpContext and would otherwise emit an empty challenge, which
+        //User.Authenticate rejects.
+        this.subscription = this.ApplicationState.RegisterOnPersisting(() =>
+        {
+            this.ApplicationState.PersistAsJson(ChallengeStateKey, this.challenge);
+            return Task.CompletedTask;
+        });
+
+        string persisted;
+
+        if (this.ApplicationState.TryTakeFromJson(ChallengeStateKey, out persisted) &&
+            !string.IsNullOrWhiteSpace(persisted))
+        {
+            this.challenge = persisted;
+        }
+        else if (context != null)
+        {
+            this.challenge = SignInSession.GenerateChallenge(context.Session);
+        }
+
+        //Page_Load, in the original order.
+        if (!this.CheckDbConnectivity())
+        {
+            return;
+        }
+
+        if (context != null)
+        {
+            //PageUtility.CheckInvalidAttempts reads the session counter, so it runs on the request
+            //that has one.
+            SignInSession.CheckInvalidAttempts(this.NavigationManager);
+        }
+
+        this.BindCompanies();
+
+        if (!this.BindBranches())
+        {
+            return;
+        }
+
+        if (this.Offices.Count.Equals(0))
+        {
+            this.NavigationManager.NavigateTo("/Install", true);
+            return;
+        }
+
+        this.BindLanguages();
+
+        //The non-postback branch: an already authenticated visitor goes straight to the dashboard.
+        if (await this.CurrentLogin.IsAuthenticatedAsync().ConfigureAwait(true))
+        {
+            long globalLoginId = await this.CurrentLogin.GetGlobalLoginIdAsync().ConfigureAwait(true);
+
+            if (globalLoginId > 0)
+            {
+                await this.CurrentLogin.SetCurrentLoginAsync().ConfigureAwait(true);
+                this.RedirectToDashboard();
+            }
+        }
+    }
+
+    /// <summary>
+    ///     BindCompanies(): the comma separated "Catalogs" DbServer parameter, with
+    ///     AppUsers.GetCurrentUserDB() preselected.
+    /// </summary>
+    private void BindCompanies()
+    {
+        string catalogs = ConfigurationHelper.GetDbServerParameter("Catalogs");
+        this.SelectedCatalog = this.GetCurrentCatalog();
+
+        if (!string.IsNullOrWhiteSpace(catalogs))
+        {
+            this.Catalogs = catalogs.Split(',').Select(p => p.Trim()).ToList();
+        }
+    }
+
+    /// <summary>
+    ///     BindBranches(): a failure means the target database carries no mixerp schema, which the
+    ///     original swallowed and answered with the offline page. Returns false when it redirected.
+    /// </summary>
+    private bool BindBranches()
+    {
+        try
+        {
+            this.Offices = MixERP.Net.FrontEnd.Data.Office.Offices
+                .GetOffices(this.GetCurrentCatalog()).ToList();
+
+            return true;
+        }
+        catch
+        {
+            //Could not bind the branch office dropdownlist.
+            //The target database does not contain mixerp schema.
+            //Swallow the exception
+            //and redirect to application offline page.
+            this.RedirectToOfflinePage();
+            return false;
+        }
+    }
+
+    /// <summary>
+    ///     GetLanguages(): every CultureInfo whose two-letter name appears in the "Cultures"
+    ///     parameter, displayed by native name, with the current UI culture preselected.
+    /// </summary>
+    private void BindLanguages()
+    {
+        List<KeyValuePair<string, string>> items = new List<KeyValuePair<string, string>>();
+
+        string[] cultures = (ConfigurationHelper.GetParameter("Cultures") ?? string.Empty).Split(',');
+
+        foreach (string culture in cultures)
+        {
+            string cultureName = culture.Trim();
+
+            foreach (CultureInfo infos in CultureInfo.GetCultures(CultureTypes.AllCultures)
+                .Where(x => x.TwoLetterISOLanguageName.Equals(cultureName)))
+            {
+                items.Add(new KeyValuePair<string, string>(infos.Name, infos.NativeName));
+            }
+        }
+
+        this.Languages = items;
+        this.SelectedLanguage = CultureInfo.CurrentUICulture.Name;
+    }
+
+    /// <summary>
+    ///     CheckDbConnectivity(). Returns false when the offline page was requested.
+    /// </summary>
+    private bool CheckDbConnectivity()
+    {
+        Log.Verbose("Checking if database server is available.");
+
+        if (!ServerConnectivity.IsDbServerAvailable(this.GetCurrentCatalog()))
+        {
+            Log.Warning("Could not connect to database server.");
+            this.RedirectToOfflinePage();
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    ///     The catalog this page works against. There is no signed-in user yet, so this is the
+    ///     configured default catalog — exactly what AppUsers.GetCurrentUserDB() returned on the
+    ///     sign-in request.
+    /// </summary>
+    private string GetCurrentCatalog()
+    {
+        if (!string.IsNullOrWhiteSpace(this.SelectedCatalog))
+        {
+            return this.SelectedCatalog;
+        }
+
+        return AppUsers.GetCurrentUserDB();
+    }
+
+    private void RedirectToDashboard()
+    {
+        this.NavigationManager.NavigateTo(MixERPAuthentication.DefaultUrl, true);
+    }
+
+    private void RedirectToOfflinePage()
+    {
+        Log.Debug("Redirecting to offline page.");
+        this.NavigationManager.NavigateTo("/static/offline.html", true);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender).ConfigureAwait(true);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        //AddJavascript(): the SignInPage_Vars globals, byte-identical to the original.
+        string script = JSUtility.GetVar("challenge", this.challenge);
+        script += JSUtility.GetVar("shortDateFormat", CurrentCulture.GetShortDateFormat());
+        script += JSUtility.GetVar("thousandSeparator", CurrentCulture.GetThousandSeparator());
+        script += JSUtility.GetVar("decimalSeparator", CurrentCulture.GetDecimalSeparator());
+        script += JSUtility.GetVar("currencyDecimalPlaces", CurrentCulture.GetCurrencyDecimalPlaces());
+
+        PageUtility.RegisterJavascript("SignInPage_Vars", script, this.JS, true);
+
+        IJSObjectReference module = await this.JS
+            .InvokeAsync<IJSObjectReference>("import", "/js/mixerp/page-interop.js").ConfigureAwait(true);
+
+        await module.InvokeVoidAsync("setBodyId", BodyId).ConfigureAwait(true);
+
+        //The globals must exist before SignIn.aspx.js reads "challenge" on the sign-in click, so the
+        //page scripts are loaded last and in the original order (jsSHA, then SignIn.aspx.js).
+        await module.InvokeVoidAsync("loadScripts", (object)PageScripts).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    ///     The legacy page was a full document, so leaving it meant losing the purple
+    ///     &lt;body id="SignInBody"&gt; styling. The body element is shared now, so the id is cleared
+    ///     when the user navigates away.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        this.subscription.Dispose();
+
+        try
+        {
+            IJSObjectReference module = await this.JS
+                .InvokeAsync<IJSObjectReference>("import", "/js/mixerp/page-interop.js").ConfigureAwait(false);
+
+            await module.InvokeVoidAsync("clearBodyId", BodyId).ConfigureAwait(false);
+        }
+        catch (JSDisconnectedException)
+        {
+            //The circuit is already gone: the browser has dropped the whole document anyway.
+        }
+    }
+}

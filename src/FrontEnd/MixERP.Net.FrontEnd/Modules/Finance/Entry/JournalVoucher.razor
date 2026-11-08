@@ -1,0 +1,297 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Entry/JournalVoucher.ascx + .ascx.cs + .ascx.designer.cs - the journal voucher
+   ENTRY screen (the 11-column debit/credit grid, the cost centre, the totals and the Post
+   button).
+
+   WHAT THE CODE-BEHIND DID, AND WHERE IT WENT. OnControlLoad was 20 assignments plus one
+   control:
+     * 18 Label/Literal .Text assignments and AddInputButton.Value - all of them Titles.*
+       resources, so each one is now rendered directly where the <asp:Literal> stood. Nothing
+       is dropped: TitleLabel -> the <h2>, AttachmentLabel -> the <h4> (whose literal
+       Text="Attachments" default in the markup was OVERWRITTEN by nothing - the code-behind
+       never touched it, so the literal English string is preserved as found).
+     * ValueDateTextBox.OfficeId / BookDateTextBox.OfficeId <- the current office; the two
+       migrated <DateTextBox> components also need Catalog to resolve their frequency dates, so
+       both are supplied from ICurrentLogin.
+     * `new Attachment(AppUsers.GetCurrentUserDB())` added to <asp:PlaceHolder ID="Placeholder1">
+       inside #AttachmentDiv -> the <Attachment Catalog="..."> element, same position.
+
+   EVERY ID IS A JAVASCRIPT CONTRACT. wwwroot/js/entry/JournalVoucher.js selects 20 elements by
+   literal id (#AddInputButton, #AccountNumberInputText, #AccountSelect, #AttachmentDiv,
+   #AttachmentLabel, #CashRepositorySelect, #CostCenterDropDownList, #CreditInputText,
+   #CreditTotalTextBox, #CurrencySelect, #DebitInputText, #DebitTotalTextBox, #ErrorLabelBottom,
+   #ERInputText, #LCCreditInputText, #LCDebitInputText, #PostButton, #ReferenceNumberInputText,
+   #StatementReferenceInputText, #TransactionGridView, #TransactionGridViewHidden,
+   #ValueDateTextBox, #BookDateTextBox) and owns ALL of the behaviour - it appends the grid
+   rows, keeps the totals, and posts to /services/finance/entry/journalvoucher/save. So:
+     * the ids, the column order, the <th> widths/classes, the footer input row and the three
+       keyboard-shortcut `title` attributes are carried over byte-identically;
+     * none of the buttons gets an @@onclick - they never had a server handler (they are
+       HtmlInputButton / plain <button>), and adding one would fight the script;
+     * the #ErrorLabelBottom <asp:Label> becomes a <span> with the same id and css class,
+       because the script writes .html() into it;
+     * the empty <tbody> rows and the hidden #TransactionGridViewHidden stay as the markup had
+       them - the script is what fills them.
+
+   PRESERVED SURFACE: OverridePath = "/Modules/Finance/JournalVoucher.mix" from the
+   <%@ Control %> directive, assigned in the CONSTRUCTOR because ModuleHost.razor reads it off
+   an Activator.CreateInstance probe instance on which no lifecycle method runs; and the class
+   implements ITransaction, which the host reads to enforce RestrictedTransactionMode. The
+   original declared no AccessLevel, MasterPageId, RemoveTheme or IsLandingPage override. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@implements MixERP.Net.Entities.Contracts.ITransaction
+@using MixERP.Net.Core.Modules.Finance.Internal
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.AttachmentFactory
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.i18n.Resources
+@inject IJSRuntime JS
+
+<h2>
+    @Titles.JournalVoucherEntry
+</h2>
+
+<div class="ui tiny form segment">
+    <div class="three fields">
+        <div class="field">
+            <label for="ValueDateTextBox">
+                @Titles.ValueDate
+            </label>
+            <DateTextBox ID="ValueDateTextBox" Mode="@(FrequencyType.Today)" CssClass="date"
+                         OfficeId="@this.officeId" Catalog="@this.catalog" />
+        </div>
+        <div class="field">
+            <label for="BookDateTextBox">
+                @Titles.BookDate
+            </label>
+            <DateTextBox ID="BookDateTextBox" Mode="@(FrequencyType.Today)" CssClass="date"
+                         OfficeId="@this.officeId" Catalog="@this.catalog" />
+        </div>
+        <div class="field">
+            <label for="ReferenceNumberInputText">
+                @Titles.ReferenceNumber
+            </label>
+            <input type="text" id="ReferenceNumberInputText" />
+        </div>
+    </div>
+</div>
+
+<input type="hidden" id="TransactionGridViewHidden" />
+
+<div style="width: 100%; overflow: auto;">
+    <table id="TransactionGridView" class="ui table segment" style="min-width: 1200px; max-width: 2000px;">
+        <thead>
+            <tr>
+                <th style="width: 9%">
+                    <label for="StatementReferenceInputText">
+                        @Titles.StatementReference
+                    </label>
+                </th>
+                <th scope="col" style="width: 7%;">
+                    <label for="AccountNumberInputText">
+                        @Titles.AccountNumber
+                    </label>
+                </th>
+                <th style="width: 15%;">
+                    <label for="AccountSelect">
+                        @Titles.Account
+                    </label>
+                </th>
+                <th style="width: 8%;">
+                    <label for="CashRepositorySelect">
+                        @Titles.CashRepository
+                    </label>
+                </th>
+                <th style="width: 8%;">
+                    <label for="CurrencySelect">
+                        @Titles.Currency
+                    </label>
+                </th>
+                <th class="text-right" style="width: 10%;">
+                    <label for="DebitInputText">
+                        @Titles.Debit
+                    </label>
+                </th>
+                <th class="text-right" style="width: 9%;">
+                    <label for="CreditInputText">
+                        @Titles.Credit
+                    </label>
+                </th>
+                <th class="text-right" style="width: 7%;">
+                    <label for="ERInputText">
+                        @Titles.ER
+                    </label>
+                </th>
+                <th class="text-right" style="width: 9%;">
+                    <label for="LCDebitInputText">
+                        @Titles.LCDebit
+                    </label>
+                </th>
+                <th class="text-right" style="width: 9%;">
+                    <label for="LCCreditInputText">
+                        @Titles.LCCredit
+                    </label>
+                </th>
+                <th style="width: 9%;">
+                    @Titles.Action
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr class="ui form footer-row">
+                <td>
+                    <input type="text" id="StatementReferenceInputText" title='Ctrl + Alt +S' />
+                </td>
+                <td>
+                    <input type="text" id="AccountNumberInputText" title='Ctrl + Alt + T' />
+                </td>
+                <td>
+                    <select id="AccountSelect" title='Ctrl + Alt + A'></select>
+                </td>
+                <td>
+                    <select id="CashRepositorySelect"></select>
+                </td>
+                <td>
+                    <select id="CurrencySelect"></select>
+                </td>
+                <td>
+                    <input type="text" id="DebitInputText" class="text-right currency" title='Ctrl + Alt + D' />
+                </td>
+                <td>
+                    <input type="text" id="CreditInputText" class="text-right currency" title='Ctrl + Alt + C' />
+                </td>
+                <td>
+                    <input type="text" id="ERInputText" class="text-right decimal" />
+                </td>
+                <td>
+                    <input type="text" id="LCDebitInputText" class="text-right currency" readonly="readonly" title='Ctrl + Alt + D' />
+                </td>
+                <td>
+                    <input type="text" id="LCCreditInputText" class="text-right currency" readonly="readonly" title='Ctrl + Alt + C' />
+                </td>
+                <td>
+                    <input type="button" id="AddInputButton" class="ui small blue button" title='Ctrl + Return'
+                           value="@Titles.Add" />
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+<h4>
+    <span id="AttachmentLabel">Attachments</span>
+</h4>
+<div id="AttachmentDiv" class="grey" style="display: none; padding-left: 24px;">
+    @if (this.loaded)
+    {
+        <Attachment Catalog="@this.catalog" />
+    }
+</div>
+
+<div class="ui tiny form segment">
+    <div class="field">
+        <label for="CostCenterDropDownList">
+            @Titles.CostCenter
+        </label>
+        <select id="CostCenterDropDownList">
+        </select>
+    </div>
+    <div class="field">
+        <label for="DebitTotalTextBox">
+            @Titles.DebitTotal
+        </label>
+        <input type="text"
+               id="DebitTotalTextBox"
+               readonly="readonly"
+               class="text-right currency" />
+    </div>
+    @* The original's label pointed at "CreditTotalLiteral", not at the input - preserved. *@
+    <div class="field">
+        <label for="CreditTotalLiteral">
+            @Titles.CreditTotal
+        </label>
+        <input type="text"
+               id="CreditTotalTextBox"
+               readonly="readonly"
+               class="text-right currency" />
+    </div>
+    <button id="PostButton" type="button" class="ui small positive button">
+        @Titles.PostTransaction
+    </button>
+</div>
+<span id="ErrorLabelBottom" class="big error"></span>
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.Finance/js/entry/JournalVoucher.js";
+
+    private bool loaded;
+    private int officeId;
+    private string catalog;
+
+    public JournalVoucher()
+    {
+        //<%@ Control ... OverridePath="/Modules/Finance/JournalVoucher.mix" %>
+        this.OverridePath = "/Modules/Finance/JournalVoucher.mix";
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body set 19 resource strings - which are rendered inline in the markup
+    ///     above - and the two date boxes' OfficeId plus the Attachment control's catalog, both
+    ///     of which come from the asynchronous ICurrentLogin and so live in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it. For an
+        //ITransaction control that includes the restricted-transaction-mode check.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+    }
+
+    /// <summary>
+    ///     The .ascx carried &lt;script src="js/entry/JournalVoucher.js"&gt;, which a .razor
+    ///     file may not. It is loaded on the render AFTER the login lookup completes, because
+    ///     its top-level block binds the elements above AND immediately calls
+    ///     initializeAjaxData() - which populates #AccountSelect and #CostCenterDropDownList,
+    ///     and would run against a half-rendered form on firstRender.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!this.loaded)
+        {
+            return;
+        }
+
+        await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+    }
+}

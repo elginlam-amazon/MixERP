@@ -1,0 +1,291 @@
+@* ---------------------------------------------------------------------------------------------
+   Reports/ReportViewer.aspx (+ its 198-line code-behind)
+   -> Components/Pages/Reports/ReportViewer.razor (checklist task 91).
+
+   MASTER PAGE. MasterPageFile="~/MixERPReportMaster.Master" is expressed by deriving from
+   Base/MixERPWebReportPage, which carries [Layout(typeof(ReportLayout))] (Specialist 5) -- so NO
+   @layout directive here, exactly as the base's contract says. The page's <asp:Content
+   ContentPlaceHolderID="head"> block was EMPTY -> no <SectionContent>.
+
+   ValidateRequest="false" has no modern counterpart and needs none: the parameter values are
+   model-bound strings that this page never renders as markup (Blazor encodes by default).
+
+   CODE-BEHIND MAP
+     Page_Init          -> OnInitializedAsync + the <Report> element below. The WebReport control
+                           (FrontEnd/Controls/WebReport.cs, Specialist 9) is NOT used: it reads
+                           AppUsers.GetCurrentUserDB() in its constructor, which returns an EMPTY
+                           catalog inside a circuit. The migrated ReportEngine <Report> component
+                           is hosted directly with AutoInitialize="false" and Catalog taken from
+                           Specialist 4's circuit-safe CurrentLoginProvider -- the same two values
+                           Page_Init assigned.
+     AddParameters()    -> BuildParameterTable(): ParameterHelper.GetParameters(physical path);
+                           an empty/null collection hides the parameter panel and initializes the
+                           report immediately, otherwise one row per parameter plus the Update
+                           button row.
+     AddRow()           -> the <tr><td>label</td><td>input</td></tr> markup of the table.
+     UpdateButton_Click -> UpdateAsync(): collects "@@<key>" -> value for every row, calls
+                           ParameterHelper.BindParameters(physical path, list), adds each bound
+                           parameter collection to the report and calls InitializeReport().
+     GetParameters()    -> the Server.MapPath(...) call is now PageUtility.MapPath(...), the
+                           content-root resolver that replaced it solution-wide.
+     ReportPath()       -> Path.Combine(ConfigurationHelper.GetReportParameter("ReportContainer"),
+                           Request["Id"]), null when Id is absent -- Request["Id"] is now
+                           [SupplyParameterFromQuery].
+     Dispose(bool)      -> DisposeAsync(): the control-tree cleanup becomes the parameter-table
+                           cleanup (there are no disposable child controls any more).
+
+   LOAD-BEARING ids/classes (wwwroot/css/report.css + report.min.css):
+     .report-parameter  - fixed overlay for the parameter panel
+     .hide              - @@media print { .hide { display: none } }
+     #ReportParameterTable - the panel's own background/border-radius rule
+     #<key>_text_box    - the input id the original TextBox carried (and the label's "for")
+   --------------------------------------------------------------------------------------------- *@
+@page "/Reports/ReportViewer"
+@inherits MixERPWebReportPage
+@implements IAsyncDisposable
+@using System.Collections.ObjectModel
+@using System.IO
+@using MixERP.Net.WebControls.ReportEngine
+@using MixERP.Net.WebControls.ReportEngine.Helpers
+@using Serilog
+
+<div id="ReportParameterPanel" class="report-parameter hide" style="@(this.HasParameters ? null : "display:none")">
+    <table id="ReportParameterTable">
+        @foreach (KeyValuePair<string, string> parameter in this.parameters)
+        {
+            string key = parameter.Key.Replace("@", string.Empty);
+            string inputId = key + "_text_box";
+
+            <tr>
+                <td>
+                    <label for="@inputId">@ResourceManager.GetString(ConfigurationHelper.GetReportParameter("ResourceClassName"), key)</label>
+                </td>
+                <td>
+                    @* The original emitted an <asp:TextBox>, i.e. <input type="text" id="..." />.
+                       "if (parameter.Value.Equals("Date")) { }" in AddParameters() was an EMPTY
+                       branch -- a date parameter got the very same plain text box -- so no
+                       date-specific rendering is introduced here either. *@
+                    <input type="text" id="@inputId" name="@inputId" value="@this.GetValue(key)"
+                           @onchange="@(e => this.SetValue(key, e.Value))" />
+                </td>
+            </tr>
+        }
+
+        @if (this.HasParameters)
+        {
+            <tr>
+                <td></td>
+                <td>
+                    @* asp:Button -> <input type="submit">. There is no form to submit now, so the
+                       button is a <button type="button"> carrying the SAME id and css class and
+                       the SAME server-side handler the Click event invoked. *@
+                    <button type="button" id="UpdateButton" class="myButton report-button" @onclick="this.Update">@Titles.Update</button>
+                </td>
+            </tr>
+        }
+    </table>
+    <a href="#" onclick=" $('.report-parameter').toggle(500); " class="ui red button" style="float: right; padding: 4px;">Close This Form</a>
+</div>
+
+<div style="padding: 12px">
+    <Report @ref="this.report" AutoInitialize="false" Catalog="@this.catalog" Path="@this.reportPath" />
+</div>
+
+@code {
+    /// <summary>
+    ///     The legacy <c>Request["Id"]</c>.
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "Id")]
+    public string Id { get; set; }
+
+    private Report report;
+    private string catalog;
+    private string reportPath;
+    private string physicalReportPath;
+    private bool initializePending;
+
+    private Collection<KeyValuePair<string, string>> parameters = new Collection<KeyValuePair<string, string>>();
+    private readonly Dictionary<string, string> parameterValues = new Dictionary<string, string>(StringComparer.Ordinal);
+
+    private bool HasParameters
+    {
+        get { return this.parameters != null && this.parameters.Count > 0; }
+    }
+
+    private string GetValue(string key)
+    {
+        string value;
+        return this.parameterValues.TryGetValue(key, out value) ? value : string.Empty;
+    }
+
+    private void SetValue(string key, object value)
+    {
+        this.parameterValues[key] = value == null ? string.Empty : value.ToString();
+    }
+
+    /// <summary>
+    ///     Page_Init: build the report surface, then AddParameters().
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync().ConfigureAwait(true);
+
+        //Page_Init: this.report.Catalog = AppUsers.GetCurrentUserDB() -- circuit-safe equivalent.
+        this.catalog = await this.CurrentLogin.GetCatalogAsync().ConfigureAwait(true);
+
+        this.reportPath = this.ReportPath();
+        this.physicalReportPath = string.IsNullOrWhiteSpace(this.reportPath)
+            ? null
+            : PageUtility.MapPath(this.reportPath);
+
+        this.BuildParameterTable();
+    }
+
+    /// <summary>
+    ///     AddParameters(). When the report declares NO parameters the panel is hidden and the
+    ///     report is initialized straight away (the original did exactly this, inline); otherwise
+    ///     a row is produced for every parameter and the report waits for the Update button.
+    /// </summary>
+    private void BuildParameterTable()
+    {
+        Collection<KeyValuePair<string, string>> collection = this.GetParameters();
+
+        if (collection == null || collection.Count == 0)
+        {
+            //ReportParameterPanel.Style.Add("display", "none") + report.Path + InitializeReport().
+            this.parameters = new Collection<KeyValuePair<string, string>>();
+            this.initializePending = true;
+            return;
+        }
+
+        this.parameters = collection;
+
+        foreach (KeyValuePair<string, string> parameter in collection)
+        {
+            string key = parameter.Key.Replace("@", string.Empty);
+
+            if (!this.parameterValues.ContainsKey(key))
+            {
+                //The original TextBox started out empty.
+                this.parameterValues[key] = string.Empty;
+            }
+        }
+    }
+
+    /// <summary>
+    ///     GetParameters(): ParameterHelper.GetParameters(Server.MapPath(ReportPath())).
+    /// </summary>
+    private Collection<KeyValuePair<string, string>> GetParameters()
+    {
+        if (string.IsNullOrWhiteSpace(this.physicalReportPath))
+        {
+            //ParameterHelper.GetParameters returns null for a non-existent file; a missing Id
+            //produced a null path, and Server.MapPath(null) returned the application root, which
+            //is not a file either. Same outcome, without the pointless probe.
+            return null;
+        }
+
+        return ParameterHelper.GetParameters(this.physicalReportPath);
+    }
+
+    /// <summary>
+    ///     ReportPath(): Path.Combine(container, Request["Id"]), or null when Id is absent.
+    /// </summary>
+    private string ReportPath()
+    {
+        string reportId = this.Id;
+        string container = ConfigurationHelper.GetReportParameter("ReportContainer");
+
+        if (string.IsNullOrWhiteSpace(reportId))
+        {
+            return null;
+        }
+
+        return System.IO.Path.Combine(container, reportId);
+    }
+
+    /// <summary>
+    ///     UpdateButton_Click. The row-count guard of the original is the <see cref="HasParameters" />
+    ///     check: the button only exists when there is at least one row, and the guard is kept
+    ///     explicitly so the handler is safe if it is ever invoked otherwise.
+    /// </summary>
+    private void Update()
+    {
+        if (!this.HasParameters || this.report == null)
+        {
+            return;
+        }
+
+        Collection<KeyValuePair<string, object>> list = new Collection<KeyValuePair<string, object>>();
+
+        foreach (KeyValuePair<string, string> parameter in this.parameters)
+        {
+            string key = parameter.Key.Replace("@", string.Empty);
+
+            //textBox.ID.Replace("_text_box", "") prefixed with "@": the ids are "<key>_text_box",
+            //so the key itself is what the original recovered.
+            list.Add(new KeyValuePair<string, object>("@" + key, this.GetValue(key)));
+        }
+
+        //this.report.Path = this.ReportPath(): the Path parameter already carries this value (it is
+        //bound from the same field and never changes for a given request).
+        if (string.IsNullOrWhiteSpace(this.physicalReportPath))
+        {
+            Log.Warning("The report parameters were not bound: no report id was supplied.");
+            return;
+        }
+
+        //The WebForms page built a BRAND NEW WebReport on every postback, so its parameter
+        //collection always started empty. This component instance survives every click, so the
+        //collection is cleared first -- without this the n-th click would bind n copies of the
+        //parameter set.
+        this.report.ParameterCollection.Clear();
+
+        Collection<Collection<KeyValuePair<string, object>>> bound =
+            ParameterHelper.BindParameters(this.physicalReportPath, list);
+
+        if (bound != null)
+        {
+            foreach (Collection<KeyValuePair<string, object>> parameter in bound)
+            {
+                this.report.AddParameterToCollection(parameter);
+            }
+        }
+
+        this.report.InitializeReport();
+    }
+
+    /// <summary>
+    ///     The no-parameter path's InitializeReport(). It must run after the first render: the
+    ///     &lt;Report&gt; element only exists (and only has its Path/Catalog parameters) once the
+    ///     component has rendered, so calling it from OnInitializedAsync would dereference null.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender).ConfigureAwait(true);
+
+        if (this.initializePending && this.report != null)
+        {
+            this.initializePending = false;
+            this.report.InitializeReport();
+        }
+    }
+
+    /// <summary>
+    ///     Dispose(bool): the original released the Update button control. There is no control tree
+    ///     any more, so what is released is the parameter table's state.
+    /// </summary>
+    public ValueTask DisposeAsync()
+    {
+        if (this.parameters != null)
+        {
+            this.parameters.Clear();
+            this.parameters = new Collection<KeyValuePair<string, string>>();
+        }
+
+        this.parameterValues.Clear();
+        this.report = null;
+
+        return ValueTask.CompletedTask;
+    }
+}

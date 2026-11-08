@@ -1,0 +1,200 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Admin/DatabaseStatistics.ascx + .ascx.cs + .ascx.designer.cs - the read-only
+   table-statistics list plus the three PostgreSQL maintenance commands.
+
+   ⚠ AccessLevel.AdminOnly IS PRESERVED. The three buttons run VACUUM, VACUUM FULL and ANALYZE
+   against the whole tenant database - VACUUM FULL takes an exclusive lock on every table - so
+   the gate is the only thing between a signed-in user and taking the database offline.
+   MixERPAuthorization.CheckAccessLevelAsync enforces it and logs
+   "Access to {Control} is denied to {User} from {IP}." on refusal.
+
+   THIS .ascx CARRIED REAL MARKUP as well as a placeholder, and all of it is reproduced in the
+   original order: the Scrud placeholder FIRST, then <h1>Maintenance</h1>, then the message
+   literal, then the three buttons.
+
+   ⚠ <h1>Maintenance</h1> IS A HARD-CODED ENGLISH LITERAL in the .ascx, unlike the three button
+   captions right beneath it, which are Titles.*. That is an upstream localization gap and it is
+   carried across verbatim rather than silently localized.
+
+   The three `<asp:Button OnClick=...>` handlers are ported as real server handlers; each runs
+   its DatabaseUtility command against the catalog and then shows the success message. The
+   `OnClientClick = "return(confirm('<question>'));"` CONFIRMATION GATES ARE PRESERVED, and they
+   matter far more here than on a normal screen - they are the last chance to abort a VACUUM
+   FULL. `onclick` and `@@onclick` may not both appear on one element (RZ10008), so each gate is
+   invoked from INSIDE its @@onclick handler, FIRST THING, and its `false` genuinely aborts the
+   command - which a literal `return false` beside `@@onclick` could not have done. The three
+   questions (Questions.ConfirmVacuum / ConfirmVacuumFull / ConfirmAnalyze) are passed through
+   unchanged.
+
+   DisplaySuccess() wrote RAW HTML into an <asp:Literal>
+   (`<div class='success'>Labels.TaskCompletedSuccessfully</div>`), which a Literal rendered
+   unencoded. It is emitted as that div directly, so the rendering is identical without needing
+   a MarkupString over a server-built string.
+
+   The Scrud is a read-only view of public.db_stat: DenyAdd/DenyEdit/DenyDelete are ALL true and
+   PageSize is 500 (the whole table at once, since it is a statistics dump). All four are
+   preserved, as is the fact that the VIEW IS THE TABLE ITSELF ("public.db_stat") and that the
+   key column is the TEXT column "relname".
+
+   The catalog comes from ICurrentLogin: AppUsers.GetCurrentUserDB() returns an EMPTY catalog
+   inside a circuit, so all three maintenance commands would have run against nothing.
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme or IsLandingPage override
+   and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Core.Modules.BackOffice.Data.Admin
+@using MixERP.Net.WebControls.ScrudFactory
+@using MixERP.Net.i18n.Resources
+@inject IJSRuntime JS
+
+<Scrud DenyAdd="true"
+       DenyDelete="true"
+       DenyEdit="true"
+       KeyColumn="relname"
+       PageSize="500"
+       TableSchema="public"
+       Table="db_stat"
+       ViewSchema="public"
+       View="db_stat"
+       Text="@Titles.DatabaseStatistics" />
+
+@* ⚠ Hard-coded English in the original markup - preserved. *@
+<h1>Maintenance</h1>
+
+@if (this.succeeded)
+{
+    @* Was DisplaySuccess()'s raw literal: "<div class='success'>...</div>" *@
+    <div class="success">@Labels.TaskCompletedSuccessfully</div>
+}
+
+<button class="ui red button" @onclick="this.VacuumButton_Click">@Titles.VacuumDatabase</button>
+<button class="ui red button" @onclick="this.FullVacuumButton_Click">@Titles.VacuumFullDatabase</button>
+<button class="ui red button" @onclick="this.AnalyzeButton_Click">@Titles.AnalyzeDatabse</button>
+
+@code {
+    private bool succeeded;
+    private string catalog;
+
+    /// <summary>
+    ///     The legacy <c>public override AccessLevel AccessLevel</c>, carried across unchanged.
+    ///     <para>
+    ///         <c>MixERPUserControlBase.AccessLevel</c> is an ABSTRACT GET-ONLY property, so it is
+    ///         overridden rather than assigned - which is also what the probe needs:
+    ///         <c>ModuleHost.razor</c> reads the surface off an <c>Activator.CreateInstance</c>
+    ///         instance on which no lifecycle method runs, and a getter answers there.
+    ///     </para>
+    /// </summary>
+    public override AccessLevel AccessLevel
+    {
+        get { return AccessLevel.AdminOnly; }
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body set the three buttons' OnClientClick and Text and called AddScrud() -
+    ///     all three are markup now (the confirmations moved INTO the click handlers, which is
+    ///     the only way to keep them gating; see the header).
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        //Was AppUsers.GetCurrentUserDB(), which is empty inside a circuit.
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+    }
+
+    /// <summary>Port of <c>AnalyzeButton_Click</c>, behind its confirmation.</summary>
+    private async Task AnalyzeButton_Click()
+    {
+        if (!await this.ConfirmAsync(Questions.ConfirmAnalyze))
+        {
+            return;
+        }
+
+        DatabaseUtility utility = new DatabaseUtility();
+        utility.Analyze(this.catalog);
+
+        this.DisplaySuccess();
+    }
+
+    /// <summary>Port of <c>FullVacuumButton_Click</c>, behind its confirmation.</summary>
+    private async Task FullVacuumButton_Click()
+    {
+        if (!await this.ConfirmAsync(Questions.ConfirmVacuumFull))
+        {
+            return;
+        }
+
+        DatabaseUtility utility = new DatabaseUtility();
+        utility.VacuumFull(this.catalog);
+
+        this.DisplaySuccess();
+    }
+
+    /// <summary>Port of <c>VacuumButton_Click</c>, behind its confirmation.</summary>
+    private async Task VacuumButton_Click()
+    {
+        if (!await this.ConfirmAsync(Questions.ConfirmVacuum))
+        {
+            return;
+        }
+
+        DatabaseUtility utility = new DatabaseUtility();
+        utility.Vacuum(this.catalog);
+
+        this.DisplaySuccess();
+    }
+
+    /// <summary>
+    ///     The legacy <c>OnClientClick = "return(confirm('&lt;question&gt;'));"</c>. It is run
+    ///     from inside the click handler because <c>onclick</c> and <c>@@onclick</c> cannot both
+    ///     sit on one element (RZ10008), and because only this form lets its <c>false</c>
+    ///     actually stop the server-side command.
+    ///     <para>
+    ///         If the browser call cannot be made at all the command is REFUSED, not run: these
+    ///         are destructive maintenance operations and "the confirmation did not happen" must
+    ///         not mean "proceed".
+    ///     </para>
+    /// </summary>
+    private async Task<bool> ConfirmAsync(string question)
+    {
+        try
+        {
+            return await this.JS.InvokeAsync<bool>("confirm", question);
+        }
+        catch (JSException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Port of the private <c>DisplaySuccess()</c>.</summary>
+    private void DisplaySuccess()
+    {
+        this.succeeded = true;
+    }
+}

@@ -1,0 +1,1621 @@
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Blazor replacement for the WebForms server control
+    "MixERP.Net.WebControls.ScrudFactory.ScrudForm" (formerly 17 partial files under ScrudForm/).
+
+    THE RENDER TREE BELOW IS THE PORT OF, in this order:
+      ScrudForm/Control.cs           CreateChildControls()   -> OnParametersSet + this markup
+      ScrudForm/ScrudContainer.cs    LoadScrudContainer()    -> title, ruler, description,
+                                                                command panels, grid panel,
+                                                                form panel, update panel, script
+      ScrudForm/Title.cs             AddTitle/AddRuler/AddDescription/LoadTitle/LoadDescription
+      ScrudForm/ViewFactory/*        CreateGridPanel/AddGridView/AddLastValueHiddenField/
+                                     BindGridView/LoadGrid
+      ScrudForm/Pager.cs             CreatePager (both overloads)
+      ScrudForm/FormFactory/*        CreateFormPanel/AddFormHeader/AddFormContainer/AddFormFooter,
+                                     DisplayError/DisplaySuccess
+      ScrudForm/UpdatePanel.cs       AddUpdatePanel/CreateCommandPanels/GetItemSelectorPath/
+                                     GetResourceClassName
+      ScrudForm/Styling.cs           the 27 css/style resolvers + GetPageSize/GetRowLimit
+      ScrudForm/Validation.cs        Validate()  (renamed ValidateProperties() - see @code)
+
+    THE DOM CONTRACT IS LOAD-BEARING. Scrud.js selects by LITERAL id: #GridPanel, #FormPanel,
+    #FormGridView, #ScrudUpdatePanel, #ScrudError, #TitleLabel, #LastValueHidden, #UserIdHidden,
+    #OfficeCodeHidden, #SaveButton, #CancelButton, #UseButton, #SelectRadio, and the suffixed
+    #EditButtontop / #DeleteButtontop (hardcoded). #ScrudError must exist UNCONDITIONALLY because
+    scrudOnServerError() writes into it, and #ScrudUpdatePanel must exist because scrudLayout()
+    sizes it. Changing any of these compiles green and silently kills the feature.
+
+    PUBLIC API IS FROZEN: MixERP.Net.FrontEnd declares "public sealed class Scrud : ScrudForm" and
+    assigns UserId/UserName/OfficeCode/OfficeId/Catalog from its constructor, so this component
+    must stay inheritable and those five members must stay plain settable [Parameter]s.
+*@
+
+@namespace MixERP.Net.WebControls.ScrudFactory
+@inherits ComponentBase
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Nav
+
+@using System
+@using System.Collections.Generic
+@using System.ComponentModel
+@using System.Data
+@using System.Globalization
+@using System.Reflection
+@using System.Threading
+@using System.Threading.Tasks
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.Extensions.Primitives
+@using Microsoft.JSInterop
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Framework
+@using MixERP.Net.i18n.Resources
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.WebControls.ScrudFactory.Controls
+@using MixERP.Net.WebControls.ScrudFactory.Data
+@using MixERP.Net.WebControls.ScrudFactory.Helpers
+
+@*
+    Control.cs: PageUtility.AddMeta(this.Page, "generator", <assembly name>).
+    The migrated overload is AddMeta(StringBuilder head, name, content) and returns the markup, so
+    the tag is emitted through the host's head outlet instead of Page.Header. The meta tag is NOT
+    dropped. See migration-summary note for task 82.
+*@
+<HeadContent>@((MarkupString)PageUtility.AddMeta(null, "generator", Assembly.GetAssembly(typeof(ScrudForm)).GetName().Name))</HeadContent>
+
+@*
+    Title.cs LoadTitle(): "this.Page.Title = this.Text". A library component cannot assign
+    Page.Title, but <PageTitle> is the modern equivalent and keeps the behaviour rather than
+    silently dropping it. A host that already renders its own <PageTitle> wins by order, exactly as
+    a WebForms page that re-assigned Page.Title after the control ran did.
+*@
+@if (!string.IsNullOrWhiteSpace(this.Text))
+{
+    <PageTitle>@this.Text</PageTitle>
+}
+
+@* Control.cs: this.scrudContainer = new Panel() -> the outer div every piece is added to. *@
+<div>
+    @* Title.cs AddTitle(Panel): div(class = GetTitleLabelCssClass) > Label(ID = "TitleLabel"). *@
+    <div class="@this.GetTitleLabelCssClass()">
+        <span id="TitleLabel">@this.Text</span>
+    </div>
+
+    @* Title.cs AddRuler(Panel): HtmlGenericControl("div") with class "ui divider". *@
+    <div class="ui divider"></div>
+
+    @*
+        Title.cs AddDescription + LoadDescription: the label got its css class and text ONLY when
+        Description was non-empty, so an empty Description rendered an empty, class-less span.
+        Emitting nothing in that case is the same visual result with less noise (task 21).
+    *@
+    @if (!string.IsNullOrWhiteSpace(this.Description))
+    {
+        <span class="@this.GetDescriptionCssClass()" style="display:block;">@this.Description</span>
+    }
+
+    @*
+        UpdatePanel.cs AddUpdatePanel(Panel). The ASP.NET AJAX partial-postback machinery is gone
+        (Blazor re-renders by itself), but the ELEMENT and its id stay: scrudLayout() in Scrud.js
+        sizes #ScrudUpdatePanel.
+    *@
+    <div id="ScrudUpdatePanel">
+        @* ContentTemplateContainer order: top command panel, message label, grid panel, form panel,
+           bottom command panel, the two hidden fields. *@
+        @this.topCommandPanel.GetCommandPanel("top")
+
+        @*
+            FormFactory/Alert.cs messageLabel. DisplayError() assigned ID = "ScrudError" at the
+            moment it had something to say; the element is now rendered UNCONDITIONALLY because
+            Scrud.js's scrudOnServerError() does $("#ScrudError").html(...) on an ajax failure and
+            would otherwise write into nothing.
+        *@
+        <span id="ScrudError" class="@this.messageCssClass" style="@this.messageStyle">@this.messageText</span>
+
+        @* ViewFactory/GridPanel.cs CreateGridPanel(). *@
+        <div id="GridPanel" class="@this.GetGridPanelCssClass()" style="@this.GetGridPanelInlineStyle()">
+            @*
+                AddGridView(): the already-migrated MixERPGridView component (NOT a new GridView()).
+                LoadGrid() additionally set the grid's Width and a white-space:nowrap inline style;
+                MixERPGridView exposes neither, so both are carried on this wrapper div - recorded
+                as a divergence (tasks 15/42).
+            *@
+            @*
+                GridPanel.cs also set formGridView.RowStyle.CssClass = GetGridViewRowCssClass() and
+                AlternatingRowStyle.CssClass = GetGridViewAlternateRowCssClass(). RowStyle and
+                AlternatingRowStyle were inherited GridView members that MixERPGridView does not
+                have (Common section 5.3), so - exactly as ScrudItemSelector already does - the two
+                resolved values are surfaced as data-* hooks on this wrapper so host CSS can still
+                stripe the rows. Dropping them would silently remove row striping for every
+                consumer that configures these two scrud parameters.
+            *@
+            <div role="grid-wrapper" style="@this.GetGridViewInlineStyle()"
+                 data-row-css-class="@this.GetGridViewRowCssClass()"
+                 data-alternate-row-css-class="@this.GetGridViewAlternateRowCssClass()">
+                <MixERPGridView ID="FormGridView"
+                                CssClass="@this.GetGridViewCssClass()"
+                                AutoGenerateColumns="false"
+                                Columns="@this.gridColumns"
+                                DataSource="@this.gridDataSource" />
+            </div>
+
+            @*
+                AddLastValueHiddenField(): a TextBox with display:none and the literal id
+                #LastValueHidden, which Scrud.js reads in scrudSaveAndClose().
+            *@
+            @*
+                The value is rendered from component state because Save() writes the selected key
+                (then the inserted key) into it - the port of
+                "this.lastValueHiddenTextBox.Text = id".
+            *@
+            <input type="text" id="LastValueHidden" name="LastValueHidden" style="display:none;" value="@this.lastValue" />
+
+            @* Control.cs: this.CreatePager(this.gridPanel) - the pager is the grid panel's last child. *@
+            @this.pager
+        </div>
+
+        @* FormFactory/FormPanel.cs CreateFormPanel(). *@
+        <div id="FormPanel" class="@this.GetFormPanelCssClass()" style="@(this.formVisible ? "display:block;" : "display:none;")">
+            @*
+                this.form = new Panel { CssClass = GetFormCssClass(), role = "form" }.
+                The "loading" class is the port of the AjaxProgressTemplate spinner: Scrud.js's
+                scrudDispalyLoading()/scrudRemoveLoading() add and remove exactly this class on
+                #FormPanel div.segment, so driving it from component state uses the SAME affordance
+                the client script uses and keeps both in step (task 33).
+            *@
+            <div class="@this.GetFormCssClass() @(this.busy ? "loading" : null)" role="form">
+                @* AddFormHeader(): the required-field legend literal. *@
+                <div class='form-description'>@Titles.RequiredFieldDetails</div>
+
+                @*
+                    AddFormContainer(): the panel LoadForm() filled with <table role="scrud">.
+                    ScrudFactory.LoadForm (Specialist 4) populates this.fieldTable; the table itself
+                    lives here, and every row is a ScrudFieldRow - the migrated per-column renderer.
+                *@
+                <div>
+                    @if (this.fieldTable.Fields.Count > 0)
+                    {
+                        <table role="scrud">
+                            <tbody>
+                                @foreach (ScrudField f in this.fieldTable.Fields)
+                                {
+                                    <ScrudFieldRow Field="f" FieldChanged="this.OnFieldChanged" />
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+
+                @* AddFormFooter(): a one-row table, label cell then control cell. *@
+                <table>
+                    <tr>
+                        <td class="label-cell"></td>
+                        <td class="control-cell">
+                            @*
+                                The Use button existed only in the modal branch, where the popup
+                                hands the saved key back to its opener.
+                            *@
+                            @if (this.IsModal())
+                            {
+                                <button type="button" id="UseButton" class="@this.GetButtonCssClass()" @onclick="this.UseButton_Click">@Titles.Use</button>
+                            }
+
+                            @*
+                                OnClientClick="return(scrudClientValidation());" was the client half
+                                of the WebForms validation pipeline. The server-side gate
+                                (ScrudFieldTable.Validate(), consumed by SaveButton_Click) is the
+                                replacement and is authoritative; the handler still raises the
+                                loading affordance the old OnClientClick raised.
+                            *@
+                            <button type="button" id="SaveButton" class="@this.GetSaveButtonCssClass()" @onclick="this.SaveButton_Click">@Titles.Save</button>
+
+                            <button type="button" id="CancelButton" class="@this.GetButtonCssClass()" @onclick="this.CancelButton_Click">@Titles.Cancel</button>
+
+                            @* HtmlInputReset: a native reset input, value = Titles.Reset. *@
+                            <input type="reset" class="@this.GetButtonCssClass()" value="@Titles.Reset" />
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        @this.bottomCommandPanel.GetCommandPanel("bottom")
+
+        @*
+            UpdatePanel.cs: the two HiddenFields Scrud.js reads through the injected
+            userIdHiddenId / officeCodeHiddenId globals.
+        *@
+        <input type="hidden" id="UserIdHidden" name="UserIdHidden" value="@this.UserId.ToString(CultureInfo.InvariantCulture)" />
+        <input type="hidden" id="OfficeCodeHidden" name="OfficeCodeHidden" value="@this.OfficeCode" />
+    </div>
+</div>
+
+@code {
+    //==================================================================================
+    // SEAMS OWNED BY SPECIALIST 4 (checklist tasks 23, 25, 43, 44, 53-65, 80, 81).
+    // This markup and the shell code below CALL the following members, which Specialist 4
+    // adds to this same component. The exact signatures referenced are:
+    //
+    //   private Task SaveButton_Click()                     - task 54
+    //   private Task UseButton_Click()                      - task 55
+    //   private Task CancelButton_Click()                   - task 60
+    //   private Task DeleteButton_Click()                   - task 58
+    //   private Task EditButton_Click()                     - task 59
+    //   private Task OnFieldChanged(ScrudField field)       - re-runs the task-65 gate
+    //   private void LoadForm(DataTable values, bool editing)        - task 62
+    //   private string GetLocalizedErrorMessage(MixERPException ex)  - task 23
+    //   private void ResetForm()                            - task 25
+    //   private RenderFragment<object> GetSelectColumnTemplate()     - task 43 (#SelectRadio)
+    //   private string GetSelectedValue() / void ClearSelectedValue()- task 44
+    //   [Parameter] public EventCallback SaveButtonClick / UseButtonClick - task 53
+    //   AddScrudScript() from OnAfterRenderAsync(firstRender)        - tasks 80/81
+    //
+    // Shell state Specialist 4 consumes, declared below and ALREADY implemented here:
+    //   this.fieldTable  (ScrudFieldTable - the FindControl replacement + validation gate source)
+    //   this.imageColumn (the bytea column name, set while the form is generated)
+    //   this.busy        (drives the #FormPanel div.segment "loading" class)
+    //   this.formVisible / this.gridVisible, DisplayError/DisplaySuccess, GetResourceClassName,
+    //   GetItemSelectorPath, GetRowLimit, GetPageSize and the 27 styling resolvers.
+    //
+    // NOTE on names: the legacy private Validate() (the PROPERTY guard, task 18) is renamed
+    // ValidateProperties() here precisely so that the names Validate()/IsValid stay free for
+    // Specialist 4's task-65 validation gate, which is what Page.Validate()/Page.IsValid become.
+    //==================================================================================
+
+    //==================================================================================
+    // ScrudForm/Properties.cs - 52 [Parameter]s. EVERY NAME IS FROZEN: seven dependent
+    // projects set them from markup, and FrontEnd/Controls/Scrud.cs sets five of them from a
+    // subclass constructor, which is why they are plain settable properties as well.
+    //==================================================================================
+
+    [Parameter]
+    public string AddButtonIconCssClass { get; set; }
+
+    [Parameter]
+    public string AllButtonIconCssClass { get; set; }
+
+    [Parameter]
+    public string ButtonCssClass { get; set; }
+
+    [Parameter]
+    public string CommandPanelButtonCssClass { get; set; }
+
+    [Parameter]
+    public string CommandPanelCssClass { get; set; }
+
+    [Parameter]
+    public string CompactButtonIconCssClass { get; set; }
+
+    /// <summary>
+    ///     Use this parameter to override the ScrudFactory's
+    ///     default Add/Edit event implementation by redirecting to a custom url.
+    ///     The edit event redirects to the custom url with the KeyColumn parameter
+    ///     and the selected value appended as query string data.
+    /// </summary>
+    [Parameter]
+    public string CustomFormUrl { get; set; }
+
+    [Parameter]
+    public string DateControlCssClass { get; set; }
+
+    [Parameter]
+    public string DeleteButtonIconCssClass { get; set; }
+
+    /// <summary>
+    ///     This property when set to true will restrict a user from adding a new row to the view.
+    ///     This property could be enabled at runtime depending upon
+    ///     the currently signed in user's role or authorization policy defined by the administrator.
+    /// </summary>
+    [Parameter]
+    public bool DenyAdd { get; set; }
+
+    /// <summary>
+    ///     This property when set to true will restrict a user from deleting the selected row.
+    ///     This property could be enabled at runtime depending upon
+    ///     the currently signed in user's role or authorization policy defined by the administrator.
+    /// </summary>
+    [Parameter]
+    public bool DenyDelete { get; set; }
+
+    /// <summary>
+    ///     This property when set to true will restrict a user from editing the selected row.
+    ///     This property could be enabled at runtime depending upon
+    ///     the currently signed in user's role or authorization policy defined by the administrator.
+    /// </summary>
+    [Parameter]
+    public bool DenyEdit { get; set; }
+
+    /// <summary>
+    ///     Description is displayed under the form title.
+    ///     Use this property if you want to provide a special hint to the user.
+    /// </summary>
+    [Parameter]
+    public string Description { get; set; }
+
+    [Parameter]
+    public string DescriptionCssClass { get; set; }
+
+    /// <summary>
+    ///     If the table has foreign keys, set this to a comma separated list of
+    ///     the name of the field or Column Expression to be displayed on the
+    ///     respective DropDownList control.
+    ///     <strong>About Column Expression</strong>
+    ///     Expressions could be used instead of column name.
+    ///     Please refer to the following MSDN articles for more information on using Expression Columns:
+    ///     http://msdn.microsoft.com/en-us/library/zwxk25bd(v=vs.100).aspx
+    ///     http://msdn.microsoft.com/en-us/library/system.data.datacolumn.expression(v=vs.100).aspx
+    ///     <strong>Syntax</strong>
+    ///     Comma separated list of [Fully qualified column]--&gt;[display_column or expression]
+    ///     as in
+    ///     DisplayFields="office.users.user_id--&gt;user_name, core.accounts.account_id--&gt;account_number + ' (' + account_name +
+    ///     ')'"
+    /// </summary>
+    [Parameter]
+    public string DisplayFields { get; set; }
+
+    /// <summary>
+    ///     This property when set a value will enable a popup selection of foreign keys
+    ///     by displaying the base tables. Set this to a comma separated list of the name of
+    ///     the Database View or Database Table to be displayed on the popup window.
+    ///     <strong>Syntax</strong>
+    ///     Comma separated list of [Fully qualified column]--&gt;[fully qualified PostgreSQL view]
+    ///     as in
+    ///     DisplayViews="office.users.user_id--&gt;office.user_view, core.accounts.account_id--&gt;core.account_view"
+    ///     Refer to the source code of BankAccount.aspx:
+    ///     https://github.com/binodnp/mixerp/blob/master/MixERP.Net.FrontEnd/Finance/Setup/BankAccounts.aspx
+    /// </summary>
+    [Parameter]
+    public string DisplayViews { get; set; }
+
+    [Parameter]
+    public string EditButtonIconCssClass { get; set; }
+
+    [Parameter]
+    public string ErrorCssClass { get; set; }
+
+    /// <summary>
+    ///     Comma separated list of columns to exclude for CRUD operation.
+    /// </summary>
+    [Parameter]
+    public string Exclude { get; set; }
+
+    /// <summary>
+    ///     Comma separated list of columns to exclude during the edit operation.
+    /// </summary>
+    [Parameter]
+    public string ExcludeEdit { get; set; }
+
+    [Parameter]
+    public string FailureCssClass { get; set; }
+
+    [Parameter]
+    public string FormCssClass { get; set; }
+
+    [Parameter]
+    public string FormPanelCssClass { get; set; }
+
+    [Parameter]
+    public string GridPanelCssClass { get; set; }
+
+    /// <summary>
+    ///     Custom CSS style for grid container.
+    /// </summary>
+    [Parameter]
+    public string GridPanelStyle { get; set; }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     The outer width of grid container.
+    ///     <para>
+    ///         API DIVERGENCE (checklist task 15): this was a
+    ///         <c>System.Web.UI.WebControls.Unit</c>, a removed platform type. It is now a CSS
+    ///         length string, for example <c>"800px"</c>. The rendered output - an inline
+    ///         <c>width:</c> style, emitted only when a value is actually set - is unchanged.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    [Parameter]
+    public string GridPanelWidth { get; set; }
+
+    [Parameter]
+    public string GridViewAlternateRowCssClass { get; set; }
+
+    [Parameter]
+    public string GridViewCssClass { get; set; }
+
+    [Parameter]
+    public string GridViewRowCssClass { get; set; }
+
+    /// <summary>
+    ///     The full inner width of the grid. <c>Unit</c> -&gt; CSS length string; see
+    ///     <see cref="GridPanelWidth" />.
+    /// </summary>
+    [Parameter]
+    public string GridViewWidth { get; set; }
+
+    /// <summary>
+    ///     Use this parameter to override "ItemSelectorPath" key in the configuration file.
+    ///     ItemSelectorPath is a page which pops up on iframe and provides
+    ///     some basic search functionalities for the dropdownlist control.
+    /// </summary>
+    [Parameter]
+    public string ItemSelectorPath { get; set; }
+
+    //----------------------------------------------------------------------------------
+    // The five members FrontEnd/MixERP.Net.FrontEnd/Controls/Scrud.cs assigns from its
+    // constructor (public sealed class Scrud : ScrudForm). They are [Parameter]s AND plain
+    // settable properties, so that subclass still compiles - see the API freeze.
+    //----------------------------------------------------------------------------------
+
+    [Parameter]
+    public int UserId { get; set; }
+
+    [Parameter]
+    public string UserName { get; set; }
+
+    [Parameter]
+    public string OfficeCode { get; set; }
+
+    [Parameter]
+    public int OfficeId { get; set; }
+
+    /// <summary>
+    ///     The name of the primary key column.
+    /// </summary>
+    [Parameter]
+    public string KeyColumn { get; set; }
+
+    [Parameter]
+    public string PagerCssClass { get; set; }
+
+    [Parameter]
+    public string PagerCurrentPageCssClass { get; set; }
+
+    [Parameter]
+    public string PagerPageButtonCssClass { get; set; }
+
+    /// <summary>
+    ///     Set this to override the default page size of the view, which is 10.
+    /// </summary>
+    [Parameter]
+    public int PageSize { get; set; }
+
+    /// <summary>Gets or sets the maximum row limit.</summary>
+    /// Set this to -1 if you want to display all the rows of your database
+    /// table no matter how big it is. Default value is: 1000
+    /// <value>The maximum row limit.</value>
+    [Parameter]
+    public int MaxRowLimit { get; set; }
+
+    [Parameter]
+    public string PrintButtonIconCssClass { get; set; }
+
+    /// <summary>
+    ///     Use this parameter to override the "ResourceClassName" key in the configuration file.
+    ///     ResourceClassName contains localized resource strings of database table column names.
+    /// </summary>
+    [Parameter]
+    public string ResourceClassName { get; set; }
+
+    [Parameter]
+    public string SaveButtonCssClass { get; set; }
+
+    [Parameter]
+    public string SelectButtonIconCssClass { get; set; }
+
+    /// <summary>
+    ///     If the table has foreign keys, set this to a comma separated list of
+    ///     the selected values to be displayed on the respective DropDownList control.
+    /// </summary>
+    [Parameter]
+    public string SelectedValues { get; set; }
+
+    [Parameter]
+    public string SuccessCssClass { get; set; }
+
+    /// <summary>
+    /// The name of the database to perform CRUD operation against.
+    /// </summary>
+    [Parameter]
+    public string Catalog { get; set; }
+
+    /// <summary>
+    ///     The name of the table to perform CRUD operation against.
+    /// </summary>
+    [Parameter]
+    public string Table { get; set; }
+
+    /// <summary>
+    ///     The database schema container of the "Table" property of this control.
+    /// </summary>
+    [Parameter]
+    public string TableSchema { get; set; }
+
+    /// <summary>
+    ///     The heading or title of this form.
+    ///     <para>
+    ///         The legacy <c>[Localizable(true)]</c> designer metadata is kept: it costs nothing
+    ///         and documents that this string is user-visible.
+    ///     </para>
+    /// </summary>
+    [Parameter]
+    [Localizable(true)]
+    public string Text { get; set; }
+
+    /// <summary>
+    ///     CssClass of the title label.
+    /// </summary>
+    [Parameter]
+    public string TitleLabelCssClass { get; set; }
+
+    /// <summary>
+    ///     If the table has foreign keys, set this to override the data being populated on the
+    ///     respective DropDownList control. Setting this will allow the Scrud to
+    ///     fetch the data from the DisplayViews Expression Tables instead of the original parent table.
+    /// </summary>
+    [Parameter]
+    public bool UseDisplayViewsAsParents { get; set; }
+
+    /// <summary>
+    ///     The name of the database view or table to select and display the resultset from.
+    /// </summary>
+    [Parameter]
+    public string View { get; set; }
+
+    /// <summary>
+    ///     The database schema container of the "View" property of this control.
+    /// </summary>
+    [Parameter]
+    public string ViewSchema { get; set; }
+
+    //==================================================================================
+    // Component state - the replacement for the 16 WebForms child-control fields the old
+    // ScrudForm/IDisposable.cs used to null out.
+    //==================================================================================
+
+    /// <summary>
+    ///     The generated form's field set. This is the replacement for the <c>HtmlTable</c> the
+    ///     factories mutated AND for the four <c>FindControl("{column}_...")</c> lookups
+    ///     <c>GetFormCollection</c> performed; it also backs the server-side validation gate.
+    /// </summary>
+    private readonly ScrudFieldTable fieldTable = new ScrudFieldTable();
+
+    /// <summary>Control.cs: the bytea column name, assigned while the form is generated.</summary>
+    private string imageColumn = string.Empty;
+
+    private CommandPanel topCommandPanel;
+    private CommandPanel bottomCommandPanel;
+
+    /// <summary>ViewFactory/GridView.cs BindGridView(): the view's current page of rows.</summary>
+    private DataTable gridDataSource;
+
+    /// <summary>
+    ///     The grid's columns. The select column is FIRST, as it was when
+    ///     <c>CreateGridPanel</c> added its <c>TemplateField</c> to a <c>GridView</c> whose
+    ///     <c>AutoGenerateColumns</c> was true (explicit columns preceded generated ones) - which is
+    ///     also what <c>FormGridView_RowDataBound</c> assumed when it injected the radio into
+    ///     <c>Cells[0]</c> and read the key out of <c>Cells[1]</c>.
+    /// </summary>
+    private IReadOnlyList<MixERPGridViewColumn> gridColumns = new List<MixERPGridViewColumn>();
+
+    /// <summary>Pager.cs: the rendered pager, or null when there is nothing to page.</summary>
+    private RenderFragment pager;
+
+    private string messageText = string.Empty;
+    private string messageCssClass;
+    private string messageStyle;
+
+    /// <summary>
+    ///     FormPanel.cs: <c>formPanel.Style.Add("display", "none")</c>, flipped by Scrud.js's
+    ///     scrudAddNew()/scrudEdit() and by DisplayError/DisplaySuccess on the server.
+    /// </summary>
+    private bool formVisible;
+
+    private bool gridVisible = true;
+
+    /// <summary>
+    ///     True while a save/delete is in flight. Drives the <c>loading</c> class on
+    ///     <c>#FormPanel div.segment</c> - the same class Scrud.js's scrudDispalyLoading() adds.
+    /// </summary>
+    private bool busy;
+
+    /// <summary>
+    ///     What the grid was last loaded for (query string + page size). The legacy control bound
+    ///     the grid exactly once per request inside CreateChildControls; OnParametersSet can run
+    ///     several times per interaction, so the database round trip is repeated only when the page
+    ///     or the page size actually changed.
+    /// </summary>
+    private string gridKey;
+
+    //==================================================================================
+    // ScrudForm/Control.cs CreateChildControls() - the ordering is load-bearing.
+    //  Validate() -> container -> title -> description -> grid -> pager ->
+    //  InitializeScrudControl() -> generator meta
+    // RecreateChildControls()/EnsureChildControls() and Render(HtmlTextWriter) disappear: the
+    // template above IS the render tree, and Blazor re-renders on its own.
+    //==================================================================================
+
+    protected override void OnParametersSet()
+    {
+        this.ValidateProperties();
+
+        this.CreateCommandPanels();
+
+        this.LoadGrid();
+
+        this.pager = this.CreatePager();
+
+        this.InitializeScrudControl();
+
+        base.OnParametersSet();
+    }
+
+    //==================================================================================
+    // ScrudForm/Validation.cs Validate(), renamed ValidateProperties() so that
+    // Validate()/IsValid stay available for the validation GATE (task 65).
+    // The five throws are kept verbatim, messages included - a silent return would let a
+    // misconfigured consumer render an empty, broken form instead of failing loudly.
+    //==================================================================================
+
+    private void ValidateProperties()
+    {
+        if (string.IsNullOrWhiteSpace(this.TableSchema))
+        {
+            throw new InvalidOperationException(Titles.TableSchemaEmptyExceptionMessage);
+        }
+
+        if (string.IsNullOrWhiteSpace(this.Table))
+        {
+            throw new InvalidOperationException(Titles.TableEmptyExceptionMessage);
+        }
+
+        if (string.IsNullOrWhiteSpace(this.ViewSchema))
+        {
+            throw new InvalidOperationException(Titles.ViewSchemaEmptyExceptionMessage);
+        }
+
+        if (string.IsNullOrWhiteSpace(this.View))
+        {
+            throw new InvalidOperationException(Titles.ViewEmptyExceptionMessage);
+        }
+
+        if (string.IsNullOrWhiteSpace(this.KeyColumn))
+        {
+            throw new InvalidOperationException(Titles.KeyColumnEmptyExceptionMessage);
+        }
+    }
+
+    //==================================================================================
+    // ScrudForm/UpdatePanel.cs CreateCommandPanels()
+    //==================================================================================
+
+    /// <summary>
+    ///     Port of <c>CreateCommandPanels()</c>: the bottom panel then the top panel, each with the
+    ///     same seven icon classes, the same button/panel css and both event pairs wired to this
+    ///     component's <c>DeleteButton_Click</c>/<c>EditButton_Click</c>.
+    ///     <para>
+    ///         The <c>Deny*</c> flags additionally suppress the matching AFFORDANCE (checklist
+    ///         tasks 112-114); the handlers keep enforcing the policy server-side, which is where
+    ///         the original enforced it.
+    ///     </para>
+    /// </summary>
+    private void CreateCommandPanels()
+    {
+        this.bottomCommandPanel = new CommandPanel();
+        this.bottomCommandPanel.DeleteButtonClick = EventCallback.Factory.Create(this, this.DeleteButton_Click);
+        this.bottomCommandPanel.EditButtonClick = EventCallback.Factory.Create(this, this.EditButton_Click);
+        this.bottomCommandPanel.ButtonCssClass = this.GetCommandPanelButtonCssClass();
+        this.bottomCommandPanel.CssClass = this.GetCommandPanelCssClass();
+
+        this.bottomCommandPanel.SelectButtonIconCssClass = this.GetSelectButtonIconCssClass();
+        this.bottomCommandPanel.CompactButtonIconCssClass = this.GetCompactButtonIconCssClass();
+        this.bottomCommandPanel.AllButtonIconCssClass = this.GetAllButtonIconCssClass();
+        this.bottomCommandPanel.AddButtonIconCssClass = this.GetAddButtonIconCssClass();
+        this.bottomCommandPanel.EditButtonIconCssClass = this.GetEditButtonIconCssClass();
+        this.bottomCommandPanel.DeleteButtonIconCssClass = this.GetDeleteButtonIconCssClass();
+        this.bottomCommandPanel.PrintButtonIconCssClass = this.GetPrintButtonIconCssClass();
+        this.bottomCommandPanel.DenyAdd = this.DenyAdd;
+        this.bottomCommandPanel.DenyEdit = this.DenyEdit;
+        this.bottomCommandPanel.DenyDelete = this.DenyDelete;
+        this.bottomCommandPanel.Navigation = this.Nav;
+
+        this.topCommandPanel = new CommandPanel();
+        this.topCommandPanel.DeleteButtonClick = EventCallback.Factory.Create(this, this.DeleteButton_Click);
+        this.topCommandPanel.EditButtonClick = EventCallback.Factory.Create(this, this.EditButton_Click);
+        this.topCommandPanel.ButtonCssClass = this.GetCommandPanelButtonCssClass();
+        this.topCommandPanel.CssClass = this.GetCommandPanelCssClass();
+
+        this.topCommandPanel.SelectButtonIconCssClass = this.GetSelectButtonIconCssClass();
+        this.topCommandPanel.CompactButtonIconCssClass = this.GetCompactButtonIconCssClass();
+        this.topCommandPanel.AllButtonIconCssClass = this.GetAllButtonIconCssClass();
+        this.topCommandPanel.AddButtonIconCssClass = this.GetAddButtonIconCssClass();
+        this.topCommandPanel.EditButtonIconCssClass = this.GetEditButtonIconCssClass();
+        this.topCommandPanel.DeleteButtonIconCssClass = this.GetDeleteButtonIconCssClass();
+        this.topCommandPanel.PrintButtonIconCssClass = this.GetPrintButtonIconCssClass();
+        this.topCommandPanel.DenyAdd = this.DenyAdd;
+        this.topCommandPanel.DenyEdit = this.DenyEdit;
+        this.topCommandPanel.DenyDelete = this.DenyDelete;
+        this.topCommandPanel.Navigation = this.Nav;
+    }
+
+    //==================================================================================
+    // ScrudForm/FormFactory/FormPanel.cs
+    //==================================================================================
+
+    /// <summary>
+    ///     Port of <c>InitializeScrudControl()</c>: the form is generated once, from an EMPTY
+    ///     <c>DataTable</c> whose <c>Locale</c> is the current culture (an insert form).
+    ///     <para>
+    ///         The guard is new and necessary: <c>CreateChildControls</c> ran once per request,
+    ///         whereas <c>OnParametersSet</c> runs on every parameter change - regenerating the
+    ///         fields there would discard whatever the user has typed.
+    ///     </para>
+    /// </summary>
+    private void InitializeScrudControl()
+    {
+        if (this.fieldTable.Fields.Count > 0)
+        {
+            return;
+        }
+
+        using (DataTable table = new DataTable())
+        {
+            table.Locale = Thread.CurrentThread.CurrentCulture;
+            this.LoadForm(table, false);
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of <c>IsModal()</c>. <c>HttpContext.Current.CurrentHandler as Page</c> plus
+    ///     <c>page.Request.QueryString["modal"]</c> becomes a query-string read off the injected
+    ///     <c>NavigationManager</c>. The truthiness semantics are unchanged: ONLY the literal "1"
+    ///     counts as modal.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private bool IsModal()
+    {
+        return "1".Equals(this.GetQueryStringValue("modal"));
+    }
+
+    /// <summary>
+    ///     The single replacement for every <c>this.Page.Request[...]</c> /
+    ///     <c>HttpContext.Current</c> query-string read in the legacy control
+    ///     (<c>modal</c>, <c>show</c>, <c>page</c>).
+    /// </summary>
+    private string GetQueryStringValue(string key)
+    {
+        if (this.Nav == null)
+        {
+            return null;
+        }
+
+        string query = new Uri(this.Nav.Uri).Query;
+
+        if (string.IsNullOrEmpty(query))
+        {
+            return null;
+        }
+
+        StringValues value;
+
+        if (QueryHelpers.ParseQuery(query).TryGetValue(key, out value))
+        {
+            return value.ToString();
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    ///     The request's query string WITHOUT a leading '?', which is what
+    ///     <c>this.Page.Request.QueryString.ToString()</c> produced. <c>ScrudPager</c> compares it
+    ///     against exact strings, so the leading '?' must not be carried.
+    /// </summary>
+    private string GetQueryString()
+    {
+        if (this.Nav == null)
+        {
+            return string.Empty;
+        }
+
+        return new Uri(this.Nav.Uri).Query.TrimStart('?');
+    }
+
+    /// <summary>
+    ///     The replacement for <c>this.Page.Request.Url.AbsolutePath</c>, which the pager used as
+    ///     the base of every page link.
+    /// </summary>
+    private string GetCurrentPageUrl()
+    {
+        if (this.Nav == null)
+        {
+            return string.Empty;
+        }
+
+        return new Uri(this.Nav.Uri).AbsolutePath;
+    }
+
+    //==================================================================================
+    // ScrudForm/FormFactory/Alert.cs
+    //==================================================================================
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of <c>DisplayError(MixERPException)</c>: the message (localized through the
+    ///     database constraint name when there is one) is written into <c>#ScrudError</c>, the grid
+    ///     is shown, the form is hidden, the failure is logged and the form is reset.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private void DisplayError(MixERPException ex)
+    {
+        this.messageCssClass = this.GetErrorCssClass();
+
+        string message = ex.Message;
+
+        if (!string.IsNullOrWhiteSpace(ex.DBConstraintName))
+        {
+            message = this.GetLocalizedErrorMessage(ex);
+        }
+
+        this.messageText = message;
+
+        //messageLabel.Style: display:block; font-size:16px; padding:8px 0;
+        this.messageStyle = "display:block;font-size:16px;padding:8px 0;";
+
+        this.gridVisible = true;
+        this.formVisible = false;
+
+        Serilog.Log.Warning("ScrudFactory: {Message}/{Exception}.", message, ex);
+
+        this.ResetForm();
+    }
+
+    /// <summary>
+    ///     Port of <c>DisplaySuccess()</c> - <c>Titles.TaskCompletedSuccessfully</c> in the success
+    ///     css class, grid shown, form hidden, form reset.
+    /// </summary>
+    private void DisplaySuccess()
+    {
+        this.messageCssClass = this.GetSuccessCssClass();
+        this.messageText = Titles.TaskCompletedSuccessfully;
+        this.messageStyle = "display:block;";
+
+        this.gridVisible = true;
+        this.formVisible = false;
+
+        this.ResetForm();
+    }
+
+    //==================================================================================
+    // ScrudForm/ViewFactory/GridPanel.cs + GridView.cs
+    //==================================================================================
+
+    /// <summary>
+    ///     Port of <c>LoadGrid()</c>: bind the grid, then apply its width and the
+    ///     <c>white-space: nowrap</c> style. The two hidden fields it also refreshed are rendered
+    ///     straight from <c>UserId</c>/<c>OfficeCode</c> above, so there is nothing to re-assign.
+    /// </summary>
+    private void LoadGrid()
+    {
+        this.BindGridView();
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of <c>BindGridView()</c>. The <c>limit</c>/<c>offset</c> arithmetic is verbatim,
+    ///     including the default limit of 10 and <c>offset = (page - 1) * limit</c>;
+    ///     <c>this.Page.Request["page"]</c> becomes a <c>NavigationManager</c> read. A negative
+    ///     limit (<c>MaxRowLimit = -1</c> with <c>show=all</c>) reaches
+    ///     <c>FormHelper.GetView</c>, which drops the LIMIT/OFFSET clause - the "all rows" branch.
+    ///     <para>
+    ///         The explicit <c>DataBind()</c> disappears: <c>DataSource</c> is a
+    ///         <c>[Parameter]</c> on the migrated grid and Blazor re-renders on change. The
+    ///         <c>DataTable</c> is NOT disposed here (the original's <c>using</c> block was safe
+    ///         only because <c>DataBind()</c> had already copied the rows into the control tree);
+    ///         it stays alive as long as it is the grid's data source.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private void BindGridView()
+    {
+        var limit = 10;
+        var offset = 0;
+
+        if (this.GetPageSize() != 0)
+        {
+            limit = this.GetPageSize();
+        }
+
+        string page = this.GetQueryStringValue("page");
+
+        if (page != null)
+        {
+            offset = (Conversion.TryCastInteger(page) - 1) * limit;
+        }
+
+        string key = string.Format(CultureInfo.InvariantCulture, "{0}|{1}|{2}", this.GetQueryString(), limit, offset);
+
+        if (this.gridDataSource != null && key.Equals(this.gridKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        this.gridKey = key;
+        this.gridDataSource = FormHelper.GetView(this.Catalog, this.ViewSchema, this.View, this.KeyColumn, limit, offset);
+        this.gridColumns = this.BuildGridColumns();
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     The column set <c>AddGridView</c> + <c>FormGridView_RowDataBound</c>'s header branch
+    ///     produced: a 20px-wide, header-less select column FIRST (its <c>Template</c> renders the
+    ///     per-row <c>#SelectRadio</c>), then one column per view column whose header text is run
+    ///     through <c>ScrudLocalizationHelper.GetResourceString(resourceClassName, columnName)</c>.
+    ///     <para>
+    ///         <c>AutoGenerateColumns</c> is false on the component because <c>MixERPGridView</c>
+    ///         APPENDS an explicit column set after the generated one, which would put the select
+    ///         column last; building the list here keeps the legacy order (and therefore the
+    ///         Cells[0]/Cells[1] relationship Scrud.js and the radio template rely on).
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private IReadOnlyList<MixERPGridViewColumn> BuildGridColumns()
+    {
+        List<MixERPGridViewColumn> columns = new List<MixERPGridViewColumn>();
+
+        MixERPGridViewColumn selectColumn = new MixERPGridViewColumn();
+        selectColumn.HeaderText = string.Empty;
+        selectColumn.CssClass = "select-cell";
+        selectColumn.HeaderCssClass = "select-cell";
+        selectColumn.Template = this.GetSelectColumnTemplate();
+
+        columns.Add(selectColumn);
+
+        if (this.gridDataSource != null)
+        {
+            string resourceClassName = this.GetResourceClassName();
+
+            foreach (DataColumn column in this.gridDataSource.Columns)
+            {
+                MixERPGridViewColumn gridColumn = new MixERPGridViewColumn(column.ColumnName, ScrudLocalizationHelper.GetResourceString(resourceClassName, column.ColumnName), column.DataType);
+
+                columns.Add(gridColumn);
+            }
+        }
+
+        return columns;
+    }
+
+    /// <summary>
+    ///     Port of <c>CreateGridPanel()</c>'s inline style: the panel's <c>Width</c> (a CSS length
+    ///     string now - task 15) followed by the <c>GridPanelStyle</c> the original added as a
+    ///     <c>style</c> attribute. Both are emitted only when a value is actually set, and the
+    ///     <c>display</c> the server-side alerts toggle is appended last so it wins.
+    /// </summary>
+    private string GetGridPanelInlineStyle()
+    {
+        string style = string.Empty;
+
+        string width = this.GetGridPanelWidth();
+
+        if (!string.IsNullOrWhiteSpace(width))
+        {
+            style += "width:" + width + ";";
+        }
+
+        string custom = this.GetGridPanelStyle();
+
+        if (!string.IsNullOrWhiteSpace(custom))
+        {
+            style += custom;
+
+            if (!custom.TrimEnd().EndsWith(";", StringComparison.Ordinal))
+            {
+                style += ";";
+            }
+        }
+
+        style += this.gridVisible ? "display:block;" : "display:none;";
+
+        return style;
+    }
+
+    /// <summary>
+    ///     Port of <c>GetGridPanelStyle()</c>: the <c>GridPanelStyle</c> property wins, except that
+    ///     - verbatim, quirk included - the original only consulted the property when a
+    ///     <c>GridPanelWidth</c> had been set, falling back to the
+    ///     <c>GridPanelStyle</c> scrud parameter otherwise.
+    /// </summary>
+    private string GetGridPanelStyle()
+    {
+        if (string.IsNullOrWhiteSpace(this.GridPanelWidth))
+        {
+            return Conversion.TryCastString(DbConfig.GetScrudParameter(this.Catalog, "GridPanelStyle"));
+        }
+
+        return this.GridPanelStyle;
+    }
+
+    /// <summary>
+    ///     Port of <c>GetGridPanelWidth()</c>: the property, else the
+    ///     <c>GridPanelDefaultWidth</c> scrud parameter. <c>Conversion.TryCastUnit</c> is gone with
+    ///     <c>Unit</c>; the parameter value is already a CSS length, so it is used as-is.
+    /// </summary>
+    private string GetGridPanelWidth()
+    {
+        if (string.IsNullOrWhiteSpace(this.GridPanelWidth))
+        {
+            return Conversion.TryCastString(DbConfig.GetScrudParameter(this.Catalog, "GridPanelDefaultWidth"));
+        }
+
+        return this.GridPanelWidth;
+    }
+
+    /// <summary>
+    ///     Port of <c>GetGridViewWidth()</c> - the property, else the <c>GridViewDefaultWidth</c>
+    ///     scrud parameter, as a CSS length string (task 15).
+    /// </summary>
+    private string GetGridViewWidth()
+    {
+        if (string.IsNullOrWhiteSpace(this.GridViewWidth))
+        {
+            return Conversion.TryCastString(DbConfig.GetScrudParameter(this.Catalog, "GridViewDefaultWidth"));
+        }
+
+        return this.GridViewWidth;
+    }
+
+    /// <summary>
+    ///     <c>LoadGrid()</c> set <c>formGridView.Width</c> and added
+    ///     <c>style="white-space: nowrap;"</c> to the grid itself. <c>MixERPGridView</c> exposes
+    ///     neither a width nor an inline style parameter, so both are carried on the wrapper div -
+    ///     recorded as a divergence; the rendered width and wrapping behaviour are the same.
+    /// </summary>
+    private string GetGridViewInlineStyle()
+    {
+        string width = this.GetGridViewWidth();
+
+        string style = "white-space: nowrap;";
+
+        if (!string.IsNullOrWhiteSpace(width))
+        {
+            style = "width:" + width + ";" + style;
+        }
+
+        return style;
+    }
+
+    //==================================================================================
+    // ScrudForm/Pager.cs
+    //==================================================================================
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of <c>CreatePager(Control container)</c>: page size, total record count, the
+    ///     current page (defaulting to 1), the three pager css classes and the hardcoded block
+    ///     count of 10 - and the early return that rendered NO pager at all when the view has no
+    ///     rows or fits on one page.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private RenderFragment CreatePager()
+    {
+        int pageSize = this.GetPageSize();
+        int totalRecords = FormHelper.GetTotalRecords(this.Catalog, this.ViewSchema, this.View);
+
+        int currentPage = Conversion.TryCastInteger(this.GetQueryStringValue("page"));
+
+        if (currentPage.Equals(0))
+        {
+            currentPage = 1;
+        }
+
+        string cssClass = this.GetPagerCssClass();
+        string activeCssClass = this.GetPagerCurrentPageCssClass();
+        string itemCssClass = this.GetPagerPageButtonCssClass();
+
+        if (totalRecords == 0 || pageSize > totalRecords)
+        {
+            return null;
+        }
+
+        const int blockCount = 10; //This can be parameterized.
+
+        return this.CreatePager(pageSize, totalRecords, currentPage, blockCount, cssClass, activeCssClass, itemCssClass);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of the 8-argument <c>CreatePager</c> overload. The <c>container</c> argument is
+    ///     gone (there is no control collection to add to); the <c>ScrudPager</c> model is built
+    ///     with exactly the same ten values and its <c>GetPager()</c> now returns a
+    ///     <c>RenderFragment</c>.
+    ///     <para>
+    ///         <c>QueryString</c> must have NO leading '?' - <c>ScrudPager</c> compares it against
+    ///         the exact literal "modal=1&amp;CallBackFunctionName=..." to decide whether to carry
+    ///         the item-selector popup's callback parameters into every page link.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private RenderFragment CreatePager(int pageSize, int totalRecords, int currentPage, int blockCount, string cssClass, string activeCssClass, string itemCssClass)
+    {
+        string queryString = this.GetQueryString();
+
+        ScrudPager scrudPager = new ScrudPager
+        {
+            TotalRecords = totalRecords,
+            CurrentPage = currentPage,
+            PageSize = pageSize,
+            BlockCount = blockCount,
+            CssClass = cssClass,
+            ActiveCssClass = activeCssClass,
+            ItemCssClass = itemCssClass,
+            CurrentPageUrl = this.GetCurrentPageUrl(),
+            QueryString = queryString
+        };
+
+        return scrudPager.GetPager();
+    }
+
+    //==================================================================================
+    // ScrudForm/Styling.cs - 27 resolvers.
+    //
+    // PRECEDENCE, PRESERVED EXACTLY: the explicit property wins; otherwise the catalog's
+    // DbConfig.GetScrudParameter(Catalog, "<key>") value is used. Only GetPageSize and
+    // GetRowLimit carry a hardcoded fallback (10 and 1000) - the css resolvers deliberately
+    // do NOT invent one, because a hardcoded class would override a tenant's configured
+    // theme. Note also the two original quirks kept verbatim: GetCommandPanelCssClass reads
+    // the CommandPanelButtonCssClass PROPERTY (not CommandPanelCssClass) before falling back
+    // to the CommandPanelCssClass parameter, and GetFailureCssClass's parameter key is
+    // misspelled "FailiureCssClass" - the database row is named that, so fixing the spelling
+    // here would silently lose the configured class.
+    //==================================================================================
+
+    private string GetAddButtonIconCssClass()
+    {
+        string cssClass = this.AddButtonIconCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "AddButtonIconCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetAllButtonIconCssClass()
+    {
+        string cssClass = this.AllButtonIconCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "AllButtonIconCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetButtonCssClass()
+    {
+        string cssClass = this.ButtonCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "ButtonCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetCommandPanelButtonCssClass()
+    {
+        string cssClass = this.CommandPanelButtonCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "CommandPanelButtonCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetCommandPanelCssClass()
+    {
+        //Quirk preserved: the ORIGINAL read CommandPanelButtonCssClass here.
+        string cssClass = this.CommandPanelButtonCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "CommandPanelCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetCompactButtonIconCssClass()
+    {
+        string cssClass = this.CompactButtonIconCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "CompactButtonIconCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetDeleteButtonIconCssClass()
+    {
+        string cssClass = this.DeleteButtonIconCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "DeleteButtonIconCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetDescriptionCssClass()
+    {
+        string cssClass = this.DescriptionCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "DescriptionCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetEditButtonIconCssClass()
+    {
+        string cssClass = this.EditButtonIconCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "EditButtonIconCssClass");
+        }
+
+        return cssClass;
+    }
+
+    /// <summary>
+    ///     The error css class, used by <c>DisplayError</c> and handed to every generated field as
+    ///     its validator css class.
+    /// </summary>
+    private string GetErrorCssClass()
+    {
+        string cssClass = this.ErrorCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "ErrorCssClass");
+        }
+
+        return cssClass;
+    }
+
+    /// <summary>
+    ///     Preserved as-is although - exactly as in the original - nothing in the control reads it:
+    ///     <c>DisplayError</c> used <c>GetErrorCssClass()</c>. It is kept because the
+    ///     <c>FailureCssClass</c> property is part of the frozen public surface and consumers set
+    ///     it. NOTE the misspelled parameter key.
+    /// </summary>
+    private string GetFailureCssClass()
+    {
+        string cssClass = this.FailureCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "FailiureCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetFormCssClass()
+    {
+        string cssClass = this.FormCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "FormCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetFormPanelCssClass()
+    {
+        string cssClass = this.FormPanelCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "FormPanelCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetGridPanelCssClass()
+    {
+        string cssClass = this.GridPanelCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "GridPanelCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetGridViewAlternateRowCssClass()
+    {
+        string cssClass = this.GridViewAlternateRowCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "GridViewAlternateRowCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetGridViewCssClass()
+    {
+        string cssClass = this.GridViewCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "GridViewCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetGridViewRowCssClass()
+    {
+        string cssClass = this.GridViewRowCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "GridViewRowCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetPagerCssClass()
+    {
+        string cssClass = this.PagerCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "PagerCssClass");
+        }
+
+        return cssClass;
+    }
+
+    /// <summary>
+    ///     Port of <c>GetRowLimit()</c>: the <c>MaxRowLimit</c> property, else the
+    ///     <c>MaxRowLimit</c> scrud parameter, else 1000. A value of -1 (set deliberately by a
+    ///     consumer that wants every row) passes straight through both zero-tests.
+    /// </summary>
+    private int GetRowLimit()
+    {
+        int maxRowLimit = this.MaxRowLimit;
+
+        if (maxRowLimit == 0)
+        {
+            maxRowLimit = Conversion.TryCastInteger(DbConfig.GetScrudParameter(this.Catalog, "MaxRowLimit"));
+        }
+
+        if (maxRowLimit == 0)
+        {
+            maxRowLimit = 1000;
+        }
+
+        return maxRowLimit;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of <c>GetPageSize()</c>, branches and ordering intact: the <c>PageSize</c>
+    ///     property, else the <c>PageSize</c> scrud parameter; then - and this overrides both -
+    ///     <c>?show=all</c> replaces the page size with <see cref="GetRowLimit" />, which is how
+    ///     the "show all" command button renders the whole view (and how <c>MaxRowLimit = -1</c>
+    ///     becomes a LIMIT-less query); finally 10 as the documented fallback.
+    ///     <para>
+    ///         <c>Conversion.TryCastString(this.Page.Request.QueryString["show"]).Equals("all")</c>
+    ///         becomes the same comparison against the <c>NavigationManager</c>-derived value.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private int GetPageSize()
+    {
+        int pageSize = this.PageSize;
+
+        if (pageSize == 0)
+        {
+            pageSize = Conversion.TryCastInteger(DbConfig.GetScrudParameter(this.Catalog, "PageSize"));
+        }
+
+        bool showAll = (Conversion.TryCastString(this.GetQueryStringValue("show")).Equals("all"));
+
+        if (showAll)
+        {
+            pageSize = this.GetRowLimit();
+        }
+
+        if (pageSize == 0)
+        {
+            pageSize = 10;//Fallback
+        }
+
+        return pageSize;
+    }
+
+    private string GetPagerCurrentPageCssClass()
+    {
+        string cssClass = this.PagerCurrentPageCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "PagerCurrentPageCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetPagerPageButtonCssClass()
+    {
+        string cssClass = this.PagerPageButtonCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "PagerPageButtonCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetPrintButtonIconCssClass()
+    {
+        string cssClass = this.PrintButtonIconCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "PrintButtonIconCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetSaveButtonCssClass()
+    {
+        string cssClass = this.SaveButtonCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "SaveButtonCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetSelectButtonIconCssClass()
+    {
+        string cssClass = this.SelectButtonIconCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "SelectButtonIconCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetSuccessCssClass()
+    {
+        string cssClass = this.SuccessCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "SuccessCssClass");
+        }
+
+        return cssClass;
+    }
+
+    private string GetTitleLabelCssClass()
+    {
+        string cssClass = this.TitleLabelCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "TitleLabelCssClass");
+        }
+
+        return cssClass;
+    }
+
+    /// <summary>
+    ///     Port of <c>GetDateControlCssClass</c>'s precedence for the date fields' css class. The
+    ///     original Styling.cs exposed the <c>DateControlCssClass</c> property but read it directly
+    ///     at the one call site; the resolver is provided here so the generated date fields follow
+    ///     the same property -&gt; parameter precedence as every other class.
+    /// </summary>
+    private string GetDateControlCssClass()
+    {
+        string cssClass = this.DateControlCssClass;
+
+        if (string.IsNullOrWhiteSpace(cssClass))
+        {
+            cssClass = DbConfig.GetScrudParameter(this.Catalog, "DateControlCssClass");
+        }
+
+        return cssClass;
+    }
+
+    //==================================================================================
+    // ScrudForm/UpdatePanel.cs - the two configuration-precedence resolvers.
+    //==================================================================================
+
+    /// <summary>
+    ///     Port of <c>GetItemSelectorPath()</c>: the <c>ItemSelectorPath</c> property, else the
+    ///     catalog's <c>ItemSelectorPath</c> scrud parameter.
+    /// </summary>
+    private string GetItemSelectorPath()
+    {
+        string itemSelectorPath = this.ItemSelectorPath;
+
+        if (string.IsNullOrWhiteSpace(itemSelectorPath))
+        {
+            itemSelectorPath = DbConfig.GetScrudParameter(this.Catalog, "ItemSelectorPath");
+        }
+
+        return itemSelectorPath;
+    }
+
+    /// <summary>
+    ///     Port of <c>GetResourceClassName()</c>: the <c>ResourceClassName</c> property, else the
+    ///     catalog's <c>ResourceClassName</c> scrud parameter. This is what gives every generated
+    ///     field and every grid header its localized label.
+    /// </summary>
+    private string GetResourceClassName()
+    {
+        string resourceClassName = this.ResourceClassName;
+
+        if (string.IsNullOrWhiteSpace(resourceClassName))
+        {
+            resourceClassName = DbConfig.GetScrudParameter(this.Catalog, "ResourceClassName");
+        }
+
+        return resourceClassName;
+    }
+}

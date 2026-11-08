@@ -1,0 +1,67 @@
+@* ---------------------------------------------------------------------------------------------
+   Modules/FirstSteps.aspx (+ FirstSteps.aspx.cs) -> Components/Pages/Modules/FirstSteps.razor
+   (checklist task 88).
+
+   The page used ~/BackendMaster.Master -> @layout BackendLayout, and consisted of exactly three
+   things: the underscore reference (ScriptContentPlaceholder), the angular include of
+   Views/Modules/Checklists.aspx.html (BodyContentPlaceholder, now
+   wwwroot/views/modules/Checklists.aspx.html after Specialist 1's asset move) and the
+   Pages/Modules/Checklists.aspx.js controller (BottomScriptContentPlaceholder), which calls
+   /services/checklists/getfirststeps.
+
+   Both scripts are loaded, in their original order, from OnAfterRenderAsync — a .razor file may
+   not contain a <script> element. The include ATTRIBUTE is then added and angular is bootstrapped
+   on the container by page-interop.js: the document-level data-ng-app bootstrap runs before the
+   page's own scripts can be fetched over the circuit, so a controller registered at that point
+   would never be applied. Bootstrapping the container explicitly processes the module's
+   registration queue, controller included.
+   --------------------------------------------------------------------------------------------- *@
+@page "/Modules/FirstSteps"
+@layout BackendLayout
+@inherits MixERPAuthorizedPageBase
+@inject IJSRuntime JS
+
+@* <div data-ng-include="'/views/modules/Checklists.aspx.html'"> — the attribute is added by
+   page-interop.js once the controller script is loaded (see the file header). *@
+<div id="FirstStepsChecklist"></div>
+
+@code {
+    private const string ContainerId = "FirstStepsChecklist";
+    private const string IncludePath = "/views/modules/Checklists.aspx.html";
+
+    /// <summary>
+    ///     The two scripts the page declared, in document order: underscore (the controller uses
+    ///     _.where) and then the controller itself.
+    /// </summary>
+    private static readonly string[] PageScripts =
+    {
+        "/js/underscore/underscore-min.js",
+        "/js/Pages/Modules/Checklists.aspx.js"
+    };
+
+    /// <summary>
+    ///     Page_Init: First Steps has no menu entry of its own, so the policy check must not run
+    ///     against it. Set in the constructor because the base activation sequence reads it from
+    ///     OnInitializedAsync.
+    /// </summary>
+    public FirstSteps()
+    {
+        this.IsLandingPage = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender).ConfigureAwait(true);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        IJSObjectReference module = await this.JS
+            .InvokeAsync<IJSObjectReference>("import", "/js/mixerp/page-interop.js").ConfigureAwait(true);
+
+        await module.InvokeVoidAsync("loadScripts", (object)PageScripts).ConfigureAwait(true);
+        await module.InvokeVoidAsync("bootstrapAngularInclude", ContainerId, IncludePath).ConfigureAwait(true);
+    }
+}

@@ -1,0 +1,791 @@
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Blazor replacement for the former WebForms composite server control
+    "MixERP.Net.WebControls.TransactionViewFactory.TransactionView" (the sealed
+    partial class formerly spread over the 13 files under Control/**).
+
+    One component, markup + @code, no .razor.cs sidecar and NO @page: this is a
+    library control, so the consuming host owns the render mode.
+
+    The template below is the port of Control/Control.cs CreateChildControls(), in
+    the SAME DOM order it produced into its HtmlGenericControl panel:
+
+        AddHeading      -> <h1>
+        AddButtons      -> div.ui icon buttons (5 conditional buttons)
+        AddTopPanel     -> div.ui form segment > 2 x div.eight fields (13 fields)
+        AddGridPanel    -> div[overflow:auto] > <MixERPGridView ID="TransactionGridView" />
+        AddHiddenFields -> input#SelectedValuesHidden
+        AddFlagControl  -> <Flag ElementId="FlagPopUnder" />
+        SetDefaultValues -> OnParametersSet()
+        BindGrid         -> OnAfterRenderAsync(firstRender) + ShowButton / Flag_Updated
+        AddJavascript    -> OnAfterRenderAsync(firstRender)
+
+    RecreateChildControls()/EnsureChildControls()/Render(HtmlTextWriter), the
+    HtmlGenericControl panel wrapper, [ToolboxData] and
+    [AspNetHostingPermission] are dropped - see migration-summary.md section 2.
+
+    *** LOAD-BEARING DOM CONTRACT - TransactionViewFactory.js binds by LITERAL id ***
+    #TransactionGridView (four places), #PrintButton, #SelectedValuesHidden,
+    #FlagButton (the Flag component's AssociatedControlId), #DateFromDateTextBox /
+    #DateToDateTextBox (the inline datepicker onclicks), and h1 (the print title,
+    read as $("h1").html()). The grid's column POSITIONS are equally load-bearing -
+    see Helpers/GridViewColumnHelper.cs - which is why the grid is rendered with
+    AutoGenerateColumns="false" and that explicit column set.
+*@
+
+@namespace MixERP.Net.WebControls.TransactionViewFactory
+
+@using System
+@using System.Collections.Generic
+@using System.Collections.ObjectModel
+@using System.Globalization
+@using System.Threading.Tasks
+@using Microsoft.AspNetCore.Components
+@using Microsoft.Extensions.Logging
+@using Microsoft.JSInterop
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Entities
+@using MixERP.Net.i18n.Resources
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.WebControls.Flag
+@using MixERP.Net.WebControls.TransactionViewFactory.Helpers
+
+@inject IJSRuntime JSRuntime
+@inject ILogger<TransactionView> Logger
+
+@* Control/Heading.cs - MUST stay an h1 with TEXT semantics (the former
+   HtmlGenericControl.InnerText): the print handler reads $("h1").html() as the title. *@
+<h1>@this.Text</h1>
+
+@* Control/Buttons.cs AddButtons - div.ui icon buttons, children in the original order:
+   Add, Flag, Approve, Reject, Print. *@
+<div class="ui icon buttons">
+    @* Control/Buttons.cs AddAddButton *@
+    @if (this.DisplayAddButton)
+    {
+        <button type="button" id="AddNewButton" class="ui blue button"
+                onclick="@string.Format(CultureInfo.InvariantCulture, "window.location='{0}'", this.AddNewPath)">@Titles.AddNew</button>
+    }
+
+    @* Control/Buttons.cs AddFlagButton - the Flag component binds its popunder to this id. *@
+    @if (this.DisplayFlagButton)
+    {
+        <button type="button" id="FlagButton" class="ui orange button">@Titles.Flag</button>
+    }
+
+    @* Control/Buttons.cs AddApproveButton - id + title are read by the host's
+       keyboard-shortcut script (CTRL + K). *@
+    @if (this.DisplayApproveButton)
+    {
+        <button type="button" id="ApproveButton" title="CTRL + K" class="ui positive button">@Titles.Approve</button>
+    }
+
+    @* Control/Buttons.cs AddRejectButton - CTRL + SHIFT + K. *@
+    @if (this.DisplayRejectButton)
+    {
+        <button type="button" id="RejectButton" title="CTRL + SHIFT + K" class="ui negative button">@Titles.Reject</button>
+    }
+
+    @* Control/Buttons.cs AddPrintButton - TransactionViewFactory.js binds
+       $("#PrintButton").click(...) -> printGridView. *@
+    @if (this.DisplayPrintButton)
+    {
+        <button type="button" id="PrintButton" class="ui teal button">@Titles.Print</button>
+    }
+</div>
+
+@*
+    Control/TopPanel.cs AddTopPanel.
+
+    Each field was wrapped by HtmlControlHelper.GetField(), which on net10.0 returns the
+    STRING "<div class=\"field\"></div>" (an empty element) rather than a parent
+    HtmlGenericControl that children could be added to. The wrapper is therefore emitted
+    as the markup below - the identical rendered DOM - instead of being composed in C#.
+
+    FIELD ORDER IS PART OF THE UI and is unchanged.
+*@
+<div class="ui form segment">
+    <div class="eight fields">
+        @* Control/TopPanel.cs AddDateFromDateTextBox *@
+        <div class="field">
+            <div class="ui icon input">
+                <DateTextBox ID="DateFromDateTextBox" CssClass="date" Mode="@this.DateFromFromFrequencyType"
+                             Required="true" Catalog="@this.Catalog" OfficeId="@this.OfficeId"
+                             @bind-Text="this.dateFrom" @ref="this.dateFromDateTextBox" />
+                <i class="icon calendar pointer" onclick="$('#DateFromDateTextBox').datepicker('show');"></i>
+            </div>
+        </div>
+
+        @* Control/TopPanel.cs AddDatetoDateTextBox *@
+        <div class="field">
+            <div class="ui icon input">
+                <DateTextBox ID="DateToDateTextBox" CssClass="date" Mode="@this.DateToFrequencyType"
+                             Required="true" Catalog="@this.Catalog" OfficeId="@this.OfficeId"
+                             @bind-Text="this.dateTo" @ref="this.dateToDateTextBox" />
+                <i class="icon calendar pointer" onclick="$('#DateToDateTextBox').datepicker('show');"></i>
+            </div>
+        </div>
+
+        @* Control/TopPanel.cs AddTranIdInputText - class="integer" drives the host's
+           numeric-input script and is kept. *@
+        <div class="field">
+            <input type="text" placeholder="@Titles.TranId" class="integer" @bind="this.tranId" @bind:event="oninput" />
+        </div>
+
+        @* Control/TopPanel.cs AddTranCodeInputText *@
+        <div class="field">
+            <input type="text" placeholder="@Titles.TranCode" @bind="this.tranCode" @bind:event="oninput" />
+        </div>
+
+        @* Control/TopPanel.cs AddBookInputText *@
+        <div class="field">
+            <input type="text" placeholder="@Titles.Book" @bind="this.book" @bind:event="oninput" />
+        </div>
+
+        @* Control/TopPanel.cs AddReferenceNumberInputText *@
+        <div class="field">
+            <input type="text" placeholder="@Titles.ReferenceNumber" @bind="this.referenceNumber" @bind:event="oninput" />
+        </div>
+
+        @* Control/TopPanel.cs AddStatementReferenceInputText *@
+        <div class="field">
+            <input type="text" placeholder="@Titles.StatementReference" @bind="this.statementReference" @bind:event="oninput" />
+        </div>
+
+        @* Control/TopPanel.cs AddPostedByInputText *@
+        <div class="field">
+            <input type="text" placeholder="@Titles.PostedBy" @bind="this.postedBy" @bind:event="oninput" />
+        </div>
+    </div>
+
+    <div class="eight fields">
+        @* Control/TopPanel.cs AddOfficeInputText *@
+        <div class="field">
+            <input type="text" placeholder="@Titles.Office" @bind="this.office" @bind:event="oninput" />
+        </div>
+
+        @* Control/TopPanel.cs AddStatusInputText *@
+        <div class="field">
+            <input type="text" placeholder="@Titles.Status" @bind="this.status" @bind:event="oninput" />
+        </div>
+
+        @* Control/TopPanel.cs AddVerifiedByInputText *@
+        <div class="field">
+            <input type="text" placeholder="@Titles.VerifiedBy" @bind="this.verifiedBy" @bind:event="oninput" />
+        </div>
+
+        @* Control/TopPanel.cs AddReasonInputText *@
+        <div class="field">
+            <input type="text" placeholder="@Titles.Reason" @bind="this.reason" @bind:event="oninput" />
+        </div>
+
+        @* Control/TopPanel.cs AddShowbutton - the WebForms Button/Click event becomes
+           @onclick; there is no postback. The Show button was NOT wrapped in a field div. *@
+        <button type="button" class="blue ui button" @onclick="this.ShowButton_Click">@Titles.Show</button>
+    </div>
+</div>
+
+@*
+    Control/GridPanel.cs AddGridPanel + AddGridView.
+
+    GridLines.None is dropped (it only suppressed the border attributes a GridView would
+    otherwise emit; MixERPGridView emits none).
+
+    The former transactionGridView.Attributes.Add("style",
+    "min-width:1200px;max-width:2000px;") cannot be set on the component - MixERPGridView
+    exposes no Attributes - so the constraint is carried as a css class ON THE TABLE ITSELF
+    (GridCssClass = "transaction-view-grid", ruled in TransactionView.razor.css). It must NOT
+    move to a wrapper div: printGridView(..., "TransactionGridView", ...) clones the TABLE
+    by id, so a wrapper's width would not travel into the print/preview window.
+*@
+<div style="width:100%;overflow:auto">
+    <MixERPGridView ID="TransactionGridView" AutoGenerateColumns="false"
+                    CssClass="@this.GetGridViewCssClass()" Columns="@this.columns"
+                    DataSource="@this.dataSource" />
+</div>
+
+@*
+    Control/HiddenFields.cs - the former HiddenField with ID "SelectedValuesHidden".
+
+    LOAD BEARING, and deliberately NOT bound. getSelectedItems() in
+    TransactionViewFactory.js publishes the selection with
+    $("#SelectedValuesHidden").val(...), and jQuery's .val() raises no input/change event,
+    so a Blazor @bind on this element would never fire - the selection would never reach
+    the server and flag creation would silently operate on an empty collection. The
+    element is therefore left unbound (so a re-render can never overwrite what the script
+    wrote) and the server reads its value over interop - see RefreshSelectedValuesAsync().
+*@
+<input type="hidden" id="SelectedValuesHidden" name="SelectedValuesHidden" />
+
+@* Control/Flag.cs AddFlagControl. ID -> ElementId, the Updated event -> EventCallback,
+   and the using(...)/Dispose() around the control disappears (Blazor owns the lifetime). *@
+<Flag ElementId="FlagPopUnder"
+      AssociatedControlId="FlagButton"
+      OnClientClick="return getSelectedItems();"
+      CssClass="ui form segment initially hidden"
+      Catalog="@this.Catalog"
+      Updated="@this.Flag_Updated" />
+
+@code {
+    #region Properties - Control/Properties.cs
+
+    //All 23 public property names and types are FROZEN (two FrontEnd consumers set them)
+    //and become [Parameter]s. The original's typo'd "DateFromFromFrequencyType" name is
+    //kept VERBATIM - renaming it would silently stop both consumers from setting the
+    //DateFrom mode. See migration-summary.md section 4.
+
+    [Parameter]
+    public string AddNewPath { get; set; }
+
+    [Parameter]
+    public string Book { get; set; }
+
+    [Parameter]
+    public string Catalog { get; set; }
+
+    [Parameter]
+    public FrequencyType DateFromFromFrequencyType { get; set; }
+
+    [Parameter]
+    public FrequencyType DateToFrequencyType { get; set; }
+
+    [Parameter]
+    public bool DisplayAddButton { get; set; }
+
+    [Parameter]
+    public bool DisplayApproveButton { get; set; }
+
+    [Parameter]
+    public bool DisplayFlagButton { get; set; }
+
+    [Parameter]
+    public bool DisplayPrintButton { get; set; }
+
+    [Parameter]
+    public bool DisplayRejectButton { get; set; }
+
+    [Parameter]
+    public string GridViewCssClass { get; set; }
+
+    [Parameter]
+    public string OfficeName { get; set; }
+
+    [Parameter]
+    public string PostedBy { get; set; }
+
+    [Parameter]
+    public string Reason { get; set; }
+
+    [Parameter]
+    public string ReferenceNumber { get; set; }
+
+    [Parameter]
+    public string StatementReference { get; set; }
+
+    [Parameter]
+    public string Status { get; set; }
+
+    [Parameter]
+    public string Text { get; set; }
+
+    [Parameter]
+    public string TranCode { get; set; }
+
+    [Parameter]
+    public long TranId { get; set; }
+
+    [Parameter]
+    public string VerifiedBy { get; set; }
+
+    [Parameter]
+    public int UserId { get; set; }
+
+    [Parameter]
+    public int OfficeId { get; set; }
+
+    #endregion
+
+    #region State - the former child-control fields of TopPanel/GridPanel/HiddenFields
+
+    //The 15 private WebForms child-control fields become ordinary component state. No
+    //Dispose() is reproduced: a Blazor component owns no child-control tree and no
+    //unmanaged resource - Control/IDisposable.cs is dropped and recorded in
+    //migration-summary.md section 2.
+
+    private DateTextBox dateFromDateTextBox;
+    private DateTextBox dateToDateTextBox;
+
+    //The filter values the former HtmlInputText.Value / DateTextBox.Text carried.
+    private string dateFrom;
+    private string dateTo;
+    private string tranId;
+    private string tranCode;
+    private string book;
+    private string referenceNumber;
+    private string statementReference;
+    private string postedBy;
+    private string office;
+    private string status;
+    private string verifiedBy;
+    private string reason;
+
+    //What getSelectedItems() wrote into #SelectedValuesHidden, read back over interop.
+    private string selectedValues;
+
+    private object dataSource;
+    private readonly List<MixERPGridViewColumn> columns = new List<MixERPGridViewColumn>();
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Guards SetDefaultValues() so the consumer's defaults seed the filter boxes ONCE
+    ///     per component instance.
+    ///     <para>
+    ///         WebForms re-ran SetDefaultValues() on every postback too, but
+    ///         HtmlInputText/DateTextBox implement IPostBackDataHandler, so LoadPostData
+    ///         restored the user's posted values AFTER the seed - the user's edits won. There
+    ///         is no post-data phase in Blazor, so an unguarded OnParametersSet would snap
+    ///         the user's typed Book/Status/Office/Reason/TranCode back to the consumer's
+    ///         constants ("Journal"/"Approved"/…) on any parent re-render, and the next Show
+    ///         would silently re-query with the defaults. Recorded in
+    ///         migration-summary.md section 4.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private bool defaultsApplied;
+
+    #endregion
+
+    #region Lifecycle - Control/Control.cs CreateChildControls
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     The column set the grid binds against, built once. AddGridView() did this inside
+    ///     CreateChildControls(), before the first bind.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    protected override void OnInitialized()
+    {
+        GridViewColumnHelper.AddColumns(this.columns);
+
+        base.OnInitialized();
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Control/DefaultValues.cs SetDefaultValues(), ported verbatim.
+    ///     <para>
+    ///         CreateChildControls() ran it after building the fields and before BindGrid(),
+    ///         and the WebForms control was rebuilt whenever a property changed; the
+    ///         equivalent Blazor hook is OnParametersSet(). The TranId > 0 guard and the
+    ///         CultureInfo.InvariantCulture formatting are kept exactly - a TranId of 0
+    ///         must leave the box EMPTY (seeding "0" would filter the view to transaction 0
+    ///         and return nothing).
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    protected override void OnParametersSet()
+    {
+        this.SetDefaultValues();
+
+        base.OnParametersSet();
+    }
+
+    private void SetDefaultValues()
+    {
+        //One-shot: the user's own filter edits must survive a parent re-render. See the
+        //defaultsApplied field remarks.
+        if (this.defaultsApplied)
+        {
+            return;
+        }
+
+        this.defaultsApplied = true;
+
+        if (this.TranId > 0)
+        {
+            this.tranId = this.TranId.ToString(CultureInfo.InvariantCulture);
+        }
+
+        this.tranCode = this.TranCode;
+        this.book = this.Book;
+        this.referenceNumber = this.ReferenceNumber;
+        this.statementReference = this.StatementReference;
+        this.postedBy = this.PostedBy;
+        this.office = this.OfficeName;
+        this.status = this.Status;
+        this.verifiedBy = this.VerifiedBy;
+        this.reason = this.Reason;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Control/JavaScript.cs AddJavascript() + the first BindGrid().
+    ///     <para>
+    ///         ALL JS interop runs from OnAfterRenderAsync and NEVER from OnInitialized:
+    ///         TransactionViewFactory.js resolves $("#TransactionGridView") and
+    ///         $("#PrintButton") at PARSE time (they are module-level vars) and binds the
+    ///         print click and the row click immediately, so those elements must already be
+    ///         in the DOM. Registering the script earlier is legal C#, raises no error and
+    ///         leaves every client feature dead.
+    ///     </para>
+    ///     <para>
+    ///         BindGrid() also runs on the first render rather than in OnInitialized,
+    ///         because the two DateTextBox children only publish their initialised
+    ///         frequency dates through @bind-Text after their OWN first render - binding
+    ///         earlier would query with two empty dates.
+    ///     </para>
+    ///     <para>
+    ///         The initTransactionView() re-wiring call is NOT inside the firstRender
+    ///         branch, and that is deliberate. StateHasChanged() only QUEUES a re-render, so
+    ///         on the first pass the grid still has no data rows when this handler runs.
+    ///         More importantly Blazor REPLACES the grid's &lt;table&gt;/&lt;tr&gt; set on
+    ///         every later re-render (Show, a flag update), while the script element is
+    ///         injected only once per circuit - so any binding made once at load time is
+    ///         attached to rows that do not exist yet or are later discarded.
+    ///         initTransactionView() re-resolves #TransactionGridView / #PrintButton and
+    ///         re-binds the row click and the print click after EVERY render; it is
+    ///         idempotent (namespaced .off().on(), no cached lookups), so repeat calls
+    ///         rebind instead of stacking handlers. Without this, row-click selection, the
+    ///         Print button and the flag row colours render and silently do nothing -
+    ///         see migration-summary.md section 3.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            this.BindGrid();
+            this.StateHasChanged();
+
+            this.AddJavascript();
+        }
+
+        await this.InitClientWiringAsync();
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Calls the idempotent window.initTransactionView() so the grid's current rows
+    ///     carry their click handler and their flag colours, and the Print button its click.
+    /// </summary>
+    /// <remarks>
+    ///     The function is PROBED rather than called inside a blanket catch (the
+    ///     StockTransactionView / AttachmentFactory precedent). JSUtility.AddJSReference is
+    ///     a void, fire-and-forget API, so on the first render the script element may not
+    ///     have finished loading and "initTransactionView" is not defined yet - that case
+    ///     needs no retry, because the script's own $(document).ready self-initialisation
+    ///     wires the control as soon as it loads, and the next render calls this again.
+    ///     Swallowing every JSException instead would hide a genuine throw from INSIDE the
+    ///     function (missing jQuery, undefined Resources, absent toogleSelection /
+    ///     createFlaggedRows / printGridView), leaving a control that renders and silently
+    ///     does nothing.
+    /// </remarks>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private async Task InitClientWiringAsync()
+    {
+        bool ready;
+
+        try
+        {
+            ready = await this.JSRuntime.InvokeAsync<bool>("eval",
+                "typeof window.initTransactionView === 'function'");
+        }
+        catch (JSException)
+        {
+            //The circuit cannot evaluate script at all; the self-initialisation path in
+            //TransactionViewFactory.js is the remaining route and needs no action here.
+            return;
+        }
+
+        if (!ready)
+        {
+            return;
+        }
+
+        try
+        {
+            await this.JSRuntime.InvokeVoidAsync("initTransactionView");
+        }
+        catch (JSException ex)
+        {
+            //A real failure INSIDE initTransactionView. It must not be silent - that is the
+            //exact failure mode this guard exists to prevent. It is reported through
+            //ILogger and NOT through a rendered message: OnAfterRenderAsync does not
+            //trigger a re-render, so a field assigned here would never be painted, and
+            //calling StateHasChanged() to force one would loop (this path runs after EVERY
+            //render, so a persistent client fault would re-render -> re-init -> throw).
+            this.Logger?.LogError(ex,
+                "initTransactionView() failed; the TransactionView grid will render but its row-click selection, Print button and flag row colours will not be wired.");
+        }
+    }
+
+    private void AddJavascript()
+    {
+        JSUtility.AddJSReference(this.JSRuntime, "MixERP.Net.WebControls.TransactionViewFactory.TransactionViewFactory.js", "TransactionView", typeof(TransactionView));
+    }
+
+    #endregion
+
+    #region Grid - Control/GridPanel.cs BindGrid
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     The css class the grid's &lt;table&gt; carries: the consumer's own
+    ///     <see cref="GridViewCssClass" /> plus the class that rules the former
+    ///     <c>Attributes.Add("style", "min-width:1200px;max-width:2000px;")</c>.
+    ///     <para>
+    ///         Appended (not prepended) and space-separated, so the consumer's value - both
+    ///         call sites pass "ui table nowrap" - is unchanged, and so
+    ///         <c>MixERPGridView.GetTableCssClass()</c>'s own "ui striped table " prefix
+    ///         still composes correctly.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    internal const string GridCssClass = "transaction-view-grid";
+
+    private string GetGridViewCssClass()
+    {
+        if (string.IsNullOrWhiteSpace(this.GridViewCssClass))
+        {
+            return GridCssClass;
+        }
+
+        return this.GridViewCssClass + " " + GridCssClass;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Control/GridPanel.cs BindGrid(), ported verbatim - the same 15 arguments in the
+    ///     same order, read from the same 13 filter fields.
+    ///     <para>
+    ///         The separate DataBind() call disappears: MixERPGridView re-renders when its
+    ///         DataSource parameter changes. StateHasChanged() is called by the handlers
+    ///         that run outside Blazor's own render loop (OnAfterRenderAsync).
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private void BindGrid()
+    {
+        int userId = this.UserId;
+        int officeId = this.OfficeId;
+
+        DateTime from = Conversion.TryCastDate(this.dateFrom);
+        DateTime to = Conversion.TryCastDate(this.dateTo);
+        long tranIdValue = Conversion.TryCastLong(this.tranId);
+        string tranCodeValue = this.tranCode;
+        string bookValue = this.book;
+        string referenceNumberValue = this.referenceNumber;
+        string statementReferenceValue = this.statementReference;
+        string postedByValue = this.postedBy;
+        string officeValue = this.office;
+        string statusValue = this.status;
+        string verifiedByValue = this.verifiedBy;
+        string reasonValue = this.reason;
+
+        this.dataSource = Data.Journal.GetJournalView(this.Catalog, userId, officeId, from, to, tranIdValue, tranCodeValue, bookValue, referenceNumberValue, statementReferenceValue, postedByValue, officeValue, statusValue, verifiedByValue, reasonValue);
+    }
+
+    #endregion
+
+    #region Events - Control/Events.cs
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Control/Events.cs ShowButton_Click.
+    ///     <para>
+    ///         Both DateTextBoxes carried Required="true". In WebForms the generated
+    ///         RequiredFieldValidator would have blocked the postback and fed Page.IsValid;
+    ///         neither pipeline exists on net10.0, so the gate is the component's own
+    ///         Validate()/IsValid - the documented Page.IsValid replacement
+    ///         (MixERP.Net.WebControls.Common migration-summary section 5.6).
+    ///     </para>
+    ///     <para>
+    ///         HONEST NOTE ON ITS CURRENT EFFECT: neither box is given EnableValidation, and
+    ///         DateTextBox.Validate() returns immediately unless EnableValidation is set, so
+    ///         IsValid is always true and this gate is presently INERT. That is FAITHFUL to
+    ///         the original, which also never set EnableValidation - its validator markup
+    ///         was never rendered and Page.IsValid was always true, so a blank date queried
+    ///         with DateTime.MinValue then too. The gate is wired rather than omitted so the
+    ///         rule becomes live the moment EnableValidation is turned on, and turning it on
+    ///         is left as a deliberate behaviour change for the consumer, not something this
+    ///         migration introduces. See migration-summary.md section 3.
+    ///     </para>
+    ///     <para>
+    ///         BOTH boxes are validated before the IsValid check - short-circuiting on the
+    ///         first failure would leave the second box without its message.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private void ShowButton_Click()
+    {
+        if (!this.DatesAreValid())
+        {
+            return;
+        }
+
+        this.BindGrid();
+    }
+
+    private bool DatesAreValid()
+    {
+        if (this.dateFromDateTextBox != null)
+        {
+            this.dateFromDateTextBox.Validate();
+        }
+
+        if (this.dateToDateTextBox != null)
+        {
+            this.dateToDateTextBox.Validate();
+        }
+
+        if (this.dateFromDateTextBox != null && !this.dateFromDateTextBox.IsValid)
+        {
+            return false;
+        }
+
+        if (this.dateToDateTextBox != null && !this.dateToDateTextBox.IsValid)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Control/Events.cs Flag_Updated, keeping the same FlagUpdatedEventArgs payload
+    ///     type and both const resource strings verbatim. Only the subscription mechanism
+    ///     changed (WebForms event -> EventCallback).
+    ///     <para>
+    ///         The Flag component's OnClientClick ("return getSelectedItems();") publishes
+    ///         the selection into #SelectedValuesHidden on the client, but jQuery's .val()
+    ///         raises no event, so the value is read back over interop here BEFORE
+    ///         GetSelectedValues() parses it. Without the refresh the flag would be created
+    ///         against an empty collection and report success.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private async Task Flag_Updated(FlagUpdatedEventArgs e)
+    {
+        if (e == null)
+        {
+            return;
+        }
+
+        await this.RefreshSelectedValuesAsync();
+
+        int flagTypeId = e.FlagId;
+
+        const string resource = "transactions.transaction_master";
+        const string resourceKey = "transaction_master_id";
+
+        int userId = this.UserId;
+
+        TransactionGovernor.Flags.CreateFlag(this.Catalog, userId, flagTypeId, resource, resourceKey, this.GetSelectedValues());
+
+        this.BindGrid();
+    }
+
+    //Control/Events.cs TransactionGridView_RowDataBound had an EMPTY body, and
+    //MixERPGridView exposes no row-data-bound hook. There is nothing to port, so no
+    //handler is fabricated - recorded in migration-summary.md section 2.
+
+    #endregion
+
+    #region Selected values - Control/SelectedValues.cs
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Reads #SelectedValuesHidden - what getSelectedItems() wrote on the client - into
+    ///     the component's state.
+    ///     <para>
+    ///         TransactionViewFactory.js keeps its DOM contract and exposes no reader
+    ///         function of its own (its one addition is initTransactionView(), which
+    ///         re-wires bindings and does not read this field), so the field is read with a
+    ///         plain DOM expression. A missing element yields an empty string rather than a
+    ///         throw.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private async Task RefreshSelectedValuesAsync()
+    {
+        try
+        {
+            this.selectedValues = await this.JSRuntime.InvokeAsync<string>("eval",
+                "(function(){var e=document.getElementById('SelectedValuesHidden');return e?e.value:'';})()");
+        }
+        catch (JSException ex)
+        {
+            //The circuit cannot evaluate script (no browser, or scripting blocked). The
+            //PREVIOUS value is deliberately left in place rather than cleared - clearing it
+            //would turn a genuine interop fault into a silent no-op CreateFlag that reports
+            //success. The fault is reported through ILogger instead; if there genuinely was
+            //no selection, GetSelectedValues() still returns an empty collection and
+            //CreateFlag is a no-op, which is exactly what the original did.
+            this.Logger?.LogError(ex,
+                "Could not read #SelectedValuesHidden over JS interop; the TransactionView flag operation is using the last known selection.");
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Control/SelectedValues.cs GetSelectedValues(), ported byte-for-byte: blank -> an
+    ///     empty collection; split on ','; Conversion.TryCastInteger(value); and the
+    ///     ORIGINAL STRING - not the parsed int - is added when val > 0.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    private Collection<string> GetSelectedValues()
+    {
+        string selected = this.selectedValues;
+
+        //Check if something was selected.
+        if (string.IsNullOrWhiteSpace(selected))
+        {
+            return new Collection<string>();
+        }
+
+        //Create a collection object to store the IDs.
+        Collection<string> values = new Collection<string>();
+
+        //Iterate through each value in the selected values
+        //and determine if each value is a number.
+        foreach (string value in selected.Split(','))
+        {
+            //Parse the value to integer.
+            int val = Conversion.TryCastInteger(value);
+
+            if (val > 0)
+            {
+                values.Add(value);
+            }
+        }
+
+        return values;
+    }
+
+    #endregion
+}

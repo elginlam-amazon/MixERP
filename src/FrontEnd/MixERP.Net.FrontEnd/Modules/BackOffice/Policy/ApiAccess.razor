@@ -1,0 +1,235 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Policy/ApiAccess.ascx + .ascx.cs + .ascx.designer.cs - the API access policy
+   editor. OnControlLoad built a Scrud over policy.api_access_policy and added it to
+   <asp:PlaceHolder ID="ScrudPlaceholder">, which is this markup now, and then called
+   RegisterJavascript().
+
+   ⚠ AccessLevel.AdminOnly IS PRESERVED. MixERPAuthorization.CheckAccessLevelAsync enforces it
+   (AdminOnly requires View.IsAdmin) and logs "Access to {Control} is denied to {User} from
+   {IP}." on refusal. This table decides which user may call which HTTP action against which
+   POCO through the API, so it is the API's own authorization table - losing the gate would let
+   any signed-in user grant themselves API access.
+
+   ⚠ THE THREE Deny* FLAGS ARE A SECOND, INDEPENDENT GATE AND ARE ALSO PRESERVED, from
+   ICurrentLogin rather than AppUsers.GetCurrent() (which returns an EMPTY login, i.e.
+   IsAdmin == false, inside a Blazor circuit and would have made the form permanently read-only
+   for everyone). That is also why the Scrud renders only once `loaded` is true.
+
+   PageSize="100" and UseDisplayViewsAsParents="true" are carried across verbatim, as is the
+   fact that the VIEW IS THE TABLE ITSELF ("policy.api_access_policy") - there is no
+   *_scrud_view for it.
+
+   ⚠ Text IS A HARD-CODED ENGLISH LITERAL, "API Access Policy", not a Titles.* resource -
+   unlike every sibling screen. That is an upstream localization gap and it is preserved as
+   found rather than silently localized (there is no matching Titles key to point at).
+
+   ⚠ THE AppDomain TYPE SCAN IS REPLACED, NOT DROPPED. GetPocos() enumerated
+   `AppDomain.CurrentDomain.GetAssemblies().SelectMany(s => s.GetTypes())` for every IPoco
+   implementation and emitted their full names as the `pocos` javascript global. That scan is
+   unreliable on modern .NET (it only sees assemblies already JIT-loaded, so the list silently
+   depended on what the user had browsed to first) and it is exactly the pattern the host
+   replaced for ItemSelector: MixERP.Net.Framework.DiscoveryAssemblies.GetTypes() enumerates the
+   registration set Program.cs builds (16 explicit assemblies +
+   RegisterFrom(AppContext.BaseDirectory), which is where the 8 Modules/* assemblies land). It
+   is therefore the same intent, deterministically. The `IPoco` filter, the `t.FullName`
+   projection, the single-quote wrapping and the comma join are byte-identical, so the emitted
+   `var pocos = [...]` is the same shape the script already parses with
+   `window.pocos.toString().split(',')`.
+
+   THE INLINE <script> BLOCK MOVED to wwwroot/js/policy/ApiAccess.js (Blazor strips <script>
+   inside a .razor file). The `pocos` global is emitted FIRST, through the SAME "ApiAccess_Vars"
+   key PageUtility.RegisterJavascript used - but AWAITED, because PageUtility's own method is
+   fire-and-forget and the script reads that global. One block of the original script could not
+   be carried over and its purpose is preserved differently; the reason is documented at length
+   in that file's header (Sys.WebForms.PageRequestManager does not exist on ASP.NET Core, so
+   addPocoSelect() is re-invoked from OnAfterRenderAsync on every render instead).
+
+   The original declared no OverridePath, MasterPageId, RemoveTheme, IsLandingPage or
+   IsRestrictedMode override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using System.Reflection
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Core.Modules.BackOffice.Internal
+@using MixERP.Net.Entities.Contracts
+@using MixERP.Net.Framework
+@using MixERP.Net.WebControls.ScrudFactory
+@inject IJSRuntime JS
+
+@if (this.loaded)
+{
+    <Scrud KeyColumn="api_access_policy_id"
+           TableSchema="policy"
+           Table="api_access_policy"
+           ViewSchema="policy"
+           View="api_access_policy"
+           PageSize="100"
+           DisplayFields="@this.displayFields"
+           DisplayViews="@this.displayViews"
+           UseDisplayViewsAsParents="true"
+           DenyAdd="@this.denyToNonAdmins"
+           DenyEdit="@this.denyToNonAdmins"
+           DenyDelete="@this.denyToNonAdmins"
+           Text="API Access Policy" />
+}
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.BackOffice/js/policy/ApiAccess.js";
+
+    /// <summary>
+    ///     The <c>PageUtility.RegisterJavascript</c> key of the legacy
+    ///     <c>RegisterJavascript()</c>, preserved so the block is de-duplicated per document
+    ///     exactly as it was.
+    /// </summary>
+    private const string VariablesKey = "ApiAccess_Vars";
+
+    /// <summary>
+    ///     The legacy <c>public override AccessLevel AccessLevel</c>, carried across unchanged.
+    ///     <para>
+    ///         <c>MixERPUserControlBase.AccessLevel</c> is an ABSTRACT GET-ONLY property, so it is
+    ///         overridden rather than assigned - which is also what the probe needs:
+    ///         <c>ModuleHost.razor</c> reads the surface off an <c>Activator.CreateInstance</c>
+    ///         instance on which no lifecycle method runs, and a getter answers there.
+    ///     </para>
+    /// </summary>
+    public override AccessLevel AccessLevel
+    {
+        get { return AccessLevel.AdminOnly; }
+    }
+
+    private bool loaded;
+    private bool denyToNonAdmins;
+    private string displayFields;
+    private string displayViews;
+    private bool scriptLoaded;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the Scrud above (markup now) and called RegisterJavascript();
+    ///     the first needs the login and the catalog, which are asynchronous, and the second
+    ///     needs a rendered document, so both moved to OnInitializedAsync / OnAfterRenderAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        //Was: !AppUsers.GetCurrent().View.IsAdmin.ToBool()
+        this.denyToNonAdmins = !login.IsAdmin;
+
+        this.displayFields = GetDisplayFields(catalog);
+        this.displayViews = GetDisplayViews();
+        this.loaded = true;
+    }
+
+    /// <summary>
+    ///     ⚠ addPocoSelect() is re-invoked on EVERY render, not just the first. That is the
+    ///     replacement for the dropped
+    ///     <c>Sys.WebForms.PageRequestManager.add_endRequest(addPocoSelect)</c> hook: the Scrud
+    ///     replaces its form when the user switches between list and edit, and without this the
+    ///     POCO select would appear once and then vanish. The javascript side is idempotent
+    ///     (two guards), so the repeated call is free when nothing changed.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            //The `pocos` global must exist before the controller is appended - hence the awaited
+            //RunAsync, under the original registration key.
+            await ModuleScripts.RunAsync(this.JS, VariablesKey, GetVariablesScript());
+            await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+            this.scriptLoaded = true;
+            return;
+        }
+
+        if (!this.scriptLoaded)
+        {
+            return;
+        }
+
+        try
+        {
+            await this.JS.InvokeVoidAsync("addPocoSelect");
+        }
+        catch (JSException)
+        {
+            //The controller has not finished loading yet; the next render retries.
+        }
+    }
+
+    /// <summary>
+    ///     Port of the legacy <c>RegisterJavascript()</c>: the identical
+    ///     <c>var pocos = [...];</c> declaration the script parses.
+    /// </summary>
+    private static string GetVariablesScript()
+    {
+        return "var pocos = [" + GetPocos() + "];";
+    }
+
+    /// <summary>
+    ///     Port of the legacy <c>GetPocos()</c>. See the header: the
+    ///     <c>AppDomain.CurrentDomain.GetAssemblies()</c> scan became
+    ///     <c>DiscoveryAssemblies.GetTypes()</c>; the filter, the projection and the join are
+    ///     unchanged.
+    /// </summary>
+    private static string GetPocos()
+    {
+        Type type = typeof(IPoco);
+
+        List<Type> types = DiscoveryAssemblies.GetTypes()
+            .Where(p => type.IsAssignableFrom(p)).ToList();
+
+        List<string> items = types.Select(t => "'" + t.FullName + "'").ToList();
+        return string.Join(",", items);
+    }
+
+    private static string GetDisplayFields(string catalog)
+    {
+        List<string> displayFields = new List<string>();
+        ScrudHelper.AddDisplayField(displayFields, "office.users.user_id",
+            DbConfig.GetDbParameter(catalog, "UserDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "office.offices.office_id",
+            DbConfig.GetDbParameter(catalog, "OfficeDisplayField"));
+        //The third display field is a LITERAL column name, not a DbConfig parameter - the
+        //original's choice, preserved.
+        ScrudHelper.AddDisplayField(displayFields, "policy.http_actions.http_action_code", "http_action_code");
+        return string.Join(",", displayFields);
+    }
+
+    private static string GetDisplayViews()
+    {
+        List<string> displayViews = new List<string>();
+        ScrudHelper.AddDisplayView(displayViews, "office.users.user_id", "office.user_selector_view");
+        ScrudHelper.AddDisplayView(displayViews, "office.offices.office_id", "office.office_selector_view");
+        ScrudHelper.AddDisplayView(displayViews, "policy.http_actions.http_action_code", "policy.http_actions");
+        return string.Join(",", displayViews);
+    }
+}

@@ -1,0 +1,295 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Entry/Receipt.ascx + .ascx.cs + .ascx.designer.cs - the customer-receipt
+   ENTRY form. This control is driven ENTIRELY by wwwroot/js/entry/Receipt.js, which selects
+   every element below by LITERAL id, so the ids, css classes, inline styles and element
+   order are byte-identical to the original markup. Changing one renders the page but
+   silently breaks the receipt.
+
+   WHAT WENT WHERE:
+     * <asp:Literal> x 24 + InitializeResourceStrings() -> the @Titles.* expressions inline.
+       InitializeResourceStrings() existed ONLY to assign those Literal.Text values, so it
+       has no counterpart; every string it set is rendered below, in the same place.
+     * <asp:PlaceHolder ID="Placeholder1"> + `new PartyControl()` -> <PartyControl />.
+       PartyControl is a Blazor component now and takes no parameters.
+     * <asp:ScriptManagerProxy> -> DROPPED. It registered the page with the WebForms
+       ScriptManager/UpdatePanel partial-rendering pipeline, which does not exist on
+       net10.0 and which this control never used (Receipt.js talks to the service
+       endpoints with plain jQuery ajax, not with an async postback).
+     * <mixerp:DateTextBox ...> -> <DateTextBox ...>, the migrated Blazor component.
+       REVIEW: the original also passed AssociatedControlId="Trigger1". The migrated
+       MixERP.Net.WebControls.Common.DateTextBox exposes no such parameter (and there is no
+       control with id "Trigger1" anywhere in this control, so the association pointed at
+       nothing) - the attribute is therefore not carried, which changes no rendered output.
+     * the inline `var exchangeRateLocalized = "<%= this.ExchangeRateLocalized() %>";`
+       block -> registered through the SAME mechanism PageUtility.RegisterJavascript uses,
+       and AWAITED, so the global exists before Receipt.js (which reads it) is appended.
+     * <script src="..."> -> OnAfterRenderAsync; a .razor file may not contain <script>.
+
+   PRESERVED SURFACE: OverridePath = "/Modules/Sales/Receipt.mix" (from the <%@ Control %>
+   directive, assigned in the CONSTRUCTOR because ModuleHost.razor reads it off an
+   Activator-created probe instance) and ITransaction (read by the host's
+   CheckTransactionPostingStatusAsync to enforce RestrictedTransactionMode). *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@implements MixERP.Net.Entities.Contracts.ITransaction
+@using MixERP.Net.Common
+@using MixERP.Net.Core.Modules.Sales.Internal
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.WebControls.PartyControl
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<h2>
+    @Titles.SalesReceipt
+</h2>
+
+<PartyControl />
+
+<div id="receipt" class="">
+    <div class="row ui grid fluid form segment">
+        <div class="four wide column">
+            <div class="field">
+                <label for="DueAmountInputText">
+                    @Titles.TotalDueAmountInBaseCurrency
+                </label>
+                <input type="text" id="DueAmountInputText" readonly="readonly" class="currency" />
+            </div>
+            <div class="field">
+                <label for="CurrencyInputText">
+                    @Titles.BaseCurrency
+                </label>
+                <input type="text" id="CurrencyInputText" readonly="readonly" class="text-right" />
+            </div>
+
+            <div class="field">
+                <label for="CurrencySelect">
+                    @Titles.ReceivedCurrency
+                </label>
+                <select id="CurrencySelect" class="text-right"></select>
+            </div>
+            <div class="field">
+                <label for="AmountInputText">
+                    @Titles.ReceivedAmountInaboveCurrency
+                </label>
+                <input type="text" id="AmountInputText" class="currency" />
+            </div>
+            <div class="field">
+                <label for="DebitExchangeRateInputText">
+                    @Titles.ExchangeRate
+                </label>
+                <input type="text" id="DebitExchangeRateInputText" class="decimal4 text-right" />
+            </div>
+            <div class="field">
+                <label for="AmountInHomeCurrencyInputText">
+                    @Titles.ConvertedtoHomeCurrency
+                </label>
+                <input type="text" id="AmountInHomeCurrencyInputText" class="currency" readonly="readonly" />
+            </div>
+
+            <div class="field">
+                <label for="CreditExchangeRateInputText">
+                    @Titles.ExchangeRate
+                </label>
+                <input type="text" id="CreditExchangeRateInputText" class="decimal4 text-right" />
+            </div>
+            <div class="field">
+                <label for="BaseAmountInputText">
+                    @Titles.ConvertedtoBaseCurrency
+                </label>
+                <input type="text" id="BaseAmountInputText" readonly="readonly" class="currency text-right" />
+            </div>
+
+            <div class="field">
+                <label for="FinalDueAmountInputText">
+                    @Titles.FinalDueAmountinBaseCurrency
+                </label>
+                <input type="text" id="FinalDueAmountInputText" readonly="readonly" class="currency text-right" />
+            </div>
+        </div>
+        <div class="four wide column">
+            <div class="field">
+                <label>
+                    @Titles.ReceiptType
+                </label>
+                <div class="vpad8" id="ReceiptType">
+
+                    <div class="blue ui buttons">
+                        <input type="button" class="ui active button" id="CashButton" value="Cash" />
+                        <div class="or"></div>
+                        <input type="button" class="ui button" id="BankButton" value="Bank" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="field">
+                <label for="CostCenterSelect">
+                    @Titles.CostCenter
+                </label>
+                <select id="CostCenterSelect"></select>
+            </div>
+
+            <div id="CashFormGroup" style="padding-bottom: 12px;">
+                <div class="field">
+                    <label for="CashRepositorySelect">
+                        @Titles.CashRepository
+                    </label>
+                    <select id="CashRepositorySelect"></select>
+                </div>
+            </div>
+
+            <div id="BankFormGroup" style="display: none; padding-bottom: 12px;">
+                <div class="field">
+                    <label for="BankSelect">
+                        @Titles.WhichBank
+                    </label>
+                    <select id="BankSelect"></select>
+                </div>
+
+                <div class="field">
+                    <label for="PaymentCardSelect">
+                        @Titles.SelectPaymentCard
+                    </label>
+                    <select id="PaymentCardSelect"></select>
+                </div>
+                <div class="two fields">
+                    <div class="field">
+                        <label for="MerchantFeeInputText">
+                            @Titles.MerchantFeeInPercent
+                        </label>
+                        <input type="text" id="MerchantFeeInputText" readonly="readonly" />
+                    </div>
+                    <div class="field">
+                        <label>
+                            @Titles.CustomerPaysFees
+                        </label>
+                        <div class="ui checkbox">
+                            <input type="radio" disabled="disabled" id="CustomerPaysFeeRadio" />
+                            <label>
+                                @Titles.Yes
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="PostedDateTextBox">
+                        @Titles.PostedDate
+                    </label>
+
+                    <DateTextBox ID="PostedDateTextBox"
+                                 CssClass="date"
+                                 Required="true" />
+                </div>
+                <div class="field">
+                    <label for="InstrumentCodeInputText">
+                        @Titles.InstrumentCode
+                    </label>
+                    <input type="text" id="InstrumentCodeInputText" />
+                </div>
+
+                <div class="field">
+                    <label for="TransactionCodeInputText">
+                        @Titles.BankTransactionCode
+                    </label>
+                    <input type="text" id="TransactionCodeInputText" />
+                </div>
+            </div>
+
+            <div class="field">
+                <label for="ReferenceNumberInputText">
+                    @Titles.ReferenceNumber
+                </label>
+                <input type="text" id="ReferenceNumberInputText" />
+            </div>
+
+            <div class="field">
+                <label for="StatementReferenceTextArea">
+                    @Titles.StatementReference
+                </label>
+                <textarea id="StatementReferenceTextArea" rows="3"></textarea>
+            </div>
+            <button type="button" id="SaveButton" class="ui small submit button green">
+                @Titles.Save
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    ///     The registration key of the globals block below. The original emitted the block
+    ///     inline, so it had no key; this one is the control's own name, which is the convention
+    ///     the host's converted pages use (SignInPage_Vars, InstallPage_Vars).
+    /// </summary>
+    private const string VariablesKey = "SalesReceiptPage_Vars";
+
+    public Receipt()
+    {
+        //<%@ Control ... OverridePath="/Modules/Sales/Receipt.mix" %>
+        this.OverridePath = "/Modules/Sales/Receipt.mix";
+    }
+
+    /// <summary>
+    ///     Preserved verbatim from the code-behind. It was called from the .ascx's inline
+    ///     &lt;%= %&gt; expression, and is kept public because it is the public surface the
+    ///     emitted javascript global is built from.
+    /// </summary>
+    public string ExchangeRateLocalized()
+    {
+        return Titles.ExchangeRate;
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body added the PartyControl to the placeholder and called
+    ///     InitializeResourceStrings() - the first is the &lt;PartyControl /&gt; element above and
+    ///     the second only assigned Literal.Text values, which are the @@Titles.* expressions in
+    ///     the markup, so nothing is left for this hook to do.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        //The inline block of the .ascx, with the SAME value. It is registered through the same
+        //interop module + "runScript" function + de-duplication key that
+        //PageUtility.RegisterJavascript uses, but AWAITED here: PageUtility's own method is
+        //fire-and-forget (it is a frozen void API), and Receipt.js reads
+        //exchangeRateLocalized, so the ordering has to be guaranteed.
+        string script = "var exchangeRateLocalized = \"" + this.ExchangeRateLocalized() + "\";";
+
+        IJSObjectReference interop = await this.JS
+            .InvokeAsync<IJSObjectReference>("import", PageUtility.InteropModulePath);
+
+        await interop.InvokeVoidAsync("runScript", VariablesKey, script);
+
+        await ModuleScripts.LoadAsync(this.JS,
+            "_content/MixERP.Net.Core.Modules.Sales/js/entry/Receipt.js");
+    }
+}

@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Net.Mail;
+//System.Net.Mail.SmtpDeliveryMethod replaced by the local EmailDeliveryMethod enum.
 
 namespace MixERP.Net.Messaging.Email
 {
@@ -26,7 +26,7 @@ namespace MixERP.Net.Messaging.Email
         public string Address { get; set; }
         public int Port { get; set; }
         public bool EnableSSL { get; set; }
-        public SmtpDeliveryMethod DeliveryMethod { get; set; }
+        public EmailDeliveryMethod DeliveryMethod { get; set; }
         public string PickupDirectory { get; set; }
     }
 }

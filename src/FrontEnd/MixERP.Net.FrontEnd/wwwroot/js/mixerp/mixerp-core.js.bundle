@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<bundle xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://vswebessentials.com/schemas/v1/bundle.xsd">
+  <settings>
+    <!--Determines if the bundle file should be automatically optimized after creation/update.-->
+    <minify>false</minify>
+    <!--Determine whether to generate/re-generate this bundle on building the solution.-->
+    <runOnBuild>true</runOnBuild>
+    <!--Specifies a custom subfolder to save files to. By default, compiled output will be placed in the same folder and nested under the original file.-->
+    <outputDirectory />
+  </settings>
+  <!--The order of the <file> elements determines the order of the files in the bundle.-->
+  <files>
+    <file>/js/mixerp/core/dom/cascading-pair.js</file>
+    <file>/js/mixerp/core/dom/checkable.js</file>
+    <file>/js/mixerp/core/dom/document.js</file>
+    <file>/js/mixerp/core/dom/events.js</file>
+    <file>/js/mixerp/core/dom/loader.js</file>
+    <file>/js/mixerp/core/dom/popunder.js</file>
+    <file>/js/mixerp/core/dom/select.js</file>
+    <file>/js/mixerp/core/dom/visibility.js</file>
+    <file>/js/mixerp/core/grid/cell.js</file>
+    <file>/js/mixerp/core/grid/grid.js</file>
+    <file>/js/mixerp/core/grid/print-grid.js</file>
+    <file>/js/mixerp/core/libraries/chartjs.js</file>
+    <file>/js/mixerp/core/libraries/colorbox.js</file>
+    <file>/js/mixerp/core/libraries/jquery-notify.js</file>
+    <file>/js/mixerp/core/libraries/semantic-ui.js</file>
+    <file>/js/mixerp/core/prototype/string.js</file>
+    <file>/js/mixerp/core/aspnet-validation.js</file>
+    <file>/js/mixerp/core/conversion.js</file>
+    <file>/js/mixerp/core/date-expressions.js</file>
+    <file>/js/mixerp/core/browser.js</file>
+    <file>/js/mixerp/core/flag.js</file>
+    <file>/js/mixerp/core/json.js</file>
+    <file>/js/mixerp/core/localization.js</file>
+    <file>/js/mixerp/core/location.js</file>
+    <file>/js/mixerp/core/mixerp-ajax.js</file>
+    <file>/js/mixerp/core/transaction.js</file>
+    <file>/js/mixerp/core/validation.js</file>
+    <file>/js/mixerp/core/window.js</file>
+    <file>/js/mixerp/core/dom/cascading-pair.js</file>
+    <file>/js/mixerp/core/dom/checkable.js</file>
+    <file>/js/mixerp/core/dom/document.js</file>
+    <file>/js/mixerp/core/dom/events.js</file>
+    <file>/js/mixerp/core/dom/popunder.js</file>
+    <file>/js/mixerp/core/dom/select.js</file>
+    <file>/js/mixerp/core/dom/visibility.js</file>
+    <file>/js/mixerp/core/grid/cell.js</file>
+    <file>/js/mixerp/core/grid/grid.js</file>
+    <file>/js/mixerp/core/grid/print-grid.js</file>
+    <file>/js/mixerp/core/libraries/chartjs.js</file>
+    <file>/js/mixerp/core/libraries/colorbox.js</file>
+    <file>/js/mixerp/core/libraries/jquery-notify.js</file>
+    <file>/js/mixerp/core/libraries/semantic-ui.js</file>
+    <file>/js/mixerp/core/prototype/string.js</file>
+  </files>
+</bundle>

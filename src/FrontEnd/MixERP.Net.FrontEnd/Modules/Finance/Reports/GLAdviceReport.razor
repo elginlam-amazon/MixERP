@@ -1,0 +1,137 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Reports/GLAdviceReport.ascx + .ascx.cs + .ascx.designer.cs - the GL advice for a
+   single transaction, opened by the journal voucher check list's "Print GL Entry" button and
+   by the Account Statement grid's print icon.
+
+   `WebReport` NO LONGER EXISTS (it was a one-property Report subclass that set Catalog from
+   AppUsers.GetCurrentUserDB(), which is EMPTY inside a circuit), so <Report> is hosted
+   directly with Catalog from ICurrentLogin.
+
+   THE TranCode FALLBACK IS REAL LOGIC, NOT TRANSPORT, and is preserved exactly: the screen is
+   reached EITHER with ?TranId= (from the check list) OR with ?TranCode= (from the account
+   statement), and when the id is absent-or-zero and a code is present it resolves the id with
+   Transaction.GetTranIdByTranCode(catalog, tranCode). Dropping it would make every
+   account-statement print icon render an empty advice. It needs the catalog, so the resolution
+   runs in OnInitializedAsync and the resolved id is pushed into the report from OnAfterRender.
+
+   AutoInitialize IS DELIBERATELY FALSE, with InitializeReport() called from OnAfterRender once
+   the @ref exists - the migrated Report component honours AutoInitialize from OnParametersSet,
+   which runs BEFORE a parent can reach the child through @ref, so "true" would initialize with
+   an EMPTY parameter collection and render blank.
+
+   ODDITY OF THE ORIGINAL, PRESERVED VERBATIM: the single-entry parameter list is handed to
+   AddParameterToCollection TWICE, so the collection carries it twice. That is what
+   Transactions.GLEntry.xml was fed.
+
+   PRESERVED SURFACE: MasterPageId = "MixERPReportMaster.Master", RemoveTheme = true AND
+   OverridePath = "/Modules/Finance/JournalVoucher.mix" - the only Finance REPORT with an
+   OverridePath, which is what lets a user who may reach the journal voucher menu item reach
+   this advice. All three are assigned in the CONSTRUCTOR because ModuleHost.razor reads them
+   off an Activator.CreateInstance probe instance on which no lifecycle method runs. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using System.Collections.ObjectModel
+@using System.Globalization
+@using MixERP.Net.Common
+@using MixERP.Net.Core.Modules.Finance.Data.Helpers
+@using MixERP.Net.Core.Modules.Finance.Internal
+@using MixERP.Net.WebControls.ReportEngine
+@using MixERP.Net.i18n.Resources
+@inject NavigationManager Navigation
+
+@if (this.loaded)
+{
+    <Report @ref="this.report" AutoInitialize="false" Catalog="@this.catalog" Path="@ReportFilePath"
+            RunningTotalText="@Titles.RunningTotal" />
+}
+
+@code {
+    private const string ReportFilePath = "~/Modules/Finance/Reports/Source/Transactions.GLEntry.xml";
+
+    private Report report;
+    private bool loaded;
+    private bool initializePending;
+    private string catalog;
+    private string tranId;
+
+    public GLAdviceReport()
+    {
+        //<%@ Control ... MasterPageId="MixERPReportMaster.Master" RemoveTheme="true"
+        //              OverridePath="/Modules/Finance/JournalVoucher.mix" %>
+        this.MasterPageId = "MixERPReportMaster.Master";
+        this.RemoveTheme = true;
+        this.OverridePath = "/Modules/Finance/JournalVoucher.mix";
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the report (markup now) and resolved the transaction id, which
+    ///     needs the asynchronous catalog and therefore lives in OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        //Port of the TranId / TranCode resolution, verbatim.
+        this.tranId = ModuleQuery.Get(this.Navigation, "TranId");
+        string tranCode = ModuleQuery.Get(this.Navigation, "TranCode");
+
+        if (Conversion.TryCastLong(this.tranId).Equals(0))
+        {
+            if (!string.IsNullOrWhiteSpace(tranCode))
+            {
+                this.tranId = Transaction.GetTranIdByTranCode(this.catalog, tranCode)
+                    .ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
+        this.loaded = true;
+        this.initializePending = true;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        base.OnAfterRender(firstRender);
+
+        if (!this.initializePending || this.report == null)
+        {
+            return;
+        }
+
+        this.initializePending = false;
+
+        Collection<KeyValuePair<string, object>> list = new Collection<KeyValuePair<string, object>>();
+        list.Add(new KeyValuePair<string, object>("@transaction_master_id", this.tranId));
+
+        this.report.ParameterCollection.Clear();
+        this.report.AddParameterToCollection(list);
+        this.report.AddParameterToCollection(list);
+        this.report.InitializeReport();
+        this.StateHasChanged();
+    }
+}

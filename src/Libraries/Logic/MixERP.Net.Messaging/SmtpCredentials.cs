@@ -17,13 +17,12 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Security;
 
 namespace MixERP.Net.Messaging.Email
 {
     public sealed class SmtpCredentials : ICredentials
     {
         public string Username { get; set; }
-        public SecureString Password { get; set; }
+        public string Password { get; set; }
     }
 }

@@ -19,16 +19,23 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.Framework;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Web.Hosting;
+//MIGRATION: System.Web.Hosting.HostingEnvironment.MapPath has no counterpart on ASP.NET
+//Core. MixERPConfiguration.MapPath is the documented equivalent - it resolves an
+//application-relative ("~/x" or "x/y") path against the CONTENT ROOT, which is exactly what
+//HostingEnvironment.MapPath resolved against, and is the resolver every other MixERP path read
+//now uses. Both values resolved here are content-root paths, not wwwroot ones: the report
+//container comes from Resource/Configs/ReportParameters.config and License.txt sits at the
+//application root, so neither is (or was) served over HTTP.
 
 namespace MixERP.Net.Core.Modules.BackOffice.Models
 {
     public sealed class ReportDefinition
     {
         private static readonly string reportContainer =
-            HostingEnvironment.MapPath(ConfigurationHelper.GetReportParameter("ReportContainer"));
+            MixERPConfiguration.MapPath(ConfigurationHelper.GetReportParameter("ReportContainer"));
 
         public string Title { get; set; }
         public string FileName { get; set; }
@@ -57,8 +64,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Models
                 this.FileName += ".xml";
             }
 
-            string path = Path.Combine(reportContainer, this.FileName);
-
+            string path = ResolveContainedPath(this.FileName);
 
             ReportBuilder builder = new ReportBuilder(this);
 
@@ -69,7 +75,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Models
 
         public ReportDefinition Get(string fileName)
         {
-            string file = Path.Combine(reportContainer, fileName);
+            string file = ResolveContainedPath(fileName);
 
             if (File.Exists(file))
             {
@@ -79,6 +85,53 @@ namespace MixERP.Net.Core.Modules.BackOffice.Models
             }
 
             return new ReportDefinition();
+        }
+
+        /// <summary>
+        ///     Resolves a caller-supplied report file name INSIDE the report container and refuses
+        ///     anything that escapes it.
+        ///     <para>
+        ///         The legacy code did a bare <c>Path.Combine(reportContainer, fileName)</c>. The
+        ///         file name arrives from the ReportWriter service, so a value containing
+        ///         <c>..</c> (or a rooted path, which <c>Path.Combine</c> would let win outright)
+        ///         wrote a caller-controlled XML document anywhere the process could reach. The
+        ///         four routes are now administrator-only, but the containment check is the actual
+        ///         fix and matches the one the attachment endpoints use.
+        ///     </para>
+        /// </summary>
+        private static string ResolveContainedPath(string fileName)
+        {
+            //Discard any directory component: a report definition has never legitimately lived in
+            //a subdirectory of the container.
+            string leaf = Path.GetFileName(fileName);
+
+            if (string.IsNullOrWhiteSpace(leaf))
+            {
+                throw new MixERPException("Invalid file name \"" + fileName + "\".");
+            }
+
+            string root = Path.GetFullPath(reportContainer);
+
+            string resolved;
+
+            try
+            {
+                resolved = Path.GetFullPath(Path.Combine(root, leaf));
+            }
+            catch (ArgumentException)
+            {
+                throw new MixERPException("Invalid file name \"" + fileName + "\".");
+            }
+
+            string prefix = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                            + Path.DirectorySeparatorChar;
+
+            if (!resolved.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                throw new MixERPException("Invalid file name \"" + fileName + "\".");
+            }
+
+            return resolved;
         }
     }
 }

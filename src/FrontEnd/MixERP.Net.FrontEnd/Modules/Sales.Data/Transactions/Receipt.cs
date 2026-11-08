@@ -19,6 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common;
 using Npgsql;
+using NpgsqlTypes;
 using System;
 
 namespace MixERP.Net.Core.Modules.Sales.Data.Transactions
@@ -58,13 +59,13 @@ namespace MixERP.Net.Core.Modules.Sales.Data.Transactions
                 command.Parameters.AddWithValue("@UserId", userId);
                 command.Parameters.AddWithValue("@OfficeId", officeId);
                 command.Parameters.AddWithValue("@LoginId", loginId);
-                command.Parameters.AddWithValue("@PartyCode", partyCode);
-                command.Parameters.AddWithValue("@CurrencyCode", currencyCode);
+                command.Parameters.AddWithValue("@PartyCode", partyCode ?? (object)DBNull.Value);
+                command.Parameters.AddWithValue("@CurrencyCode", currencyCode ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("@Amount", amount);
                 command.Parameters.AddWithValue("@DebitExchangeRate", debitExchangeRate);
                 command.Parameters.AddWithValue("@CreditExchangeRate", creditExchangeRate);
-                command.Parameters.AddWithValue("@ReferenceNumber", referenceNumber);
-                command.Parameters.AddWithValue("@StatementReference", statementReference);
+                command.Parameters.AddWithValue("@ReferenceNumber", referenceNumber ?? (object)DBNull.Value);
+                command.Parameters.AddWithValue("@StatementReference", statementReference ?? (object)DBNull.Value);
 
                 if (costCenterId.Equals(0))
                 {
@@ -102,17 +103,23 @@ namespace MixERP.Net.Core.Modules.Sales.Data.Transactions
                     command.Parameters.AddWithValue("@PaymentCardId", paymentCardId);
                 }
 
+                //Npgsql 6+ maps the PostgreSQL "date" type to DateOnly, so the nullable DateTime
+                //must be bound with an explicit NpgsqlDbType.Date for @PostedDate::date to resolve.
+                NpgsqlParameter postedDateParameter = new NpgsqlParameter("@PostedDate", NpgsqlDbType.Date);
+
                 if (postedDate == null)
                 {
-                    command.Parameters.AddWithValue("@PostedDate", DBNull.Value);
+                    postedDateParameter.Value = DBNull.Value;
                 }
                 else
                 {
-                    command.Parameters.AddWithValue("@PostedDate", postedDate);
+                    postedDateParameter.Value = postedDate.Value.Date;
                 }
 
-                command.Parameters.AddWithValue("@BankInstrumentCode", bankInstrumentCode);
-                command.Parameters.AddWithValue("@BankTransactionCode", bankTransactionCode);
+                command.Parameters.Add(postedDateParameter);
+
+                command.Parameters.AddWithValue("@BankInstrumentCode", bankInstrumentCode ?? (object)DBNull.Value);
+                command.Parameters.AddWithValue("@BankTransactionCode", bankTransactionCode ?? (object)DBNull.Value);
 
                 return Conversion.TryCastLong(DbFactory.DbOperation.GetScalarValue(catalog, command));
             }

@@ -20,17 +20,37 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.ScrudFactory.Helpers;
 using System;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
 {
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Builds the integral-number field (smallint / integer / bigint and their MixERP strict
+    ///     domains) of the schema-driven scrud form.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
     internal static class ScrudNumberTextBox
     {
-        internal static void AddNumberTextBox(HtmlTable htmlTable, string resourceClassName, string columnName, string defaultValue, bool isSerial, bool isNullable, int maxLength, string domain, string errorCssClass, bool disabled)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>AddNumberTextBox(HtmlTable, …)</c>, branch for branch:
+        ///     <list type="bullet">
+        ///         <item>a <c>nextVal</c> default (a PostgreSQL sequence call, matched
+        ///         case-insensitively) is NOT written into the field — the database supplies it;</item>
+        ///         <item><c>disabled</c> makes the input read-only;</item>
+        ///         <item>a SERIAL column is forced read-only and gets NO required rule, because the
+        ///         original's <c>if (isSerial) … else { if (!isNullable) … }</c> structure skipped
+        ///         the required validator and the indicator-suffixed label for it entirely;</item>
+        ///         <item>a non-serial, non-nullable column gets the required rule and the
+        ///         <c>Titles.RequiredFieldIndicator</c>-suffixed label.</item>
+        ///     </list>
+        ///     The number rule is attached in every case, as the original always passed
+        ///     <c>numberValidator</c> to <c>AddRow</c>.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        internal static void AddNumberTextBox(ScrudFieldTable fieldTable, string resourceClassName, string columnName, string defaultValue, bool isSerial, bool isNullable, int maxLength, string domain, string errorCssClass, bool disabled)
         {
-            if (htmlTable == null)
+            if (fieldTable == null)
             {
                 return;
             }
@@ -40,71 +60,93 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
                 return;
             }
 
-            using (TextBox textBox = ScrudTextBox.GetTextBox(columnName + "_textbox", maxLength))
+            ScrudField field = ScrudTextBox.GetTextBox(columnName + "_textbox", maxLength);
+
+            if (field == null)
             {
-                using (CompareValidator numberValidator = GetNumberValidator(textBox, domain, errorCssClass))
+                return;
+            }
+
+            field.ColumnName = columnName;
+            field.Kind = ScrudFieldKind.NumberTextBox;
+            field.Domain = domain;
+            field.IsNullable = isNullable;
+            field.IsSerial = isSerial;
+            field.ValidatorCssClass = errorCssClass;
+
+            field.AddRule(GetNumberValidator(field, domain, errorCssClass));
+
+            string label = ScrudLocalizationHelper.GetResourceString(resourceClassName, columnName);
+
+            if (!string.IsNullOrWhiteSpace(defaultValue))
+            {
+                if (!defaultValue.StartsWith("nextVal", StringComparison.OrdinalIgnoreCase))
                 {
-                    string label = ScrudLocalizationHelper.GetResourceString(resourceClassName, columnName);
-
-                    if (!string.IsNullOrWhiteSpace(defaultValue))
-                    {
-                        if (!defaultValue.StartsWith("nextVal", StringComparison.OrdinalIgnoreCase))
-                        {
-                            textBox.Text = defaultValue;
-                        }
-                    }
-
-                    textBox.ReadOnly = disabled;
-
-                    if (isSerial)
-                    {
-                        textBox.ReadOnly = true;
-                    }
-                    else
-                    {
-                        if (!isNullable)
-                        {
-                            using (RequiredFieldValidator required = ScrudFactoryHelper.GetRequiredFieldValidator(textBox, errorCssClass))
-                            {
-                                ScrudFactoryHelper.AddRow(htmlTable, label + Titles.RequiredFieldIndicator, textBox, numberValidator, required);
-                                return;
-                            }
-                        }
-                    }
-
-                    ScrudFactoryHelper.AddRow(htmlTable, label, textBox, numberValidator);
+                    field.Value = defaultValue;
                 }
             }
+
+            field.ReadOnly = disabled;
+
+            if (isSerial)
+            {
+                field.ReadOnly = true;
+            }
+            else
+            {
+                if (!isNullable)
+                {
+                    field.Label = label + Titles.RequiredFieldIndicator;
+                    field.AddRule(ScrudFactoryHelper.GetRequiredFieldValidator(field, errorCssClass));
+                    fieldTable.Add(field);
+                    return;
+                }
+            }
+
+            field.Label = label;
+            fieldTable.Add(field);
         }
 
-
-        private static CompareValidator GetNumberValidator(Control controlToValidate, string domain, string cssClass)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>GetNumberValidator</c>. The <c>CompareValidator</c>
+        ///     (<c>Type = ValidationDataType.Integer</c>, <c>ValueToCompare = "0"</c>,
+        ///     <c>ErrorMessage = "&lt;br/&gt;" + Titles.OnlyNumbersAllowed</c>) is a removed type, so
+        ///     the RULE is re-expressed as a <see cref="ScrudValidationRule" /> that
+        ///     <see cref="ScrudField.Validate" /> enforces server-side.
+        ///     <para>
+        ///         The MixERP strict-domain switch is preserved exactly: a domain name ending in
+        ///         <c>strict</c> compares <c>GreaterThan</c> (so zero is rejected), anything else
+        ///         <c>GreaterThanEqual</c>.
+        ///     </para>
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private static ScrudValidationRule GetNumberValidator(ScrudField fieldToValidate, string domain, string cssClass)
         {
-            using (CompareValidator validator = new CompareValidator())
+            if (fieldToValidate == null)
             {
-                validator.ID = controlToValidate.ID + "NumberValidator";
-                validator.ErrorMessage = @"<br/>" + Titles.OnlyNumbersAllowed;
-                validator.CssClass = cssClass;
-                validator.ControlToValidate = controlToValidate.ID;
-                validator.EnableClientScript = true;
-                validator.SetFocusOnError = true;
-                validator.Display = ValidatorDisplay.Dynamic;
-                validator.Type = ValidationDataType.Integer;
-
-                //MixERP strict data type
-                if (domain.EndsWith("strict"))
-                {
-                    validator.Operator = ValidationCompareOperator.GreaterThan;
-                }
-                else
-                {
-                    validator.Operator = ValidationCompareOperator.GreaterThanEqual;
-                }
-
-                validator.ValueToCompare = "0";
-
-                return validator;
+                return null;
             }
+
+            ScrudValidationRule validator = new ScrudValidationRule();
+            validator.Id = fieldToValidate.ElementId + "NumberValidator";
+            validator.ErrorMessage = @"<br/>" + Titles.OnlyNumbersAllowed;
+            validator.CssClass = cssClass;
+            validator.DataType = ScrudValidationDataType.Integer;
+
+            //MixERP strict data type
+            if (domain != null && domain.EndsWith("strict", StringComparison.Ordinal))
+            {
+                validator.Operator = ScrudCompareOperator.GreaterThan;
+            }
+            else
+            {
+                validator.Operator = ScrudCompareOperator.GreaterThanEqual;
+            }
+
+            validator.ValueToCompare = "0";
+
+            return validator;
         }
     }
 }

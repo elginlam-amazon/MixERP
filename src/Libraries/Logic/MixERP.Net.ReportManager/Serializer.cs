@@ -1,6 +1,5 @@
 ﻿using MixERP.Net.Common.Helpers;
 using System.IO;
-using System.Web.Hosting;
 
 namespace MixERP.Net.ReportManager
 {
@@ -10,7 +9,9 @@ namespace MixERP.Net.ReportManager
 
         internal Serializer(string fileName, string content)
         {
-            string targetDirectory = HostingEnvironment.MapPath(ConfigurationHelper.GetReportParameter("ReportContainer"));
+            //MixERPConfiguration.MapPath is the modern .NET replacement for
+            //System.Web.Hosting.HostingEnvironment.MapPath, which does not exist off System.Web.
+            string targetDirectory = MixERPConfiguration.MapPath(ConfigurationHelper.GetReportParameter("ReportContainer"));
             this.Content = content;
 
             if (targetDirectory == null || !Directory.Exists(targetDirectory))

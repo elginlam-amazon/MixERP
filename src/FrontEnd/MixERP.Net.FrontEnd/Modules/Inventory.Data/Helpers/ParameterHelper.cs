@@ -1,6 +1,7 @@
 ﻿using MixERP.Net.Entities;
 using MixERP.Net.Entities.Models.Transactions;
 using Npgsql;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -42,10 +43,12 @@ namespace MixERP.Net.Core.Modules.Inventory.Data.Helpers
                         type = "Dr";
                     }
 
-                    collection.Add(new NpgsqlParameter("@TranType" + i, type));
-                    collection.Add(new NpgsqlParameter("@StoreName" + i, details[i].StoreName));
-                    collection.Add(new NpgsqlParameter("@ItemCode" + i, details[i].ItemCode));
-                    collection.Add(new NpgsqlParameter("@UnitName" + i, details[i].UnitName));
+                    // Npgsql no longer accepts a CLR null parameter value: nullable string
+                    // members must be bound as DBNull so the ROW(...) composite still builds.
+                    collection.Add(new NpgsqlParameter("@TranType" + i, (object)type ?? DBNull.Value));
+                    collection.Add(new NpgsqlParameter("@StoreName" + i, (object)details[i].StoreName ?? DBNull.Value));
+                    collection.Add(new NpgsqlParameter("@ItemCode" + i, (object)details[i].ItemCode ?? DBNull.Value));
+                    collection.Add(new NpgsqlParameter("@UnitName" + i, (object)details[i].UnitName ?? DBNull.Value));
                     collection.Add(new NpgsqlParameter("@Quantity" + i, details[i].Quantity));
                 }
             }

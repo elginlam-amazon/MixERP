@@ -1,8 +1,9 @@
-﻿using MixERP.Net.Framework;
+﻿using MixERP.Net.Common.Helpers;
+using MixERP.Net.Framework;
 using MixERP.Net.i18n.Resources;
+using SixLabors.ImageSharp.Formats;
 using System;
-using System.Drawing.Imaging;
-using System.Web.Hosting;
+using System.IO;
 
 namespace MixERP.Net.HtmlParser.ImageSerializer
 {
@@ -10,7 +11,8 @@ namespace MixERP.Net.HtmlParser.ImageSerializer
     {
         public string TempDirectory { get; set; }
         public string Html { get; set; }
-        public ImageFormat ImageFormat { get; set; }
+        [System.CLSCompliant(false)]
+        public IImageFormat ImageFormat { get; set; }
         public event EventHandler<ImageSavedEventArgs> ImageSaved;
 
         public void Serialize()
@@ -20,11 +22,24 @@ namespace MixERP.Net.HtmlParser.ImageSerializer
                 throw new MixERPException(Messages.TempDirectoryNullError);
             }
 
-            string imagePath = HostingEnvironment.MapPath(this.TempDirectory + Guid.NewGuid());
+            //HostingEnvironment.MapPath is a System.Web API with no net10.0 equivalent. The
+            //MixERPConfiguration seam (initialized once by the host from IWebHostEnvironment)
+            //resolves the same "~/Resource/Temp/Images/" style virtual path against the content
+            //root, and normalizes separators for case-sensitive Linux filesystems.
+            string imagePath = MixERPConfiguration.MapPath(this.TempDirectory + Guid.NewGuid());
 
             if (string.IsNullOrWhiteSpace(imagePath))
             {
                 throw new MixERPException(Messages.CouldNotDetermineVirtualPathError);
+            }
+
+            //IIS created the temp directory for the Framework app; a self-hosted ASP.NET Core
+            //process has to ensure it exists before anything is written into it.
+            string directory = Path.GetDirectoryName(imagePath);
+
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
             }
 
             this.CreateImage(imagePath);
@@ -36,9 +51,11 @@ namespace MixERP.Net.HtmlParser.ImageSerializer
 
         public void OnImageSaved(ImageSavedEventArgs e)
         {
-            if (this.ImageSaved != null)
+            EventHandler<ImageSavedEventArgs> handler = this.ImageSaved;
+
+            if (handler != null)
             {
-                this.ImageSaved(this, e);
+                handler(this, e);
             }
         }
     }

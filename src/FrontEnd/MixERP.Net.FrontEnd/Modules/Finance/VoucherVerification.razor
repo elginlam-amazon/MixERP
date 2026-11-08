@@ -1,0 +1,164 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from VoucherVerification.ascx + .ascx.cs + .ascx.designer.cs - the transaction
+   verification queue (approve / reject an unverified voucher with a reason).
+
+   TWO THINGS THE LEGACY OnControlLoad DID, both carried over:
+     1. it built a `TransactionView` (approve/reject/flag/print toolbar, Today..Today,
+        status "Unverified") and added it to this.Controls - that is the <TransactionView>
+        element below, with all 11 values preserved;
+     2. it built the REASON MODAL procedurally (AddModal/AddHeader/AddContent/AddActions with
+        HtmlGenericControl + HtmlControlHelper) - that is the markup below, emitted in the
+        same child order and with the same ids and css classes the control tree rendered:
+          div#ActionModal.ui.modal
+            > div.ui.massive.red.header                 (empty, as built)
+            > div.ui.inverted.red.content
+                > div.ui.form                           (HtmlControlHelper.GetForm())
+                    > div.ui.blue.large.dividing.header (empty, as built)
+                    > div.field                         (HtmlControlHelper.GetField())
+                        > label for="ReasonTextArea"
+                        > textarea#ReasonTextArea
+            > div.actions > div.ui.buttons
+                > input.ui.red.button   value=Cancel
+                > input#VerifyButton.ui.green.button value=Verify title="CTRL + RETURN"
+
+   THE IDS AND THE BUTTON ORDER ARE A JAVASCRIPT CONTRACT. wwwroot/js/VoucherVerification.ascx.js
+   drives this whole screen: it shows $("#ActionModal") as a Semantic-UI modal, reads
+   $("#ReasonTextArea").val() and posts it from $("#VerifyButton").click() to the ported
+   /services/finance/transactions/{approve,reject} endpoints. The two buttons are plain
+   <input type="button"> elements with NO server handler (the legacy ones were
+   HtmlInputButtons too), so they carry no @@onclick here either - the script owns them. The
+   Cancel button has no id and no handler of its own: Semantic-UI's modal closes on any click
+   inside .actions, which is how it has always been dismissed.
+
+   The empty headers are emitted as the original emitted them: AddHeader and the inner form
+   header added a div with a css class and NO text. The script does not fill them, so they
+   render as empty styled bars - that is the screen as it was.
+
+   PRESERVED SURFACE: the class implements ITransaction, which the host reads to enforce
+   RestrictedTransactionMode (MixERPAuthorization.CheckTransactionPostingStatusAsync tests
+   `control is ITransaction`), so a user whose transaction posting is blocked still cannot
+   reach this screen. The original declared no OverridePath, AccessLevel, MasterPageId,
+   RemoveTheme or IsLandingPage override. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@implements MixERP.Net.Entities.Contracts.ITransaction
+@using MixERP.Net.Core.Modules.Finance.Internal
+@using MixERP.Net.Entities
+@using MixERP.Net.WebControls.TransactionViewFactory
+@using MixERP.Net.i18n.Resources
+@inject IJSRuntime JS
+
+@if (this.loaded)
+{
+    <TransactionView DisplayFlagButton="true"
+                     DisplayApproveButton="true"
+                     DisplayRejectButton="true"
+                     DisplayPrintButton="true"
+                     GridViewCssClass="ui table nowrap"
+                     Text="@Titles.VoucherVerification"
+                     DateFromFromFrequencyType="@(FrequencyType.Today)"
+                     DateToFrequencyType="@(FrequencyType.Today)"
+                     Status="Unverified"
+                     OfficeName="@this.officeName"
+                     UserId="@this.userId"
+                     OfficeId="@this.officeId"
+                     Catalog="@this.catalog" />
+}
+
+@* AddModal() *@
+<div id="ActionModal" class="ui modal">
+    @* AddHeader() - a header div with no text, exactly as built. *@
+    <div class="ui massive red header"></div>
+
+    @* AddContent() *@
+    <div class="ui inverted red content">
+        <div class="ui form">
+            <div class="ui blue large dividing header"></div>
+            <div class="field">
+                <label for="ReasonTextArea">@Titles.VerificationReason</label>
+                <textarea id="ReasonTextArea"></textarea>
+            </div>
+        </div>
+    </div>
+
+    @* AddActions() *@
+    <div class="actions">
+        <div class="ui buttons">
+            <input type="button" class="ui red button" value="@Titles.Cancel" />
+            <input type="button" id="VerifyButton" class="ui green button" value="@Titles.Verify"
+                   title="CTRL + RETURN" />
+        </div>
+    </div>
+</div>
+
+@code {
+    private const string ControllerScript =
+        "_content/MixERP.Net.Core.Modules.Finance/js/VoucherVerification.ascx.js";
+
+    private bool loaded;
+    private string officeName;
+    private int userId;
+    private int officeId;
+    private string catalog;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the TransactionView and the modal, both of which are markup
+    ///     now; the view's login-derived values are asynchronous, so they are read in
+    ///     OnInitializedAsync.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it. For an
+        //ITransaction control that includes the restricted-transaction-mode check.
+        await base.OnInitializedAsync();
+
+        LoginInfo login = await this.CurrentLogin.GetLoginAsync();
+
+        this.officeName = login.OfficeName;
+        this.userId = login.UserId;
+        this.officeId = login.OfficeId;
+        this.catalog = await this.CurrentLogin.GetCatalogAsync();
+        this.loaded = true;
+    }
+
+    /// <summary>
+    ///     The .ascx carried &lt;script src="js/VoucherVerification.ascx.js"&gt;. A .razor file
+    ///     may not contain a script element, so it is loaded here instead - and NOT on
+    ///     firstRender: its top-level block binds $("#VerifyButton") and the grid's rows, so it
+    ///     must run on the render AFTER the asynchronous query has produced them.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!this.loaded)
+        {
+            return;
+        }
+
+        await ModuleScripts.LoadAsync(this.JS, ControllerScript);
+    }
+}

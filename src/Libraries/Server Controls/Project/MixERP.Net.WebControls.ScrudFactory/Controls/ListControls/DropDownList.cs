@@ -25,66 +25,121 @@ using MixERP.Net.WebControls.ScrudFactory.Helpers;
 using System;
 using System.Data;
 using System.Linq;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
 {
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Builds the foreign-key field of the schema-driven scrud form: the drop-down list of
+    ///     parent rows plus its item-selector popup link. This is the control the whole
+    ///     referential-integrity UX hangs off, so every one of the original's five private helpers
+    ///     is ported.
+    ///     <para>
+    ///         <c>System.Web.UI.WebControls.DropDownList</c>, <c>ListItem</c> and
+    ///         <c>System.Web.UI.HtmlControls.HtmlAnchor</c> are all removed on net10.0, so this
+    ///         produces a <see cref="ScrudFieldKind.DropDownList" /> field (options in
+    ///         <see cref="ScrudField.Items" />, link in <see cref="ScrudField.ItemSelector" />) that
+    ///         <c>ScrudFieldRow.razor</c> renders as the same
+    ///         <c>&lt;select id="{column}_dropdownlist"&gt;</c> and <c>&lt;a role="item-selector"&gt;</c>.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
     internal static class ScrudDropDownList
     {
-        internal static void AddDropDownList(string catalog, HtmlTable htmlTable, string resourceClassName, string itemSelectorPath, string columnName, bool isNullable, string tableSchema, string tableName, string tableColumn, string defaultValue, string displayFields, string displayViews, bool useDisplayViewsAsParent, string selectedValues, string errorCssClass, bool disabled)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>AddDropDownList</c> (16 parameters), in the ORIGINAL ORDER, which matters:
+        ///     the options are loaded and the selection applied BEFORE the blank item is inserted at
+        ///     index 0 for a nullable column, so inserting it cannot disturb the chosen value.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        internal static void AddDropDownList(string catalog, ScrudFieldTable fieldTable, string resourceClassName, string itemSelectorPath, string columnName, bool isNullable, string tableSchema, string tableName, string tableColumn, string defaultValue, string displayFields, string displayViews, bool useDisplayViewsAsParent, string selectedValues, string errorCssClass, bool disabled)
         {
+            if (fieldTable == null)
+            {
+                return;
+            }
+
             string label = ScrudLocalizationHelper.GetResourceString(resourceClassName, columnName);
 
-            using (DropDownList dropDownList = GetDropDownList(columnName + "_dropdownlist"))
+            ScrudField field = GetDropDownList(columnName + "_dropdownlist");
+
+            if (field == null)
             {
-                if (disabled)
-                {
-                    dropDownList.Attributes.Add("disabled", "disabled");
-                }
-
-                using (DataTable table = GetTable(catalog, tableSchema, tableName, tableColumn, displayViews, useDisplayViewsAsParent))
-                {
-                    SetDisplayFields(catalog, dropDownList, table, tableSchema, tableName, tableColumn, displayFields);
-
-                    using (HtmlAnchor itemSelectorAnchor = GetItemSelector(catalog, dropDownList.ClientID, itemSelectorPath, tableSchema, tableName, tableColumn, displayViews, resourceClassName, label))
-                    {
-                        if (disabled)
-                        {
-                            itemSelectorAnchor.Attributes.Add("style", "pointer-events:none;");
-                        }
-
-                        SetSelectedValue(catalog, dropDownList, tableSchema, tableName, tableColumn, defaultValue, selectedValues);
-
-                        if (isNullable)
-                        {
-                            dropDownList.Items.Insert(0, new ListItem(String.Empty, String.Empty));
-                            ScrudFactoryHelper.AddDropDownList(htmlTable, label, dropDownList, itemSelectorAnchor, null);
-                        }
-                        else
-                        {
-                            RequiredFieldValidator required = ScrudFactoryHelper.GetRequiredFieldValidator(dropDownList, errorCssClass);
-                            ScrudFactoryHelper.AddDropDownList(htmlTable, label + Titles.RequiredFieldIndicator, dropDownList, itemSelectorAnchor, required);
-                        }
-                    }
-                }
+                return;
             }
 
+            field.ColumnName = columnName;
+            field.IsNullable = isNullable;
+            field.ValidatorCssClass = errorCssClass;
+
+            if (disabled)
+            {
+                //Attributes.Add("disabled", "disabled") - a select, unlike a text box, was truly
+                //disabled rather than made read-only.
+                field.Disabled = true;
+            }
+
+            using (DataTable table = GetTable(catalog, tableSchema, tableName, tableColumn, displayViews, useDisplayViewsAsParent))
+            {
+                SetDisplayFields(catalog, field, table, tableSchema, tableName, tableColumn, displayFields);
+
+                ScrudItemSelectorLink itemSelectorAnchor = GetItemSelector(catalog, field.ElementId, itemSelectorPath, tableSchema, tableName, tableColumn, displayViews, resourceClassName, label);
+
+                if (itemSelectorAnchor != null && disabled)
+                {
+                    //Attributes.Add("style", "pointer-events:none;")
+                    itemSelectorAnchor.Disabled = true;
+                }
+
+                field.ItemSelector = itemSelectorAnchor;
+
+                SetSelectedValue(catalog, field, tableSchema, tableName, tableColumn, defaultValue, selectedValues);
+
+                if (isNullable)
+                {
+                    field.Items.Insert(0, new ScrudListItem(String.Empty, String.Empty));
+                    field.Label = label;
+                    fieldTable.Add(field);
+                }
+                else
+                {
+                    field.Label = label + Titles.RequiredFieldIndicator;
+                    field.AddRule(ScrudFactoryHelper.GetRequiredFieldValidator(field, errorCssClass));
+                    fieldTable.Add(field);
+                }
+            }
         }
 
-        private static DropDownList GetDropDownList(string id)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>GetDropDownList(string id)</c>. <c>ClientIDMode.Static</c> is replaced by
+        ///     the <see cref="ScrudField.ElementId" /> contract — the select renders with the
+        ///     unmangled <c>{column}_dropdownlist</c> id that <c>GetFormCollection</c> reads back by.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private static ScrudField GetDropDownList(string id)
         {
-            using (DropDownList dropDownList = new DropDownList())
+            if (string.IsNullOrWhiteSpace(id))
             {
-                dropDownList.ID = id;
-                dropDownList.ClientIDMode = ClientIDMode.Static;
-
-                return dropDownList;
+                return null;
             }
+
+            ScrudField field = new ScrudField();
+            field.ElementId = id;
+            field.Kind = ScrudFieldKind.DropDownList;
+
+            return field;
         }
 
-
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Ported unchanged — it is pure string logic over the scrud <c>ItemSeparator</c> and
+        ///     <c>ExpressionSeparator</c> parameters. Given a comma-separated list of
+        ///     <c>schema.table.column--&gt;expression</c> entries it returns the expression belonging
+        ///     to one fully qualified relation, or an empty string.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         private static string GetExpressionValue(string catalog, string expressions, string schema, string table, string column)
         {
             if (new[] {expressions, schema, table, column}.AnyNullOrWhitespace())
@@ -115,13 +170,23 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
             return string.Empty;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         /// <summary>
-        /// Creates item selector html anchor which basically is an extender of the control. The
-        /// extender is an html image button which, when clicked, will open a popup window which
-        /// allows selection, filtering, search, etc. on the target table.
+        ///     Creates the item selector link which basically is an extender of the control. The
+        ///     extender is an anchor which, when clicked, will open a popup window which allows
+        ///     selection, filtering, search, etc. on the target table.
+        ///     <para>
+        ///         Port of <c>GetItemSelector</c>. The <c>HtmlAnchor</c> it returned is a removed
+        ///         type, so the same attribute set (<c>class</c> from the
+        ///         <c>ItemSelectorAnchorCssClass</c> scrud parameter, <c>role="item-selector"</c>,
+        ///         <c>tabindex="10000"</c>, <c>data-title</c>) and the same
+        ///         <c>?Schema=&amp;View=&amp;AssociatedControlId=&amp;ResourceClassName=</c> query
+        ///         string are carried on <see cref="ScrudItemSelectorLink" /> and rendered by
+        ///         <c>ScrudFieldRow.razor</c>.
+        ///     </para>
         /// </summary>
         /// <param name="catalog"></param>
-        /// <param name="associatedControlId">ClientID of the DropDownList control to which this control is associated to.</param>
+        /// <param name="associatedControlId">Element id of the drop-down list this control is associated to.</param>
         /// <param name="itemSelectorPath">Item Selector Target Url</param>
         /// <param name="tableSchema">Target Table Schema</param>
         /// <param name="tableName">Target Table</param>
@@ -130,47 +195,49 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
         /// <param name="resourceClassName">The resource class name containing localization.</param>
         /// <param name="columnNameLocalized">Localized name of the column to which item selector is bound to.</param>
         /// <returns></returns>
-        private static HtmlAnchor GetItemSelector(string catalog, string associatedControlId, string itemSelectorPath, string tableSchema, string tableName, string tableColumn, string displayViews, string resourceClassName, string columnNameLocalized)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private static ScrudItemSelectorLink GetItemSelector(string catalog, string associatedControlId, string itemSelectorPath, string tableSchema, string tableName, string tableColumn, string displayViews, string resourceClassName, string columnNameLocalized)
         {
             if (string.IsNullOrWhiteSpace(displayViews))
             {
                 return null;
             }
 
-            using (HtmlAnchor itemSelectorAnchor = new HtmlAnchor())
+            //Get the expression value of display view from comma separated list of expressions.
+            //The expression must be a valid fully qualified table or view name.
+            string viewRelation = GetExpressionValue(catalog, displayViews, tableSchema, tableName, tableColumn);
+
+            string schema = viewRelation.Split('.').First();
+            string view = viewRelation.Split('.').Last();
+
+            //Sanitize the schema and the view
+            schema = Sanitizer.SanitizeIdentifierName(schema);
+            view = Sanitizer.SanitizeIdentifierName(view);
+
+            if (string.IsNullOrWhiteSpace(schema) || string.IsNullOrWhiteSpace(view))
             {
-                //string relation = string.Empty;
-
-                //Get the expression value of display view from comma separated list of expressions.
-                //The expression must be a valid fully qualified table or view name.
-                string viewRelation = GetExpressionValue(catalog, displayViews, tableSchema, tableName, tableColumn);
-
-                string schema = viewRelation.Split('.').First();
-                string view = viewRelation.Split('.').Last();
-
-                //Sanitize the schema and the view
-                schema = Sanitizer.SanitizeIdentifierName(schema);
-                view = Sanitizer.SanitizeIdentifierName(view);
-
-                if (string.IsNullOrWhiteSpace(schema) || string.IsNullOrWhiteSpace(view))
-                {
-                    return null;
-                }
-
-                itemSelectorAnchor.Attributes["class"] = DbConfig.GetScrudParameter(catalog, "ItemSelectorAnchorCssClass");
-
-                itemSelectorAnchor.Attributes.Add("role", "item-selector");
-
-                itemSelectorAnchor.Attributes.Add("tabindex", "10000");
-                itemSelectorAnchor.Attributes.Add("data-title", columnNameLocalized);
-
-                itemSelectorAnchor.HRef = itemSelectorPath + "?Schema=" + schema + "&View=" + view +
-                                          "&AssociatedControlId=" + associatedControlId + "&ResourceClassName=" + resourceClassName;
-
-                return itemSelectorAnchor;
+                return null;
             }
+
+            ScrudItemSelectorLink itemSelectorAnchor = new ScrudItemSelectorLink();
+
+            itemSelectorAnchor.CssClass = DbConfig.GetScrudParameter(catalog, "ItemSelectorAnchorCssClass");
+            itemSelectorAnchor.Title = columnNameLocalized;
+
+            itemSelectorAnchor.Href = itemSelectorPath + "?Schema=" + schema + "&View=" + view +
+                                      "&AssociatedControlId=" + associatedControlId + "&ResourceClassName=" + resourceClassName;
+
+            return itemSelectorAnchor;
         }
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Ported unchanged: the parent row set comes either from the display VIEW named by the
+        ///     <c>DisplayViews</c> expression (when <paramref name="useDisplayViewsAsParent" />) or
+        ///     from the referenced parent TABLE. The fallback to the parent table when the expression
+        ///     does not resolve to a sanitizable schema/view pair is preserved.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
         private static DataTable GetTable(string catalog, string tableSchema, string tableName, string tableColumn, string displayViews, bool useDisplayViewsAsParent)
         {
             if (useDisplayViewsAsParent)
@@ -197,9 +264,29 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
             return FormHelper.GetTable(catalog, tableSchema, tableName, "1");
         }
 
-        private static void SetDisplayFields(string catalog, DropDownList dropDownList, DataTable table, string tableSchema, string tableName, string tableColumn, string displayFields)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>SetDisplayFields</c>. The original set
+        ///     <c>DataSource</c>/<c>DataValueField</c>/<c>DataTextField</c> and called
+        ///     <c>DataBind()</c>; there is no <c>ListControl</c> data-binding machinery on net10.0,
+        ///     so the option list is materialized here from the same two columns — which is exactly
+        ///     what <c>DataBind()</c> did.
+        ///     <para>
+        ///         The computed-column trick is preserved verbatim: when the display-field expression
+        ///         is not an existing column it is added to the <see cref="DataTable" /> as a
+        ///         computed column named <c>DataTextField</c> (so, for example,
+        ///         <c>first_name || ' ' || last_name</c> becomes the option text).
+        ///     </para>
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private static void SetDisplayFields(string catalog, ScrudField field, DataTable table, string tableSchema, string tableName, string tableColumn, string displayFields)
         {
             //See DisplayFields Property for more information.
+
+            if (table == null || field == null)
+            {
+                return;
+            }
 
             if (table.Rows.Count > 0)
             {
@@ -216,18 +303,41 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
                     columnOrExpression = "DataTextField";
                 }
 
-                dropDownList.DataSource = table;
-                dropDownList.DataValueField = tableColumn;
-                dropDownList.DataTextField = columnOrExpression;
-                dropDownList.DataBind();
+                //DataBind(): one option per row, DataValueField -> value, DataTextField -> text.
+                foreach (DataRow row in table.Rows)
+                {
+                    string value = table.Columns.Contains(tableColumn) && row[tableColumn] != DBNull.Value
+                        ? row[tableColumn].ToString()
+                        : string.Empty;
+
+                    string text = row[columnOrExpression] == DBNull.Value
+                        ? string.Empty
+                        : row[columnOrExpression].ToString();
+
+                    field.Items.Add(new ScrudListItem(text, value));
+                }
             }
         }
 
-        private static void SetSelectedValue(string catalog, DropDownList dropDownList, string schema, string table, string column, string postbackValue, string selectedValueExpressions)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>SetSelectedValue</c>, branch for branch: a postback value wins outright;
+        ///     otherwise the value is taken from the <c>SelectedValues</c> expression for this
+        ///     relation, and an expression value wrapped in single quotes is resolved by matching the
+        ///     option's TEXT (the former <c>ListItem.FindByText</c>) instead of its value.
+        ///     <para>
+        ///         <c>DropDownList.SelectedValue = x</c> becomes
+        ///         <see cref="ScrudField.Value" /> = x plus the matching option marked selected —
+        ///         which is what the rendered <c>&lt;option selected&gt;</c> and
+        ///         <c>GetFormCollection</c> both read.
+        ///     </para>
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private static void SetSelectedValue(string catalog, ScrudField field, string schema, string table, string column, string postbackValue, string selectedValueExpressions)
         {
             string selectedItemValue = string.Empty;
 
-            if (dropDownList == null || new[] {schema, table, column}.AnyNullOrWhitespace())
+            if (field == null || new[] {schema, table, column}.AnyNullOrWhitespace())
             {
                 return;
             }
@@ -252,7 +362,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
                     if (value.StartsWith("'", StringComparison.OrdinalIgnoreCase))
                     {
                         //If the value starts with a quote, find the value by the text.
-                        ListItem item = dropDownList.Items.FindByText(value.Replace("'", ""));
+                        ScrudListItem item = FindByText(field, value.Replace("'", ""));
 
                         if (item != null)
                         {
@@ -268,8 +378,22 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
 
             if (!string.IsNullOrWhiteSpace(selectedItemValue))
             {
-                dropDownList.SelectedValue = selectedItemValue;
+                field.Value = selectedItemValue;
+
+                foreach (ScrudListItem item in field.Items)
+                {
+                    item.Selected = string.Equals(item.Value, selectedItemValue, StringComparison.Ordinal);
+                }
             }
+        }
+
+        /// <summary>
+        ///     Port of <c>ListItemCollection.FindByText(string)</c>, which matched on the item's
+        ///     exact text.
+        /// </summary>
+        private static ScrudListItem FindByText(ScrudField field, string text)
+        {
+            return field.Items.FirstOrDefault(item => string.Equals(item.Text, text, StringComparison.Ordinal));
         }
     }
 }

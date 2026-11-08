@@ -1,0 +1,164 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Setup/PartiesPopup.ascx + PartiesPopup.ascx.cs + .ascx.designer.cs - the
+   party maintenance screen in its POPUP form.
+
+   PRESERVED SURFACE: MasterPageId = "MixERPBlankMaster.Master" (from the <%@ Control %>
+   directive), assigned in the CONSTRUCTOR because the host's ModuleHost.razor reads it off
+   an Activator.CreateInstance PROBE INSTANCE on which no lifecycle method ever runs.
+
+   Also preserved: Exclude = "party_code, account_id" (the party code is generated on the
+   database, per the original's comment) and Description = Labels.PartyDescription.
+
+   RegisterJavascript(): the original emitted `var partyNameParameter = "<value>";` under the
+   client-script key "PartiesPopup_Vars" and then loaded Parties.js, which reads that global
+   by bare name to compose party_name out of first/middle/last. The global is emitted here
+   through the SAME interop module + runScript function + de-duplication key
+   PageUtility.RegisterJavascript uses, but AWAITED - PageUtility's own method is
+   fire-and-forget, and Parties.js must not be appended before the global exists. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Core.Modules.Inventory.Internal
+@using MixERP.Net.WebControls.ScrudFactory
+@using MixERP.Net.i18n.Resources
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<div class="container" id="container">
+    @if (this.loaded)
+    {
+        <Scrud KeyColumn="party_id"
+               TableSchema="core"
+               Table="parties"
+               ViewSchema="core"
+               View="party_scrud_view"
+               Exclude="party_code, account_id"
+               DisplayFields="@this.displayFields"
+               DisplayViews="@this.displayViews"
+               Description="@Labels.PartyDescription"
+               Text="@Titles.Parties" />
+    }
+</div>
+
+@code {
+    //The original client-script registration key, preserved: de-duplication is by this key.
+    internal const string VariablesKey = "PartiesPopup_Vars";
+
+    internal const string PartiesScriptUrl =
+        "_content/MixERP.Net.Core.Modules.Inventory/js/setup/Parties.js";
+
+    private bool loaded;
+    private string displayFields;
+    private string displayViews;
+
+    public PartiesPopup()
+    {
+        //<%@ Control ... MasterPageId="MixERPBlankMaster.Master" %>
+        this.MasterPageId = "MixERPBlankMaster.Master";
+    }
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body built the Scrud above - markup now - and called
+    ///     RegisterJavascript(); the display-field lookups need the catalog (asynchronous) and
+    ///     the script registration needs a rendered document, so both moved to the
+    ///     corresponding async lifecycle methods.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.displayFields = GetDisplayFields(catalog);
+        this.displayViews = GetDisplayViews();
+        this.loaded = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            await RegisterJavascriptAsync(this.JS);
+        }
+    }
+
+    /// <summary>
+    ///     Port of PartiesPopup.ascx.cs's RegisterJavascript(). Shared with the in-layout
+    ///     Parties screen, which carried the identical shared code-behind.
+    /// </summary>
+    internal static async Task RegisterJavascriptAsync(IJSRuntime js)
+    {
+        string partyNameParameter = ConfigurationHelper.GetParameter("PartyName");
+        string script = JSUtility.GetVar("partyNameParameter", partyNameParameter);
+
+        //The global MUST exist before Parties.js is appended - it reads it by bare name - so
+        //this is the awaited form of PageUtility.RegisterJavascript(key, script, js, true).
+        IJSObjectReference interop = await js
+            .InvokeAsync<IJSObjectReference>("import", PageUtility.InteropModulePath);
+
+        await interop.InvokeVoidAsync("runScript", VariablesKey, script);
+
+        await ModuleScripts.LoadAsync(js, PartiesScriptUrl);
+    }
+
+    internal static string GetDisplayFields(string catalog)
+    {
+        List<string> displayFields = new List<string>();
+        ScrudHelper.AddDisplayField(displayFields, "core.party_types.party_type_id",
+            DbConfig.GetDbParameter(catalog, "PartyTypeDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.frequencies.frequency_id",
+            DbConfig.GetDbParameter(catalog, "FrequencyDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.currencies.currency_code",
+            DbConfig.GetDbParameter(catalog, "CurrencyDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.countries.country_id",
+            DbConfig.GetDbParameter(catalog, "CountryDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.states.state_id",
+            DbConfig.GetDbParameter(catalog, "StateDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.entities.entity_id",
+            DbConfig.GetDbParameter(catalog, "EntityDisplayField"));
+        ScrudHelper.AddDisplayField(displayFields, "core.industries.industry_id",
+            DbConfig.GetDbParameter(catalog, "IndustryDisplayField"));
+        return string.Join(",", displayFields);
+    }
+
+    internal static string GetDisplayViews()
+    {
+        List<string> displayViews = new List<string>();
+        ScrudHelper.AddDisplayView(displayViews, "core.party_types.party_type_id", "core.party_type_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.frequencies.frequency_id", "core.frequency_selector_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.currencies.currency_code", "core.currency_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.countries.country_id", "core.country_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.states.state_id", "core.state_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.entities.entity_id", "core.entity_scrud_view");
+        ScrudHelper.AddDisplayView(displayViews, "core.industries.industry_id", "core.industry_scrud_view");
+
+        return string.Join(",", displayViews);
+    }
+}

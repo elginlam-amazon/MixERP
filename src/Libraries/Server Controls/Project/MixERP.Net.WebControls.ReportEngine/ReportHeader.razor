@@ -1,0 +1,108 @@
+@* ComponentBase is not CLS-compliant; this assembly is CLSCompliant(true). *@
+@attribute [System.CLSCompliant(false)]
+@* ********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+*********************************************************************************** *@
+@* Replaces the four WebForms partials ReportHeader/{Control,Properties,Events,RaisedEvents}.cs.
+   No @page directive: this is a library control, exactly as the CompositeControl was. *@
+
+@using MixERP.Net.WebControls.ReportEngine.Helpers
+@using System.IO
+
+@if (this.html != null)
+{
+    @* The original called RenderBeginTag(Div) BEFORE AddAttribute(Id, "reportheader"),
+       so WebForms silently discarded the id and emitted a bare <div>. Emitting the id is
+       the evident intent (it is the header styling / export anchor), so the id is now
+       emitted. Recorded in migration-summary.md §4. *@
+    <div id="reportheader">@((MarkupString)this.html)</div>
+}
+
+@code {
+    private string html;
+
+    /// <summary>
+    ///     Report header XML/HTML template path. Frozen public API
+    ///     (was ReportHeader/Properties.cs).
+    /// </summary>
+    [Parameter]
+    public string Path { get; set; }
+
+    /// <summary>
+    ///     Returns the parsed report-header HTML. Frozen public API: no in-solution caller
+    ///     was found, but the member is public on a shipped control, so it is preserved.
+    /// </summary>
+    public string GetHtml()
+    {
+        if (this.html == null)
+        {
+            this.PrepareReportHeader();
+        }
+
+        return this.html;
+    }
+
+    protected override void OnParametersSet()
+    {
+        this.html = null;
+        this.PrepareReportHeader();
+    }
+
+    private string GetPath()
+    {
+        if (!string.IsNullOrWhiteSpace(this.Path))
+        {
+            return this.Path;
+        }
+
+        return Net.Common.Helpers.ConfigurationHelper.GetReportParameter("HeaderPath");
+    }
+
+    private bool IsValid()
+    {
+        string headerPath = this.GetPath();
+
+        if (string.IsNullOrWhiteSpace(headerPath))
+        {
+            return false;
+        }
+
+        if (!File.Exists(MixERP.Net.Common.PageUtility.MapPath(headerPath)))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private void PrepareReportHeader()
+    {
+        // Blank path or missing file: emit nothing at all, silently — the original
+        // returned from Render() before writing any markup.
+        if (!this.IsValid())
+        {
+            this.html = null;
+            return;
+        }
+
+        string header = File.ReadAllText(MixERP.Net.Common.PageUtility.MapPath(this.GetPath()));
+
+        // Note the NULL datatable collection, as in the original; ParseExpression tolerates it.
+        this.html = ReportParser.ParseExpression(header, null);
+    }
+}

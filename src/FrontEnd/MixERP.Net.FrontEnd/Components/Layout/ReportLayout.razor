@@ -1,0 +1,41 @@
+@* ---------------------------------------------------------------------------------------------
+   MixERPReportMaster.Master  ->  Components/Layout/ReportLayout.razor   (checklist task 64)
+
+   PLACEHOLDER MAPPING
+     head                   -> <SectionOutlet SectionName="@LayoutSections.ReportHeadContent" />
+     BodyContentPlaceholder -> @Body (wrapped in <AuthorizationOutlet>)
+
+   Page_Load was EMPTY in the original; the globals registration it inherited from
+   MixERPMasterPage is preserved below. The report title ("MixERP Report") reaches App.razor's
+   <HeadOutlet> through <PageTitle>, and the inline closeWindow() script
+   (parent.$.fn.colorbox.close) moved to wwwroot/js/mixerp/master-page/eod.js, which App.razor
+   loads — report pages are opened inside a colorbox by the calling page and call closeWindow().
+   --------------------------------------------------------------------------------------------- *@
+@inherits LayoutComponentBase
+@inject MasterPageScriptService MasterPageScript
+@inject IJSRuntime JS
+
+<PageTitle>MixERP Report</PageTitle>
+
+<HeadContent>
+    <meta http-equiv="X-UA-Compatible" content="IE=9" />
+    <link href="/css/report.min.css" rel="stylesheet" />
+</HeadContent>
+
+<SectionOutlet SectionName="@LayoutSections.ReportHeadContent" />
+
+<AuthorizationOutlet>
+    @Body
+</AuthorizationOutlet>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender).ConfigureAwait(true);
+
+        if (firstRender)
+        {
+            await this.MasterPageScript.RegisterAsync(this.JS).ConfigureAwait(true);
+        }
+    }
+}

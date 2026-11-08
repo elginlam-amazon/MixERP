@@ -1,0 +1,107 @@
+@* 
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses />.
+*@
+
+@* Ported from Setup/Shippers.ascx + .ascx.cs + .ascx.designer.cs - the shipping company
+   maintenance screen. OnControlLoad built a Scrud and added it to
+   <asp:PlaceHolder ID="ScrudPlaceholder">, which is this markup now.
+
+   PRESERVED: Exclude = "shipper_code, shipper_name" (both are generated on the database
+   server), and the SelectedValues default for the shipping-payable account - including the
+   original's own "Todo: should be done via GL Mapping" note, which is carried over because
+   it documents a real outstanding design decision, not dropped work.
+
+   The display-field lookup reads DbConfig.GetDbParameter(AppUsers.GetCurrentUserDB(), ...);
+   that catalog is EMPTY inside a Blazor circuit, so it comes from ICurrentLogin.
+
+   The original declared no OverridePath, AccessLevel, MasterPageId, RemoveTheme or
+   IsLandingPage override and implemented no ITransaction. *@
+
+@inherits MixERP.Net.Framework.Controls.MixERPUserControl
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.WebControls.ScrudFactory
+@using MixERP.Net.i18n.Resources
+
+@if (this.loaded)
+{
+    <Scrud KeyColumn="shipper_id"
+           TableSchema="core"
+           Table="shippers"
+           ViewSchema="core"
+           View="shipper_scrud_view"
+           Exclude="shipper_code, shipper_name"
+           DisplayFields="@this.displayFields"
+           DisplayViews="@this.displayViews"
+           SelectedValues="@this.selectedValues"
+           Text="@Titles.Shippers" />
+}
+
+@code {
+    private bool loaded;
+    private string displayFields;
+    private string displayViews;
+    private string selectedValues;
+
+    /// <summary>
+    ///     MixERPUserControlBase.OnControlLoad is abstract, so every ported control declares it.
+    ///     The legacy body ONLY built the Scrud above, which is markup now; its display-field
+    ///     lookup needs the catalog, which is asynchronous.
+    /// </summary>
+    public override void OnControlLoad(object sender, EventArgs e)
+    {
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //base.OnInitializedAsync runs BOTH authorization checks - never skip it.
+        await base.OnInitializedAsync();
+
+        string catalog = await this.CurrentLogin.GetCatalogAsync();
+
+        this.displayFields = GetDisplayFields(catalog);
+        this.displayViews = GetDisplayViews();
+        this.selectedValues = GetSelectedValues();
+        this.loaded = true;
+    }
+
+    private static string GetDisplayFields(string catalog)
+    {
+        List<string> displayFields = new List<string>();
+        ScrudHelper.AddDisplayField(displayFields, "core.accounts.account_id",
+            DbConfig.GetDbParameter(catalog, "AccountDisplayField"));
+        return string.Join(",", displayFields);
+    }
+
+    private static string GetDisplayViews()
+    {
+        List<string> displayViews = new List<string>();
+        ScrudHelper.AddDisplayView(displayViews, "core.accounts.account_id", "core.account_selector_view");
+        return string.Join(",", displayViews);
+    }
+
+    private static string GetSelectedValues()
+    {
+        List<string> selectedValues = new List<string>();
+
+        //Todo:
+        //The default selected value of shipping payable account
+        //should be done via GL Mapping.
+        ScrudHelper.AddSelectedValue(selectedValues, "core.accounts.account_id", "'20110 (Shipping Charge Payable)'");
+        return string.Join(",", selectedValues);
+    }
+}

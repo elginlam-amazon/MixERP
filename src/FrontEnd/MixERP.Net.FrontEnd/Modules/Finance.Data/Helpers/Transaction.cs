@@ -27,6 +27,7 @@ using MixERP.Net.Entities.Models.Transactions;
 using MixERP.Net.i18n;
 using MixERP.Net.i18n.Resources;
 using Npgsql;
+using NpgsqlTypes;
 using PetaPoco;
 using Serilog;
 
@@ -40,7 +41,9 @@ namespace MixERP.Net.Core.Modules.Finance.Data.Helpers
             using (NpgsqlCommand command = new NpgsqlCommand(sql))
             {
                 command.Parameters.AddWithValue("@OfficeId", officeId);
-                command.Parameters.AddWithValue("@CurrencyCode", currencyCode);
+
+                // Npgsql 6+ refuses a CLR null in AddWithValue.
+                command.Parameters.AddWithValue("@CurrencyCode", (object)currencyCode ?? DBNull.Value);
 
                 return Conversion.TryCastDecimal(DbOperation.GetScalarValue(catalog, command));
             }
@@ -52,7 +55,8 @@ namespace MixERP.Net.Core.Modules.Finance.Data.Helpers
                 "SELECT transaction_master_id FROM transactions.transaction_master WHERE transaction_code=@TranCode;";
             using (NpgsqlCommand command = new NpgsqlCommand(sql))
             {
-                command.Parameters.AddWithValue("@TranCode", tranCode);
+                // Npgsql 6+ refuses a CLR null in AddWithValue.
+                command.Parameters.AddWithValue("@TranCode", (object)tranCode ?? DBNull.Value);
 
                 return Conversion.TryCastLong(DbOperation.GetScalarValue(catalog, command));
             }
@@ -78,7 +82,10 @@ namespace MixERP.Net.Core.Modules.Finance.Data.Helpers
                 command.Parameters.AddWithValue("@UserId", userId);
                 command.Parameters.AddWithValue("@LoginId", loginId);
                 command.Parameters.AddWithValue("@VerificationStatusId", verificationStatusId);
-                command.Parameters.AddWithValue("@Reason", reason);
+
+                // Npgsql 6+ refuses a CLR null in AddWithValue; a null reason must still reach
+                // PostgreSQL as SQL NULL rather than an empty string.
+                command.Parameters.AddWithValue("@Reason", (object)reason ?? DBNull.Value);
 
                 DbOperation.ExecuteNonQuery(catalog, command);
             }
@@ -132,14 +139,20 @@ namespace MixERP.Net.Core.Modules.Finance.Data.Helpers
                         long transactionMasterId;
                         using (NpgsqlCommand master = new NpgsqlCommand(sql, connection))
                         {
-                            master.Parameters.AddWithValue("@ValueDate", valueDate);
-                            master.Parameters.AddWithValue("@BookDate", bookDate);
+                            // transaction_master.value_date and book_date are PostgreSQL "date"
+                            // columns. Npgsql 6+ infers "timestamp" for an untyped DateTime, so
+                            // both are bound as "date" explicitly.
+                            master.Parameters.Add(new NpgsqlParameter("@ValueDate", NpgsqlDbType.Date) { Value = valueDate.Date });
+                            master.Parameters.Add(new NpgsqlParameter("@BookDate", NpgsqlDbType.Date) { Value = bookDate.Date });
                             master.Parameters.AddWithValue("@OfficeId", officeId);
                             master.Parameters.AddWithValue("@UserId", userId);
                             master.Parameters.AddWithValue("@LoginId", loginId);
                             master.Parameters.AddWithValue("@Book", "Journal");
                             master.Parameters.AddWithValue("@CostCenterId", costCenterId);
-                            master.Parameters.AddWithValue("@ReferenceNumber", referenceNumber);
+
+                            // Npgsql 6+ refuses a CLR null in AddWithValue; an absent reference
+                            // number must still be stored as SQL NULL.
+                            master.Parameters.AddWithValue("@ReferenceNumber", (object)referenceNumber ?? DBNull.Value);
 
                             transactionMasterId = Conversion.TryCastLong(master.ExecuteScalar());
                         }
@@ -180,15 +193,24 @@ namespace MixERP.Net.Core.Modules.Finance.Data.Helpers
 
                             using (NpgsqlCommand transactionDetail = new NpgsqlCommand(sql, connection))
                             {
-                                transactionDetail.Parameters.AddWithValue("@ValueDate", valueDate);
+                                // transaction_details.value_date is a PostgreSQL "date" column.
+                                transactionDetail.Parameters.Add(new NpgsqlParameter("@ValueDate", NpgsqlDbType.Date) { Value = valueDate.Date });
                                 transactionDetail.Parameters.AddWithValue("@TransactionMasterId", transactionMasterId);
                                 transactionDetail.Parameters.AddWithValue("@TranType", tranType);
-                                transactionDetail.Parameters.AddWithValue("@AccountNumber", model.AccountNumber);
+
+                                // Npgsql 6+ refuses a CLR null in AddWithValue. Each of these must
+                                // still reach PostgreSQL as SQL NULL, never as an empty string --
+                                // in particular @CashRepositoryCode, which is null for non-cash
+                                // journal lines so that
+                                // office.get_cash_repository_id_by_cash_repository_code yields NULL.
+                                transactionDetail.Parameters.AddWithValue("@AccountNumber",
+                                    (object)model.AccountNumber ?? DBNull.Value);
                                 transactionDetail.Parameters.AddWithValue("@StatementReference",
-                                    model.StatementReference);
+                                    (object)model.StatementReference ?? DBNull.Value);
                                 transactionDetail.Parameters.AddWithValue("@CashRepositoryCode",
-                                    model.CashRepositoryCode);
-                                transactionDetail.Parameters.AddWithValue("@CurrencyCode", model.CurrencyCode);
+                                    (object)model.CashRepositoryCode ?? DBNull.Value);
+                                transactionDetail.Parameters.AddWithValue("@CurrencyCode",
+                                    (object)model.CurrencyCode ?? DBNull.Value);
                                 transactionDetail.Parameters.AddWithValue("@AmountInCurrency", amountInCurrency);
                                 transactionDetail.Parameters.AddWithValue("@OfficeId", officeId);
                                 transactionDetail.Parameters.AddWithValue("@Er", model.ExchangeRate);
@@ -213,12 +235,16 @@ namespace MixERP.Net.Core.Modules.Finance.Data.Helpers
                                         "transactions.transaction_master");
                                     attachmentCommand.Parameters.AddWithValue("@ResourceKey", "transaction_master_id");
                                     attachmentCommand.Parameters.AddWithValue("@ResourceId", transactionMasterId);
+                                    // Npgsql 6+ refuses a CLR null in AddWithValue; absent
+                                    // attachment metadata must still be stored as SQL NULL.
                                     attachmentCommand.Parameters.AddWithValue("@OriginalFileName",
-                                        attachment.OriginalFileName);
+                                        (object)attachment.OriginalFileName ?? DBNull.Value);
                                     attachmentCommand.Parameters.AddWithValue("@FileExtension",
-                                        System.IO.Path.GetExtension(attachment.OriginalFileName));
-                                    attachmentCommand.Parameters.AddWithValue("@FilePath", attachment.FilePath);
-                                    attachmentCommand.Parameters.AddWithValue("@Comment", attachment.Comment);
+                                        (object)System.IO.Path.GetExtension(attachment.OriginalFileName) ?? DBNull.Value);
+                                    attachmentCommand.Parameters.AddWithValue("@FilePath",
+                                        (object)attachment.FilePath ?? DBNull.Value);
+                                    attachmentCommand.Parameters.AddWithValue("@Comment",
+                                        (object)attachment.Comment ?? DBNull.Value);
 
                                     attachmentCommand.ExecuteNonQuery();
                                 }

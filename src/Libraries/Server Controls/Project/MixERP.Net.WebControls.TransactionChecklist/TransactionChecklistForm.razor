@@ -1,0 +1,729 @@
+@* ComponentBase is not CLS-compliant; this assembly is CLSCompliant(true). *@
+@attribute [System.CLSCompliant(false)]
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Blazor replacement for the former WebForms CompositeControl
+    "MixERP.Net.WebControls.TransactionChecklist.TransactionChecklistForm", which was
+    assembled from thirteen partial-class files. The markup below is the one-for-one port
+    of the control's render tree, in the exact order CreateChildControls() built it:
+
+      TransactionCheckList/Base.cs         CreateChildControls()  -> this template
+        Heading.cs                         AddHeader()            -> <h1>/<hr>/<h2>/<hr>/verification/<br>
+        Buttons.cs                         AddButtons()           -> "ui vertical menu" div
+        WithdrawDiv.cs                     AddWidthdrawDiv()      -> #WithdrawDiv
+        HiddenFields.cs                    AddEmailHidden()       -> #EmailHidden
+        Footer.cs                          AddMessageLabel()      -> the message span
+        Javascript.cs                      AddScript()            -> OnAfterRenderAsync (below)
+        QueryStringData.cs                 GetTranId()            -> GetTranId() (below)
+        Events.cs                          EmailLinkButton_Click / OkButton_Click
+        VerificationStatuses.cs            ShowVerificationStatus()
+        Properties.cs                      the 28 [Parameter]s
+
+    DOM / WIRE CONTRACT (the primary silent-failure risk of this migration):
+    Scripts/TransactionChecklist.js selects every element it touches by LITERAL id -
+    #CancelButton, #WithdrawDiv, #WithdrawAnchor, #ViewReportAnchor, #EmailHidden and
+    #OKButton - and reads the data-url attribute off #ViewReportAnchor to pre-fetch the
+    emailable report body. Change any one of those ids, or drop data-url, and this control
+    still compiles and still renders while the withdraw panel never opens and the email
+    button mails an empty body.
+
+    The former TransactionCheckList/IDisposable.cs is intentionally gone: its whole
+    Dispose/disposed pattern existed only to release nine WebForms child-control instances.
+    A Blazor component owns no child-control tree and no unmanaged resource, so there is
+    nothing to dispose and an empty Dispose() would only pretend to do work. The empty
+    Styling.cs and Helpers/TransactionChecklistResourceHelper.cs are likewise gone - both
+    declared zero members.
+*@
+
+@namespace MixERP.Net.WebControls.TransactionChecklist
+@using System
+@using System.Globalization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.Extensions.Primitives
+@using Microsoft.JSInterop
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.i18n
+@using MixERP.Net.i18n.Resources
+@using MixERP.Net.TransactionGovernor.Verification
+@using MixERP.Net.WebControls.TransactionChecklist.Helpers
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+@* ---------- Base.cs CreateChildControls(): the checkListContainer ---------- *@
+<div>
+    @* ---------- Heading.cs AddHeader() ---------- *@
+    <h1>@this.Text</h1>
+    <hr class="ui divider" />
+    <h2>@this.subTitleText</h2>
+    <hr class="ui divider" />
+    @* AddVerificationLabel(): the WebForms Label rendered a <span>; it emitted nothing
+       when ShowVerificationStatus() took one of its early returns. *@
+    @if (!string.IsNullOrEmpty(this.verificationText))
+    {
+        <span class="@this.verificationCssClass">@this.verificationText</span>
+    }
+    <br />
+
+    @* ---------- Buttons.cs AddButtons() / AddPanelHeader() / AddPanelBody() ---------- *@
+    <div class="ui vertical menu" style="width:@this.GetWidthText()px;">
+        <div class="ui header inverted green item">
+            @((MarkupString)("<i class='user icon'></i>" + Titles.Checklists))
+        </div>
+
+        @* AddWidthdrawAnchor() - DOM contract: #WithdrawAnchor *@
+        @if (this.DisplayWithdrawButton)
+        {
+            <a id="WithdrawAnchor" class="item" href="javascript:void(0);">
+                @((MarkupString)("<i class='icon hide'></i>" + Titles.WithdrawTransaction))
+            </a>
+        }
+
+        @* AddViewReportAnchor() - DOM contract: #ViewReportAnchor and its data-url *@
+        @if (this.DisplayViewReportButton
+             && !string.IsNullOrWhiteSpace(this.ReportPath)
+             && !this.GetTranId().Equals("0"))
+        {
+            string reportUrl = PageUtility.ResolveUrl(this.ReportPath + "?" + TRAN_ID_PARAMETER_NAME + "=" + this.GetTranId());
+
+            <a id="ViewReportAnchor" class="item" href="javascript:void(0);"
+               onclick="@("showWindow('" + reportUrl + "');")" data-url="@reportUrl">
+                @((MarkupString)("<i class='icon grid layout'></i>" + this.ViewReportButtonText))
+            </a>
+        }
+
+        @* AddEmailReportLinkButton() - the LinkButton had CausesValidation = false, so it
+           must NOT run the withdraw-reason rule; EmailReportClick() does not call it. *@
+        @if (this.DisplayEmailReportButton && !string.IsNullOrWhiteSpace(this.PartyEmailAddress))
+        {
+            <a id="EmailReportLinkButton" class="item" href="javascript:void(0);"
+               @onclick="this.EmailReportClick" @onclick:preventDefault="true">
+                @((MarkupString)("<i class='icon mail'></i>" + this.EmailReportButtonText))
+            </a>
+        }
+
+        @* AddCustomerReportAnchor() *@
+        @if (this.DisplayCustomerReportButton
+             && !string.IsNullOrWhiteSpace(this.CustomerReportPath)
+             && !this.GetTranId().Equals("0"))
+        {
+            string customerReportUrl = PageUtility.ResolveUrl(this.CustomerReportPath + "?" + TRAN_ID_PARAMETER_NAME + "=" + this.GetTranId());
+
+            <a id="CustomerReportAnchor" class="item" href="javascript:void(0);"
+               onclick="@("showWindow('" + customerReportUrl + "');")">
+                @((MarkupString)("<i class='icon list layout'></i>" + this.CustomerReportButtonText))
+            </a>
+        }
+
+        @* AddPrintReceiptAnchor() *@
+        @if (this.DisplayPrintReceiptButton
+             && !string.IsNullOrWhiteSpace(this.ReceiptAdvicePath)
+             && !this.GetTranId().Equals("0"))
+        {
+            string receiptUrl = PageUtility.ResolveUrl(this.ReceiptAdvicePath + "?" + TRAN_ID_PARAMETER_NAME + "=" + this.GetTranId());
+
+            <a id="PrintReceiptAnchor" class="item" href="javascript:void(0);"
+               onclick="@("showWindow('" + receiptUrl + "');")">
+                @((MarkupString)("<i class='icon print'></i>" + Titles.PrintReceipt))
+            </a>
+        }
+
+        @* AddPrintGLAnchor() *@
+        @if (this.DisplayPrintGlEntryButton
+             && !string.IsNullOrWhiteSpace(this.GlAdvicePath)
+             && !this.GetTranId().Equals("0"))
+        {
+            string glAdviceUrl = PageUtility.ResolveUrl(this.GlAdvicePath + "?" + TRAN_ID_PARAMETER_NAME + "=" + this.GetTranId());
+
+            <a id="PrintGLAnchor" class="item" href="javascript:void(0);"
+               onclick="@("showWindow('" + glAdviceUrl + "');")">
+                @((MarkupString)("<i class='icon print'></i>" + Titles.PrintGlEntry))
+            </a>
+        }
+
+        @* AddAttachmentAnchor() *@
+        @if (this.DisplayAttachmentButton
+             && !this.GetTranId().Equals("0")
+             && !string.IsNullOrWhiteSpace(this.AttachmentBookName))
+        {
+            <a id="AttachmentAnchor" class="item" href="@this.GetAttachmentUrl()">
+                @((MarkupString)("<i class='icon cloud upload'></i>" + Titles.UploadAttachmentsForThisTransaction))
+            </a>
+        }
+
+        @* AddNewAnchor() *@
+        @if (!string.IsNullOrWhiteSpace(this.AddNewPath))
+        {
+            <a id="AddNewAnchor" class="item" href="@PageUtility.ResolveUrl(this.AddNewPath)">
+                @((MarkupString)("<i class='icon add sign'></i>" + Titles.AddNew))
+            </a>
+        }
+
+        @* AddViewAnchor() *@
+        @if (!string.IsNullOrWhiteSpace(this.ViewPath))
+        {
+            <a id="ViewAnchor" class="item" href="@PageUtility.ResolveUrl(this.ViewPath)">
+                @((MarkupString)("<i class='icon circle left'></i>" + Titles.ReturnToView))
+            </a>
+        }
+
+        @* AddBackAnchor() - the only menu item the original gave no id *@
+        <a class="item" href="javascript:history.go(-1);">
+            @((MarkupString)("<i class='icon backward'></i>" + Titles.Back))
+        </a>
+    </div>
+
+    @* ---------- WithdrawDiv.cs AddWidthdrawDiv() - DOM contract: #WithdrawDiv ---------- *@
+    @if (this.DisplayWithdrawButton)
+    {
+        <div id="WithdrawDiv" style="max-width:@this.GetWidthText()px;">
+            @* AddWithdrawHeader() - the original used InnerText, so this stays encoded. *@
+            <div class="ui attached red message" style="display:block;">
+                <div class="header">@Questions.WithdrawalReason</div>
+            </div>
+
+            @* AddWithdrawPanelBody() *@
+            <div class="ui form attached fluid segment">
+                @* paragraph.InnerText - encoded. *@
+                <p>@Labels.TransactionWithdrawalInformation</p>
+
+                <div class="field">
+                    @* AddReasonTextBox(): TextMode.MultiLine + Rows = 5 + ClientIDMode.Static.
+                       The value is read server-side by OkButtonClick, so the binding must be
+                       two-way - a one-way textarea would withdraw with an empty reason. *@
+                    <textarea id="ReasonTextBox" name="ReasonTextBox" rows="5"
+                              @bind="this.reasonText" @bind:event="oninput"></textarea>
+
+                    @* Replaces RequiredFieldValidator "ReasonTextBoxRequired"
+                       (ControlToValidate = ReasonTextBox, ErrorMessage =
+                       Labels.ThisFieldIsRequired, CssClass = "error-message",
+                       Display = ValidatorDisplay.Dynamic). Dynamic means the message
+                       occupies no space while valid, so it is rendered conditionally
+                       rather than toggled with visibility. The rule itself is ENFORCED
+                       in OkButtonClick - see the comment there. *@
+                    @if (!string.IsNullOrEmpty(this.reasonValidationMessage))
+                    {
+                        <span class="error-message">@this.reasonValidationMessage</span>
+                    }
+                </div>
+
+                @* AddOkButton() - CausesValidation = true. DOM contract: #OKButton (the
+                   script clears #EmailHidden on its click). The legacy asp:Button rendered
+                   <input type="submit">, which is what Semantic UI's ".button" styling was
+                   written against, so the element type is kept; there is no form to submit,
+                   so the click is handled by Blazor rather than by a postback. *@
+                <input id="OKButton" type="submit" class="ui red small submit button"
+                       value="@Titles.OK" @onclick="this.OkButtonClick"
+                       @onclick:preventDefault="true" />
+
+                @* AddSpacer() *@
+                <span class="spacer">@((MarkupString)"&nbsp;")</span>
+
+                @* AddCancelButton() - CausesValidation = false and it never had a server
+                   handler; it is purely the client-side toggle the script binds.
+                   DOM contract: #CancelButton. *@
+                <input id="CancelButton" type="button" class="ui red small submit button"
+                       value="@Titles.Cancel" />
+            </div>
+
+            @* AddWithdrawFooter() - the original used InnerHtml, so the <i> stays raw. *@
+            <div class="ui bottom attached red info message">
+                @((MarkupString)("<i class='icon help'></i>" + Questions.AreYouSure))
+            </div>
+        </div>
+    }
+
+    @* ---------- HiddenFields.cs AddEmailHidden() ----------
+       DOM contract: #EmailHidden. TransactionChecklist.js writes the pre-fetched report
+       body into it and the email handler reads it back. jQuery's .val() raises no input
+       event, so the script's setEmailTemplate() dispatches a bubbling native "input" event
+       after every write - which is what makes this @bind:event="oninput" observe it. That
+       is deliberately preferred over reading the element back from C# through script
+       evaluation, which would break under a Content-Security-Policy that withholds
+       'unsafe-eval' and leave every email body silently empty. *@
+    <input id="EmailHidden" name="EmailHidden" type="hidden"
+           @bind="this.emailHiddenValue" @bind:event="oninput" />
+
+    @* ---------- Footer.cs AddMessageLabel() ----------
+       The WebForms Label rendered an empty <span> until a handler set its Text; it is
+       rendered here only once there is a message, which is the same visual result. *@
+    @if (!string.IsNullOrEmpty(this.messageText))
+    {
+        <span class="@this.messageCssClass">@this.messageText</span>
+    }
+</div>
+
+@code {
+    //=====================================================================================
+    // Properties.cs - all 28 public property names are FROZEN: five projects consume this
+    // control (MixERP.Net.FrontEnd plus the Sales/Finance/Inventory/Purchase confirmation
+    // pages). Only Width's TYPE could not be preserved; see its remarks and
+    // migration-summary.md section 4.
+    //=====================================================================================
+
+    [Parameter] public string AddNewPath { get; set; }
+    [Parameter] public string AttachmentBookName { get; set; }
+    [Parameter] public string Catalog { get; set; }
+    [Parameter] public string CustomerReportButtonText { get; set; }
+    [Parameter] public string CustomerReportPath { get; set; }
+    [Parameter] public bool HideVerificationMessage { get; set; }
+    [Parameter] public bool DisplayAttachmentButton { get; set; }
+    [Parameter] public bool DisplayCustomerReportButton { get; set; }
+    [Parameter] public bool DisplayEmailReportButton { get; set; }
+    [Parameter] public bool DisplayPrintGlEntryButton { get; set; }
+    [Parameter] public bool DisplayPrintReceiptButton { get; set; }
+    [Parameter] public bool DisplayViewReportButton { get; set; }
+    [Parameter] public bool DisplayWithdrawButton { get; set; }
+    [Parameter] public string EmailReportButtonText { get; set; }
+    [Parameter] public string GlAdvicePath { get; set; }
+    [Parameter] public bool IsNonGlTransaction { get; set; }
+    [Parameter] public bool IsStockTransferRequest { get; set; }
+    [Parameter] public string TableName { get; set; }
+    [Parameter] public string OverridePath { get; set; }
+    [Parameter] public string PartyEmailAddress { get; set; }
+    [Parameter] public string ReceiptAdvicePath { get; set; }
+    [Parameter] public string ReportPath { get; set; }
+    [Parameter] public string Text { get; set; }
+    [Parameter] public string ViewPath { get; set; }
+    [Parameter] public string ViewReportButtonText { get; set; }
+
+    /// <summary>
+    ///     Port of Properties.cs <c>public new Unit Width</c>.
+    ///     <para>
+    ///         SIGNATURE CHANGE: <c>System.Web.UI.WebControls.Unit</c> is removed from the
+    ///         platform, so this is now a CSS length string (for example "500px" or "500").
+    ///         <see cref="GetWidthText" /> extracts its numeric part, and the rendered output
+    ///         is unchanged: <c>style="width:&lt;n&gt;px;"</c> on the menu div and
+    ///         <c>style="max-width:&lt;n&gt;px;"</c> on the withdraw div, defaulting to 400
+    ///         exactly as the legacy GetWidth() did.
+    ///     </para>
+    /// </summary>
+    [Parameter] public string Width { get; set; }
+
+    [Parameter] public int UserId { get; set; }
+    [Parameter] public bool RestrictedTransactionMode { get; set; }
+
+    //=====================================================================================
+    // Component state. These replace the WebForms child-control instances whose Text /
+    // CssClass / Value the handlers mutated (subTitleLiteral, verificationLabel,
+    // messageLabel, reasonTextBox, emailHidden).
+    //=====================================================================================
+
+    /// <summary>Heading.cs AddSubtitle(). Mutable: the email handler overwrites it.</summary>
+    private string subTitleText = Labels.TransactionPostedSuccessfully;
+
+    private string verificationText;
+    private string verificationCssClass;
+    private string messageText;
+    private string messageCssClass;
+    private string reasonText;
+    private string reasonValidationMessage;
+    private string emailHiddenValue;
+
+    /// <summary>
+    ///     Gates the verification lookup in OnParametersSet to the inputs it depends on.
+    /// </summary>
+    private string verificationSignature;
+
+    //=====================================================================================
+    // QueryStringData.cs
+    //=====================================================================================
+
+    /// <summary>
+    ///     Port of QueryStringData.cs. The constant is preserved because it is concatenated
+    ///     into five report URLs above.
+    /// </summary>
+    private const string TRAN_ID_PARAMETER_NAME = "TranId";
+
+    /// <summary>
+    ///     Port of QueryStringData.cs GetTranId().
+    ///     <para>
+    ///         SIGNATURE CHANGE: <c>this.Page.Request["TranId"]</c> becomes a read of the
+    ///         current URI's query string through the injected NavigationManager. The "0"
+    ///         sentinel semantics are preserved exactly: an absent or unparseable id yields
+    ///         "0", which six of the menu buttons test against to hide themselves.
+    ///     </para>
+    /// </summary>
+    private string GetTranId()
+    {
+        long transactionMasterId = Conversion.TryCastLong(this.GetQueryStringValue(TRAN_ID_PARAMETER_NAME));
+        return transactionMasterId.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private string GetQueryStringValue(string key)
+    {
+        if (this.Navigation == null)
+        {
+            return null;
+        }
+
+        string query = new Uri(this.Navigation.Uri).Query;
+
+        if (string.IsNullOrEmpty(query))
+        {
+            return null;
+        }
+
+        StringValues value;
+
+        if (QueryHelpers.ParseQuery(query).TryGetValue(key, out value))
+        {
+            return value.ToString();
+        }
+
+        return null;
+    }
+
+    //=====================================================================================
+    // Buttons.cs
+    //=====================================================================================
+
+    /// <summary>
+    ///     Port of Buttons.cs GetWidth(). The legacy control read <c>Width.Value</c> (a
+    ///     double) and fell back to 400 when no width had been set. <see cref="Width" /> is
+    ///     now a CSS length string, so its leading numeric part is parsed; a blank,
+    ///     non-numeric or non-positive width keeps the legacy 400 default.
+    /// </summary>
+    private double GetWidth()
+    {
+        if (!string.IsNullOrWhiteSpace(this.Width))
+        {
+            int length = 0;
+            string candidate = this.Width.Trim();
+
+            while (length < candidate.Length
+                   && (char.IsDigit(candidate[length]) || candidate[length] == '.'))
+            {
+                length++;
+            }
+
+            double parsed;
+
+            if (length > 0
+                && double.TryParse(candidate.Substring(0, length), NumberStyles.Float,
+                       CultureInfo.InvariantCulture, out parsed)
+                && parsed > 0)
+            {
+                return parsed;
+            }
+        }
+
+        return 400; //Todo: Can be parameterized on a config file.
+    }
+
+    /// <summary>
+    ///     The width as the legacy control wrote it into the inline style. WebForms used the
+    ///     current culture's double formatting here; that is preserved so the emitted markup
+    ///     is byte-identical for the whole-number widths every consumer sets.
+    /// </summary>
+    private string GetWidthText()
+    {
+        return this.GetWidth().ToString(CultureInfo.CurrentCulture);
+    }
+
+    /// <summary>
+    ///     Port of Buttons.cs AddAttachmentAnchor()'s URL construction, including the
+    ///     InvariantCulture formatting and the fall back to the current page URL when
+    ///     OverridePath is blank.
+    ///     <para>SIGNATURE CHANGE: PageUtility.GetCurrentPageUrl takes a NavigationManager.</para>
+    /// </summary>
+    private string GetAttachmentUrl()
+    {
+        string overridePath = this.OverridePath;
+
+        if (string.IsNullOrWhiteSpace(overridePath))
+        {
+            overridePath = PageUtility.GetCurrentPageUrl(this.Navigation);
+        }
+
+        //The legacy HtmlAnchor.HRef resolved a leading "~" at render time; Razor emits the
+        //attribute verbatim, so the "~/" MUST be resolved here or the browser requests a
+        //literal "~/Modules/..." path and the attachment link is dead. Every other anchor
+        //in this component resolves through the same helper.
+        return PageUtility.ResolveUrl(string.Format(CultureInfo.InvariantCulture,
+            "~/Modules/BackOffice/AttachmentManager.mix?OverridePath={0}&Book={1}&Id={2}",
+            overridePath, this.AttachmentBookName, this.GetTranId()));
+    }
+
+    //=====================================================================================
+    // Heading.cs / VerificationStatuses.cs
+    //=====================================================================================
+
+    /// <summary>
+    ///     Heading.cs AddVerificationLabel() ran ShowVerificationStatus() while the control
+    ///     tree was being built, which is OnParametersSet here: it needs Catalog,
+    ///     IsNonGlTransaction and HideVerificationMessage to already be assigned, and it must
+    ///     re-run when a consumer changes any of them.
+    ///     <para>
+    ///         The lookup is a database round-trip, and WebForms made it once per control
+    ///         build rather than once per parameter assignment, so it is gated on the inputs
+    ///         it actually depends on. Without that gate an unrelated parameter change (say
+    ///         a button's visibility) would re-query the verification status.
+    ///     </para>
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        string tranId = this.GetTranId();
+
+        string signature = string.Join("|", this.Catalog, tranId,
+            this.IsStockTransferRequest.ToString(), this.IsNonGlTransaction.ToString(),
+            this.HideVerificationMessage.ToString());
+
+        if (!string.Equals(signature, this.verificationSignature, StringComparison.Ordinal))
+        {
+            this.verificationSignature = signature;
+            this.ShowVerificationStatus(tranId);
+        }
+
+        base.OnParametersSet();
+    }
+
+    /// <summary>
+    ///     Port of VerificationStatuses.cs ShowVerificationStatus(). All three early returns
+    ///     and all six switch cases are preserved with their original css classes, resource
+    ///     lookups and culture formatting. The <c>Label</c> argument is gone - the component
+    ///     writes its own verificationText/verificationCssClass state instead.
+    /// </summary>
+    private void ShowVerificationStatus(string tranId)
+    {
+        //WebForms built a FRESH Label on every control build, so a run that took one of the
+        //early returns below rendered nothing. The component's state persists, so it must be
+        //cleared first or a previously shown banner would stay on screen after a consumer
+        //sets HideVerificationMessage / IsNonGlTransaction or the id stops resolving.
+        this.verificationText = null;
+        this.verificationCssClass = null;
+
+        if (this.HideVerificationMessage)
+        {
+            return;
+        }
+
+        if (this.IsNonGlTransaction)
+        {
+            return;
+        }
+
+        long transactionMasterId = Conversion.TryCastLong(tranId);
+
+        if (transactionMasterId <= 0)
+        {
+            return;
+        }
+
+        Entities.Models.Transactions.Verification model = VerificationStatus.GetVerificationStatus(this.Catalog, transactionMasterId, this.IsStockTransferRequest);
+
+        switch (model.VerificationStatusId)
+        {
+            case -3:
+                this.verificationCssClass = "ui block message red";
+                this.verificationText = string.Format(CultureInfo.CurrentCulture, Labels.TransactionRejectedDetails, model.VerifierName, model.VerifiedDate.ToString(CurrentCulture.GetCurrentUICulture()), model.VerificationReason);
+                break;
+
+            case -2:
+                this.verificationCssClass = "ui block message yellow";
+                this.verificationText = string.Format(CultureInfo.CurrentCulture, Labels.TransactionClosedDetails, model.VerifierName, model.VerifiedDate.ToString(CurrentCulture.GetCurrentUICulture()), model.VerificationReason);
+                break;
+
+            case -1:
+                this.verificationText = string.Format(CultureInfo.CurrentCulture, Labels.TransactionWithdrawnDetails, model.VerifierName, model.VerifiedDate.ToString(CurrentCulture.GetCurrentUICulture()), model.VerificationReason);
+                this.verificationCssClass = "ui block message yellow";
+                break;
+
+            case 0:
+                this.verificationText = Labels.TransactionAwaitingVerification;
+                this.verificationCssClass = "ui block message blue";
+                break;
+
+            case 1:
+                this.verificationText = string.Format(CultureInfo.CurrentCulture, Labels.TransactionAutoApprovedDetails, model.VerifierName, model.VerifiedDate.ToString(CurrentCulture.GetCurrentUICulture()));
+                this.verificationCssClass = "ui block message green";
+                break;
+
+            case 2:
+                this.verificationText = string.Format(CultureInfo.CurrentCulture, Labels.TransactionApprovedDetails, model.VerifierName, model.VerifiedDate.ToString(CurrentCulture.GetCurrentUICulture()));
+                this.verificationCssClass = "ui block message green";
+                break;
+        }
+    }
+
+    //=====================================================================================
+    // Events.cs
+    //=====================================================================================
+
+    /// <summary>
+    ///     Port of Events.cs EmailLinkButton_Click(). All three guards (tran id, email
+    ///     template, recipient) are preserved, as is the silent return on each - the original
+    ///     gave the user no feedback in those cases and adding some would be a behaviour
+    ///     change.
+    ///     <para>
+    ///         The email template comes from #EmailHidden, which TransactionChecklist.js
+    ///         fills by GETting the report URL. jQuery's .val() raises no input event, so the
+    ///         script's setEmailTemplate() dispatches a bubbling native "input" event after
+    ///         every write; that is what lets the bound field below hold the real value with
+    ///         no JS interop on this path at all. Reading the element back through script
+    ///         evaluation would break under a Content-Security-Policy that withholds
+    ///         'unsafe-eval' and leave every email body silently empty.
+    ///     </para>
+    /// </summary>
+    private void EmailReportClick()
+    {
+        string tranId = this.GetTranId();
+
+        string emailTemplate = this.emailHiddenValue;
+
+        if (string.IsNullOrWhiteSpace(tranId))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(emailTemplate))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(this.PartyEmailAddress))
+        {
+            return;
+        }
+
+        EmailHelper email = new EmailHelper(this.Catalog, emailTemplate, this.Text + " #" + tranId, this.PartyEmailAddress);
+        email.SendEmail();
+        this.subTitleText = string.Format(CultureInfo.CurrentCulture, Labels.EmailSentConfirmation, this.PartyEmailAddress);
+    }
+
+    /// <summary>
+    ///     Port of Events.cs OkButton_Click() - the withdrawal flow. The decision order is
+    ///     preserved exactly: restricted mode, then a blank tran id, then a non-GL
+    ///     transaction, then the verification-status gate, and finally a refresh of the
+    ///     verification banner.
+    ///     <para>
+    ///         The okButton had CausesValidation = true, which is what made the removed
+    ///         RequiredFieldValidator block an empty reason. That rule is re-implemented here
+    ///         in C# and is genuinely enforced - a blank reason stops the withdrawal and
+    ///         shows Labels.ThisFieldIsRequired - because leaving the check out would let a
+    ///         reasonless withdrawal through behind a green build.
+    ///     </para>
+    /// </summary>
+    private void OkButtonClick()
+    {
+        this.reasonValidationMessage = null;
+
+        if (string.IsNullOrWhiteSpace(this.reasonText))
+        {
+            this.reasonValidationMessage = Labels.ThisFieldIsRequired;
+            return;
+        }
+
+        if (this.RestrictedTransactionMode)
+        {
+            this.messageText = Labels.CannotWithdrawTransaction;
+            this.messageCssClass = "ui block message red vpad12";
+            return;
+        }
+
+        string tranId = this.GetTranId();
+
+        if (string.IsNullOrWhiteSpace(tranId))
+        {
+            return;
+        }
+
+        if (this.IsNonGlTransaction)
+        {
+            this.messageText = Labels.CannotWithdrawNotValidGLTransaction;
+            this.messageCssClass = "ui block message red vpad12";
+            return;
+        }
+
+        DateTime transactionDate = DateTime.Now;
+        long transactionMasterId = Conversion.TryCastLong(tranId);
+
+        Entities.Models.Transactions.Verification model = VerificationStatus.GetVerificationStatus(this.Catalog, transactionMasterId, this.IsStockTransferRequest);
+        if (
+            model.VerificationStatusId.Equals(0) //Awaiting verification
+            ||
+            model.VerificationStatusId.Equals(1) //Automatically Approved by Workflow
+            )
+        {
+            //Withdraw this transaction.
+            if (transactionMasterId > 0)
+            {
+                if (Withdrawal.WithdrawTransaction(this.Catalog, this.IsStockTransferRequest, transactionMasterId, this.UserId, this.reasonText))
+                {
+                    this.messageText = string.Format(CultureInfo.CurrentCulture, Labels.TransactionWithdrawnMessage, transactionDate.ToShortDateString());
+                    this.messageCssClass = "ui block message yellow vpad12";
+                }
+            }
+        }
+        else
+        {
+            this.messageText = Labels.CannotWithdrawTransaction;
+            this.messageCssClass = "ui block message red vpad12";
+        }
+
+        this.ShowVerificationStatus(tranId);
+    }
+
+    //=====================================================================================
+    // Javascript.cs
+    //=====================================================================================
+
+    /// <summary>
+    ///     Port of Javascript.cs AddScript(). CreateChildControls() registered the script
+    ///     while building the control tree; JS interop is only legal after the first render
+    ///     in Blazor, so it moves here.
+    ///     <para>
+    ///         THE TIMING IS LOAD-BEARING. TransactionChecklist.js caches
+    ///         <c>$("#CancelButton")</c>, <c>$("#WithdrawDiv")</c>, <c>$("#WithdrawAnchor")</c>,
+    ///         <c>$("#ViewReportAnchor")</c>, <c>$("#EmailHidden")</c> and <c>$("#OKButton")</c>
+    ///         in top-level variables the moment it loads, then wires its handlers inside
+    ///         <c>$(document).ready</c>. Registering it from OnInitialized would run it before
+    ///         those elements exist - legal C# that leaves every button inert - so it must be
+    ///         firstRender of OnAfterRenderAsync, after the markup above is in the DOM.
+    ///     </para>
+    ///     <para>
+    ///         The former <c>[assembly: WebResource(...)]</c> declaration is gone with the
+    ///         System.Web.UI namespace; the script remains an EmbeddedResource and is resolved
+    ///         by JSUtility.GetWebResourceUrl through the host's
+    ///         JSUtility.WebResourceRoutePrefix endpoint. The former
+    ///         <c>[AspNetHostingPermission(SecurityAction.Demand, Level = Minimal)]</c> demand
+    ///         is likewise dropped: Code Access Security does not exist on modern .NET, and it
+    ///         was a host-trust demand rather than an application authorization rule, so no
+    ///         authorization behaviour is lost.
+    ///     </para>
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            JSUtility.AddJSReference(this.JSRuntime,
+                "MixERP.Net.WebControls.TransactionChecklist.Scripts.TransactionChecklist.js",
+                "TransactionChecklistForm",
+                typeof(TransactionChecklistForm));
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+}

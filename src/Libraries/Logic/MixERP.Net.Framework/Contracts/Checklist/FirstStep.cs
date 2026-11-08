@@ -24,12 +24,11 @@ namespace MixERP.Net.Framework.Contracts.Checklist
         public static IEnumerable<FirstStep> GetAll()
         {
             Type type = typeof (FirstStep);
-            
-            var items = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(s => s.GetTypes())
+
+            var items = DiscoveryAssemblies.GetTypes()
                 .Where(p => p.IsSubclassOf(type));
 
-            return items.Select(t => (FirstStep) Activator.CreateInstance(t));
+            return items.Select(t => (FirstStep) Activator.CreateInstance(t)).ToList();
         }
     }
 }
