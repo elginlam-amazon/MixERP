@@ -17,12 +17,80 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Runtime.Caching;
+using System;
+using Microsoft.Extensions.Caching.Memory;
+using Serilog;
 
 namespace MixERP.Net.Framework
 {
+    /// <summary>
+    ///     Application-wide object cache.
+    ///     Replaces the .NET Framework default <c>ObjectCache</c> singleton with
+    ///     <see cref="IMemoryCache" /> from <c>Microsoft.Extensions.Caching.Memory</c>.
+    ///     The host application should call <see cref="UseCache" /> during startup
+    ///     (<c>CacheFactory.UseCache(app.Services.GetRequiredService&lt;IMemoryCache&gt;())</c>) so that the
+    ///     library shares the DI-managed cache instance. When the host does not do so, a private
+    ///     process-wide <see cref="MemoryCache" /> is created lazily, preserving the original behavior
+    ///     of the framework's default cache.
+    /// </summary>
     public static class CacheFactory
     {
+        private static readonly object SyncRoot = new object();
+        private static IMemoryCache cache;
+        private static bool usingFallback;
+        private static bool fallbackServedEntries;
+
+        /// <summary>
+        ///     The cache instance used by this factory. Never null.
+        /// </summary>
+        public static IMemoryCache Cache
+        {
+            get
+            {
+                if (cache != null)
+                {
+                    return cache;
+                }
+
+                lock (SyncRoot)
+                {
+                    if (cache == null)
+                    {
+                        cache = new MemoryCache(new MemoryCacheOptions());
+                        usingFallback = true;
+                    }
+                }
+
+                return cache;
+            }
+        }
+
+        /// <summary>
+        ///     Supplies the DI-managed <see cref="IMemoryCache" /> to this factory. Call once at startup.
+        /// </summary>
+        public static void UseCache(IMemoryCache memoryCache)
+        {
+            if (memoryCache == null)
+            {
+                throw new ArgumentNullException(nameof(memoryCache));
+            }
+
+            lock (SyncRoot)
+            {
+                if (fallbackServedEntries && !ReferenceEquals(cache, memoryCache))
+                {
+                    // Swapping the cache discards whatever the fallback already holds. That must not happen
+                    // silently — call UseCache before anything else touches the cache.
+                    Log.Warning(
+                        "CacheFactory was already in use with its private fallback cache when the application supplied the shared cache; entries cached until now have been discarded. Call CacheFactory.UseCache during startup, before any other initialization.");
+                }
+
+                cache = memoryCache;
+                usingFallback = false;
+                fallbackServedEntries = false;
+            }
+        }
+
         public static void AddToDefaultCache(string key, object value)
         {
             if (string.IsNullOrWhiteSpace(key))
@@ -35,16 +103,14 @@ namespace MixERP.Net.Framework
                 return;
             }
 
-            var cacheItem = new CacheItem(key, value);
+            IMemoryCache target = Cache;
 
-            if (MemoryCache.Default[key] == null)
+            if (usingFallback)
             {
-                MemoryCache.Default.Add(cacheItem, new CacheItemPolicy());
+                fallbackServedEntries = true;
             }
-            else
-            {
-                MemoryCache.Default[key] = cacheItem;
-            }
+
+            target.Set(key, value);
         }
 
         public static object GetFromDefaultCacheByKey(string key)
@@ -54,7 +120,8 @@ namespace MixERP.Net.Framework
                 return null;
             }
 
-            return MemoryCache.Default.Get(key);
+            object value;
+            return Cache.TryGetValue(key, out value) ? value : null;
         }
     }
 }

@@ -1,16 +1,37 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
+﻿/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+
 using System.Globalization;
 using System.Resources;
-using System.Runtime.Caching;
-using System.Threading;
 
 namespace MixERP.Net.i18n
 {
     public class ResourceManager
     {
-        private static readonly bool supressException = ConfigurationManager.AppSettings["SupressMissingResourceException"].ToUpperInvariant().Equals("TRUE");
+        private const string ResourcesCacheKey = "Resources";
+
+        /// <summary>
+        /// When true, a missing resource returns its key instead of throwing. Supplied by the
+        /// host through <see cref="I18nServiceCollectionExtensions.AddMixErpI18n" />; defaults
+        /// to false (non-suppressing), matching the legacy Web.config value.
+        /// </summary>
+        private static bool SupressException => I18nRuntime.Options.SupressMissingResourceException;
 
         public static string GetString(string resourceClass, string resourceKey, string cultureCode = null)
         {
@@ -18,46 +39,47 @@ namespace MixERP.Net.i18n
 
             if (result == null)
             {
-                if (supressException)
+                if (SupressException)
                 {
                     return resourceKey;
                 }
 
-                throw new MissingManifestResourceException("Resource " + resourceClass + "." + resourceKey + " was not found.");
+                throw new MissingManifestResourceException("Resource " + resourceClass + "." + resourceKey +
+                                                           " was not found.");
             }
 
             return result;
         }
 
-        public static string TryGetResourceFromCache(string resourceClass, string resourceKey, string cultureCode = null)
+        public static string TryGetResourceFromCache(string resourceClass, string resourceKey,
+            string cultureCode = null)
         {
-            CultureInfo culture = Thread.CurrentThread.CurrentCulture;
+            return TryGetResourceFromCache(resourceClass, resourceKey, cultureCode, false);
+        }
+
+        private static string TryGetResourceFromCache(string resourceClass, string resourceKey, string cultureCode,
+            bool initialized)
+        {
+            CultureInfo culture = CultureInfo.CurrentCulture;
 
             if (!string.IsNullOrWhiteSpace(cultureCode))
             {
                 culture = new CultureInfo(cultureCode);
             }
 
-
-            IDictionary<string, string> cache;
-            var cacheItem = MemoryCache.Default.Get("Resources");
-
-            if (cacheItem is CacheItem)
-            {
-                CacheItem item = (CacheItem) cacheItem;
-
-                cache = (IDictionary<string, string>)item.Value;
-            }
-            else
-            {
-                cache = (IDictionary<string, string>)cacheItem;                
-            }
-
+            IDictionary<string, string> cache =
+                CacheFactory.GetFromDefaultCacheByKey(ResourcesCacheKey) as IDictionary<string, string>;
 
             if (cache == null || cache.Count.Equals(0))
             {
+                if (initialized)
+                {
+                    // The database returned no rows — return a miss instead of recursing forever.
+                    return null;
+                }
+
                 InitializeResources();
-                return TryGetResourceFromCache(resourceClass, resourceKey, cultureCode);
+                return TryGetResourceFromCache(resourceClass, resourceKey, cultureCode, true);
             }
 
             string cacheKey = resourceClass + "." + culture.Name + "." + resourceKey;
@@ -95,16 +117,10 @@ namespace MixERP.Net.i18n
             return result;
         }
 
-        private static string GetFallBackResource(ref IDictionary<string, string> cache, CultureInfo culture, string resourceClass, string resourceKey)
-        {
-            throw new NotImplementedException();
-        }
-
-
         private static void InitializeResources()
         {
             IDictionary<string, string> resources = DbResources.GetLocalizedResources();
-            CacheFactory.AddToDefaultCache("Resources", resources);
+            CacheFactory.AddToDefaultCache(ResourcesCacheKey, resources);
         }
     }
 }

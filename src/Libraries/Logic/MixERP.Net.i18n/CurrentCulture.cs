@@ -41,6 +41,9 @@ namespace MixERP.Net.i18n
             var cultureString = culture.ToString();
             if (cultureString.Equals("fr") || cultureString.Equals("ru"))
             {
+                // A shared CultureInfo is read-only on modern .NET, so assigning to its
+                // NumberFormat throws. Clone it first, then apply the group-separator override.
+                culture = (CultureInfo)culture.Clone();
                 culture.NumberFormat.CurrencyGroupSeparator = "\x0020";
                 culture.NumberFormat.NumberGroupSeparator = "\x0020";
             }
