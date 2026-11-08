@@ -1,0 +1,450 @@
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Blazor replacement for the former WebForms CompositeControl
+    "MixERP.Net.WebControls.StockAdjustmentFactory.FormView" (the partial class formerly
+    spread over FormView/**).
+
+    The markup below reproduces, in order, the DOM that FormView/Control.cs
+    CreateChildControls() built:
+
+        CreateHeader()          -> the <h2>
+        AddRuler()              -> div.ui.divider
+        CreateTopPanel()        -> div.ui.form > div.inline.fields
+        CreateGridPanel()       -> div[style] > table#TransferGridView
+        AddErrorLabelBottom()   -> div#ErrorLabel
+        CreateBottomPanel()     -> the bottom form
+        AddInlineScript()       -> the 7 JS globals          } now OnAfterRenderAsync
+        AddJavascript()         -> the embedded FormView.js   } (see @code)
+
+    Render(HtmlTextWriter w) emitted ONLY this.container, an HtmlGenericControl constructed
+    with the parameterless ctor. That ctor is `: this("span")` - it does NOT leave TagName
+    null - so the control rendered a bare <span> (no id, no class) wrapping every panel. The
+    template therefore keeps that <span> as its root element: nothing in FormView.js uses a
+    parent/child combinator, so dropping it would break no scripted behaviour, but it would
+    remove a DOM level that host CSS may target and would change the inline/block layout
+    context the wrapper established.
+
+    DOM CONTRACT - read §3 of migration-summary.md BEFORE editing any markup. FormView.js
+    selects every handle it uses by LITERAL element id, so each id below must stay
+    byte-identical, and the three CONDITIONAL ids (TransactionTypeSelect, SourceStoreSelect,
+    ShippingCompanySelect) must stay ABSENT - not empty - when their flag is off, because the
+    script branches on .length. In addition:
+      * The grid's column ORDER is a positional contract. Validate()/GetDebit()/GetCredit()
+        index the tableToJSON payload as [0]=transaction type, [2]=item name, [4]=unit name,
+        [5]=quantity, and appendToTable() indexes the rendered rows by getColumnText(row, n).
+        Reordering a column silently breaks the Dr/Cr balance check.
+      * The control row must remain the LAST <tr> of the table: appendToTable() addresses the
+        body with find("tbody tr:not(:last-child)") and inserts with find("tr:last").before().
+      * The control row must keep class="footer-row ui form".
+      * The table must render exactly TWO <tr> when empty: saveButton's handler treats
+        find("tr").length === 2 as "grid is empty".
+*@
+
+@namespace MixERP.Net.WebControls.StockAdjustmentFactory
+@using System
+@using System.Collections.Generic
+@using System.Globalization
+@using System.Threading.Tasks
+@using Microsoft.JSInterop
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.Entities
+@using MixERP.Net.i18n.Resources
+@using MixERP.Net.WebControls.Common
+
+@*
+    FormView/JavaScript.cs needed the WebForms Page (PageUtility.RegisterJavascript(..., this.Page, ...)
+    and JSUtility.AddJSReference(this.Page, ...)) to register its script vars and the embedded
+    script file; both now go through IJSRuntime. The legacy ambient-request context is NULL
+    over the SignalR circuit and must never be reintroduced.
+*@
+@inject IJSRuntime JSRuntime
+
+@*
+    FormView/Control.cs - the `container` HtmlGenericControl. Parameterless HtmlGenericControl()
+    is `: this("span")`, so this bare <span> is the wrapper the legacy control actually emitted
+    around all of its panels. No id and no class, exactly as the original.
+*@
+<span>
+
+@* FormView/Header.cs - CreateHeader: an h2 carrying the Text property. *@
+<h2>@this.Text</h2>
+
+@* FormView/Header.cs - AddRuler. *@
+<div class="ui divider"></div>
+
+@*
+    FormView/TopPanel.cs - CreateTopPanel: div.ui.form wrapping FormHelper.GetFields()
+    (div.inline.fields), which holds the date field then the reference-number field.
+    FormHelper.GetField() emitted div.small.field.
+*@
+<div class="ui form">
+    <div class="inline fields">
+        @* FormView/TopPanel.cs - AddDateTextBox. The migrated Common DateTextBox component
+           replaces the former child control; #ValueDateTextBox is the id it renders. *@
+        <div class="small field">
+            <label for="ValueDateTextBox">@Titles.ValueDate</label>
+            <DateTextBox ID="ValueDateTextBox"
+                         Mode="FrequencyType.Today"
+                         Catalog="@this.Catalog"
+                         OfficeId="@this.OfficeId" />
+        </div>
+        @* FormView/TopPanel.cs - AddReferenceNumberTextBox. The resource key misspelling
+           "RefererenceNumberAbbreviated" is the i18n key's actual name, kept verbatim.
+           HtmlInputText rendered <input type="text" id=".." name=".." maxlength="24" />. *@
+        <div class="small field">
+            <label for="ReferenceNumberInputText">@Titles.RefererenceNumberAbbreviated</label>
+            <input type="text" id="ReferenceNumberInputText" name="ReferenceNumberInputText" maxlength="24" />
+        </div>
+    </div>
+</div>
+
+@*
+    FormView/GridPanel.cs - CreateGridPanel. Header row + control row only: the data rows are
+    built client-side by FormView.js (appendToTable).
+*@
+<div style="width: 100%;overflow:auto;">
+    <table id="TransferGridView" class="ui table segment" style="min-width:1000px;max-width:2000px;">
+        @*
+            FormView/GridPanel.cs - GetHeaderRow()/GetHeaderCell(). The TableHeaderRow carried
+            TableSection = TableRowSection.TableHeader, which is what made ASP.NET emit <thead>.
+            GetHeaderCell(text, associatedControlId, alignRight, width) added class="text-right"
+            only when alignRight, and style="width:Npx;" only when width > 0 (hence NO style on
+            the ItemName cell, whose width argument is 0), and emitted plain text instead of a
+            <label> when associatedControlId was null (hence the Action cell).
+            CELL ORDER IS A JS CONTRACT.
+        *@
+        <thead>
+            <tr>
+                @if (!this.HideSides)
+                {
+                    <th style="width:80px;"><label for="TransactionTypeSelect">@Titles.Type</label></th>
+                }
+                <th style="width:140px;"><label for="StoreSelect">@Titles.Store</label></th>
+                <th style="width:90px;"><label for="ItemCodeInputText">@Titles.ItemCode</label></th>
+                <th><label for="ItemSelect">@Titles.ItemName</label></th>
+                <th style="width:120px;"><label for="UnitSelect">@Titles.Unit</label></th>
+                <th class="text-right" style="width:120px;"><label for="QuantityInputText">@Titles.Quantity</label></th>
+                <th style="width:120px;">@Titles.Action</th>
+            </tr>
+        </thead>
+        @*
+            FormView/GridInlineForm.cs - GetControlRow(): the control cells in the SAME order as
+            the header. The "footer-row" class is part of the legacy markup.
+            The GetCell()/GetControlRow() "using"-and-return helpers are DROPPED (recorded in
+            migration-summary.md §2) - they disposed the very control they returned, a
+            WebForms-era bug that is meaningless in Razor.
+        *@
+        <tbody>
+            <tr class="footer-row ui form">
+                @if (!this.HideSides)
+                {
+                    @* AddTransactionTypeSelect - the two options are hardcoded and drive
+                       GetDebit()/GetCredit() in the script; their values must stay "Cr"/"Dr". *@
+                    <td>
+                        <select id="TransactionTypeSelect" name="TransactionTypeSelect">
+                            <option value="Cr">Cr</option>
+                            <option value="Dr">Dr</option>
+                        </select>
+                    </td>
+                }
+                @* AddStoreSelect - populated by loadStores(). *@
+                <td><select id="StoreSelect" name="StoreSelect"></select></td>
+                @* AddItemCodeInputText *@
+                <td><input type="text" id="ItemCodeInputText" name="ItemCodeInputText" /></td>
+                @* AddItemSelect - populated by loadItems(). *@
+                <td><select id="ItemSelect" name="ItemSelect"></select></td>
+                @* AddUnitSelect - populated by loadUnits(). *@
+                <td><select id="UnitSelect" name="UnitSelect"></select></td>
+                @* AddQuantityInputText *@
+                <td><input type="text" id="QuantityInputText" name="QuantityInputText" class="text-right integer" /></td>
+                @* AddButton - deliberately NO @@onclick: addButton.click in FormView.js owns it. *@
+                <td><input type="button" id="AddButton" name="AddButton" value="@Titles.Add" class="ui small red button" /></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+@*
+    FormView/BottomPanel.cs - AddErrorLabelBottom. Its position BETWEEN the grid panel and the
+    bottom panel is the original order. Rendered EMPTY, exactly as the original: FormView.js
+    owns this node (errorLabel.html(...)), so the component must never render children into it -
+    a later component re-render would wipe a JS-written validation message.
+*@
+<div id="ErrorLabel" class="big error vpad16"></div>
+
+@*
+    FormView/BottomPanel.cs - CreateBottomPanel. FormHelper.GetFields() set class="inline fields"
+    and CreateBottomPanel() then OVERWROTE it with Attributes.Add("class", "ui form"); an
+    HtmlControl attribute collection keeps only the LAST write, so the rendered class was
+    "ui form" alone. The rendered result is reproduced here; the resolution is recorded in
+    migration-summary.md §4.
+*@
+<div class="ui form" style="width:290px;">
+    @if (this.DisplaySourceStore)
+    {
+        @* AddSourceStoreSelect - returns early unless DisplaySourceStore. *@
+        <div class="small field">
+            <label for="SourceStoreSelect">@Titles.DeliverFrom</label>
+            <select id="SourceStoreSelect" name="SourceStoreSelect"></select>
+        </div>
+    }
+    @if (this.DisplayShipper)
+    {
+        @* AddShippingCompanySelect - returns early unless DisplayShipper. *@
+        <div class="small field">
+            <label for="ShippingCompanySelect">@Titles.ShippingCompany</label>
+            <select id="ShippingCompanySelect" name="ShippingCompanySelect"></select>
+        </div>
+    }
+    @* AddStatementReferenceTextArea *@
+    <div class="small field">
+        <label for="StatementReferenceTextArea">@Titles.StatementReference</label>
+        <textarea id="StatementReferenceTextArea" name="StatementReferenceTextArea" rows="4"></textarea>
+    </div>
+    @* AddSaveButton - deliberately NO @@onclick: saveButton.click in FormView.js owns the click
+       (it validates the grid and then calls the host's
+       StockAdjustmentFactory_FormvView_SaveButton_Callback). *@
+    <input type="button" id="SaveButton" name="SaveButton" value="@Titles.Save" class="ui small blue button" />
+</div>
+
+@* Closes the `container` <span> opened at the top of the template. *@
+</span>
+
+@code {
+    //---------------------------------------------------------------------------------------
+    // FormView/Control.cs + FormView/Properties.cs
+    //
+    // The 13 public members are a FROZEN API: three consumer pages in
+    // MixERP.Net.Core.Modules.Inventory set them by name (recorded in migration-summary.md
+    // §5). Each keeps its original name and type and becomes a [Parameter] - including the
+    // ItemIdQuerySericeUrl misspelling, which is part of the public surface and also drives
+    // the JS global of the same (misspelled) name.
+    //---------------------------------------------------------------------------------------
+
+    /// <summary>
+    ///     The title displayed in the form's h2.
+    /// </summary>
+    [Parameter]
+    public string Text { get; set; }
+
+    /// <summary>
+    ///     Service url loadStores() binds BOTH #StoreSelect and #SourceStoreSelect from.
+    /// </summary>
+    [Parameter]
+    public string StoreServiceUrl { get; set; }
+
+    /// <summary>
+    ///     Service url loadItems() binds #ItemSelect from.
+    /// </summary>
+    [Parameter]
+    public string ItemServiceUrl { get; set; }
+
+    /// <summary>
+    ///     Service url loadUnits() binds #UnitSelect from.
+    /// </summary>
+    [Parameter]
+    public string UnitServiceUrl { get; set; }
+
+    /// <summary>
+    ///     Service url loadShippers() binds #ShippingCompanySelect from.
+    /// </summary>
+    [Parameter]
+    public string ShippingCompanyServiceUrl { get; set; }
+
+    /// <summary>
+    ///     Url of the item-lookup popup window, opened by the F4 shortcut.
+    /// </summary>
+    [Parameter]
+    public string ItemPopupUrl { get; set; }
+
+    /// <summary>
+    ///     Service url ajaxDataBindCallBack() queries an item by id from, after the item popup
+    ///     has written #ItemIdHidden.
+    /// </summary>
+    /// <remarks>
+    ///     The name is MISSPELLED ("Serice"). It is preserved verbatim: it is public API that
+    ///     three consumers set, and it is emitted as the JS global itemIdQuerySericeUrl, which
+    ///     FormView.js reads under that exact spelling.
+    /// </remarks>
+    [Parameter]
+    public string ItemIdQuerySericeUrl { get; set; }
+
+    /// <summary>
+    ///     When enabled, the save handler requires the debit and credit sides to balance per
+    ///     item. Emitted as the JS global validateSides.
+    /// </summary>
+    [Parameter]
+    public bool ValidateSides { get; set; }
+
+    /// <summary>
+    ///     When enabled, the transaction-type (Dr/Cr) column is omitted from BOTH the header
+    ///     row and the control row.
+    /// </summary>
+    [Parameter]
+    public bool HideSides { get; set; }
+
+    /// <summary>
+    ///     Database catalog, forwarded to the DateTextBox component.
+    /// </summary>
+    [Parameter]
+    public string Catalog { get; set; }
+
+    /// <summary>
+    ///     Office id, forwarded to the DateTextBox component.
+    /// </summary>
+    [Parameter]
+    public int OfficeId { get; set; }
+
+    /// <summary>
+    ///     When enabled, the bottom panel displays #ShippingCompanySelect.
+    /// </summary>
+    [Parameter]
+    public bool DisplayShipper { get; set; }
+
+    /// <summary>
+    ///     When enabled, the bottom panel displays #SourceStoreSelect.
+    /// </summary>
+    [Parameter]
+    public bool DisplaySourceStore { get; set; }
+
+    //---------------------------------------------------------------------------------------
+    // Lifecycle.
+    //
+    // FormView/Control.cs ran AddInlineScript() and AddJavascript() from
+    // CreateChildControls(), i.e. while the control tree was being built. Both need the
+    // browser, and the script file binds 17 literal element ids, so both belong in
+    // OnAfterRenderAsync(firstRender) - no DOM exists before the first render in Blazor
+    // Server.
+    //
+    // DROPPED (recorded in migration-summary.md §2):
+    //   CreateChildControls / RecreateChildControls / EnsureChildControls /
+    //   Render(HtmlTextWriter) and the HtmlGenericControl container (a Razor component
+    //   re-renders declaratively and owns no child-control tree);
+    //   the sealed Dispose()/Dispose(bool)/disposed trio, which existed only to release the
+    //   container and dateTextBox CHILD CONTROLS - there is no child-control tree and no
+    //   unmanaged resource here, so this component does NOT implement IDisposable and does
+    //   not carry an empty Dispose();
+    //   [ToolboxData("<{0}:FormView runat=server></{0}:FormView>")], a Visual Studio
+    //   WebForms designer-only attribute;
+    //   [AspNetHostingPermission(SecurityAction.Demand, Level = Minimal)] - Code Access
+    //   Security is gone from modern .NET, and this was a host-trust demand, never an
+    //   application authorization rule;
+    //   [assembly: WebResource("...FormView.js", "application/x-javascript")] -
+    //   System.Web.UI.WebResourceAttribute is a removed type. The script is now resolved by
+    //   JSUtility through the assembly manifest name (pinned by the EmbeddedResource
+    //   LogicalName in the csproj) and served by the host's JSUtility.WebResourceRoutePrefix
+    //   endpoint.
+    //---------------------------------------------------------------------------------------
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        // FormView/Control.cs ran AddInlineScript() BEFORE AddJavascript(), and the order
+        // matters: FormView.js reads the globals those vars declare.
+        this.AddInlineScript();
+        this.AddJavascript();
+        this.InitializeJavascript();
+
+        await Task.CompletedTask;
+    }
+
+    //---------------------------------------------------------------------------------------
+    // FormView/JavaScript.cs
+    //---------------------------------------------------------------------------------------
+
+    /// <summary>
+    ///     FormView/JavaScript.cs - AddInlineScript(), ported verbatim: the same seven globals,
+    ///     in the same order, under the unchanged key "StockAdjustmentFormViewInlineScript".
+    /// </summary>
+    /// <remarks>
+    ///     validateSides is emitted as a STRING var holding "true"/"false" - exactly what the
+    ///     original did (ValidateSides.ToString().ToLower(InvariantCulture) passed through the
+    ///     default isString: true overload). FormView.js tests it with the loose
+    ///     "validateSides == true", and a non-empty string is NOT loosely equal to true in
+    ///     JavaScript, so the legacy semantics are: the balance check effectively never fires.
+    ///     That is preserved deliberately - "fixing" it would change which saves are rejected,
+    ///     which is a behaviour change, not a migration. Recorded in migration-summary.md §3.
+    /// </remarks>
+    private void AddInlineScript()
+    {
+        string script = string.Empty;
+
+        script += JSUtility.GetVar("storeServiceUrl", this.StoreServiceUrl);
+        script += JSUtility.GetVar("shippingCompanyServiceUrl", this.ShippingCompanyServiceUrl);
+        script += JSUtility.GetVar("itemServiceUrl", this.ItemServiceUrl);
+        script += JSUtility.GetVar("unitServiceUrl", this.UnitServiceUrl);
+        script += JSUtility.GetVar("itemPopupUrl", this.ItemPopupUrl);
+        script += JSUtility.GetVar("itemIdQuerySericeUrl", this.ItemIdQuerySericeUrl);
+        script += JSUtility.GetVar("validateSides", this.ValidateSides.ToString().ToLower(CultureInfo.InvariantCulture));
+
+        PageUtility.RegisterJavascript("StockAdjustmentFormViewInlineScript", script, JSRuntime, true);
+    }
+
+    /// <summary>
+    ///     FormView/JavaScript.cs - AddJavascript(). The manifest name is pinned by the
+    ///     &lt;LogicalName&gt; of the EmbeddedResource in the csproj and must stay
+    ///     byte-identical to the string below.
+    /// </summary>
+    private void AddJavascript()
+    {
+        JSUtility.AddJSReference(JSRuntime, "MixERP.Net.WebControls.StockAdjustmentFactory.FormView.js", "FormView", typeof(StockAdjustmentForm));
+    }
+
+    /// <summary>
+    ///     Calls the script's public init entry point, window.initStockAdjustmentForm().
+    ///
+    ///     PageUtility.RegisterJavascript and JSUtility.AddJSReference only QUEUE a script
+    ///     append (they are fire-and-forget), so window.initStockAdjustmentForm does not exist
+    ///     yet at the moment this runs. Invoking it directly would throw a JSException out of
+    ///     OnAfterRenderAsync and tear down the circuit on first load, so the emitted bootstrap
+    ///     polls for the function and only then calls it - the StockTransactionFactory
+    ///     precedent.
+    ///
+    ///     The key is per instance because PageUtility.RegisterJavascript injects a given key
+    ///     only ONCE, whereas every instantiation of this component needs its own init run
+    ///     (WebForms re-executed the file on every page load).
+    /// </summary>
+    private void InitializeJavascript()
+    {
+        string javaScript =
+            "(function(){var tries=0;var run=function(){" +
+            "if(typeof window.initStockAdjustmentForm==='function'){window.initStockAdjustmentForm();return;}" +
+            "if(++tries<600){window.setTimeout(run,50);}};run();})();";
+
+        PageUtility.RegisterJavascript(
+            "StockAdjustmentForm_Init_" + this.javascriptInstanceKey,
+            javaScript,
+            JSRuntime,
+            true);
+    }
+
+    /// <summary>
+    ///     Makes the per-instance bootstrap key unique - see InitializeJavascript().
+    /// </summary>
+    private readonly string javascriptInstanceKey = Guid.NewGuid().ToString("N");
+}

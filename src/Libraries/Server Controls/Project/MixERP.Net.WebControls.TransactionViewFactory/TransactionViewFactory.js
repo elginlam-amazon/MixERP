@@ -2,11 +2,27 @@
 var printButton = $("#PrintButton");
 
 $(document).ready(function () {
-    updateFlagColor();
-    updatePreviewButtons();
+    initTransactionView();
 });
 
-printButton.click(function () {
+//Resolves the grid FRESH on every call.
+//
+//Blazor re-renders MixERPGridView's <table> whenever the data source changes (and its
+//empty-data table and its populated table are two different elements), so the module-level
+//"transactionGridView" captured when this script was parsed quickly points at a DETACHED
+//node. Every selection/print/flag lookup must therefore re-resolve the grid by id instead
+//of reusing that cached jQuery object.
+var getTransactionGridView = function () {
+    transactionGridView = $("#TransactionGridView");
+    return transactionGridView;
+};
+
+var getPrintButton = function () {
+    printButton = $("#PrintButton");
+    return printButton;
+};
+
+var printTransactionGridView = function () {
     var templatePath = "/Reports/Print.html";
     var headerPath = "/Reports/Assets/Header.aspx";
     var title = $("h1").html();
@@ -17,15 +33,15 @@ printButton.click(function () {
     var offsetLast = 2;
 
     printGridView(templatePath, headerPath, title, targetControlId, date, user, office, windowName, offsetFirst, offsetLast);
-});
+};
 
 var updateFlagColor = function () {
-    var grid = $("#TransactionGridView");
+    var grid = getTransactionGridView();
     createFlaggedRows(grid);
 };
 
 var updatePreviewButtons = function () {
-    var grid = $("#TransactionGridView");
+    var grid = getTransactionGridView();
 
     grid.find("tbody tr").each(function () {
         var row = $(this);
@@ -54,7 +70,7 @@ var getSelectedItems = function () {
     //Set the position of the column which contains id.
     var idColumnPosition = "3";
 
-    var selection = getSelectedCheckBoxItemIds(checkBoxColumnPosition, idColumnPosition, transactionGridView);
+    var selection = getSelectedCheckBoxItemIds(checkBoxColumnPosition, idColumnPosition, getTransactionGridView());
 
     if (selection.length > 0) {
         $("#SelectedValuesHidden").val(selection.join(','));
@@ -65,10 +81,30 @@ var getSelectedItems = function () {
     }
 };
 
-transactionGridView.find('tr').click(function () {
-    var checkBox = $(this).find('td input:checkbox');
-    toogleSelection(checkBox);
-});
+//(Re)wires everything this script owns against the CURRENT DOM.
+//
+//IDEMPOTENT by construction: every binding is namespaced and re-bound with
+//.off('click.transactionView').on('click.transactionView', ...), and no jQuery object is
+//cached across calls - so repeated calls REBIND rather than stack handlers. The component
+//calls this after EVERY render (not just the first), because Blazor replaces the grid's
+//<table>/<tr> set on every data change (initial load, Show, a flag update) while this
+//script element is injected only once per circuit. Without it the row-click selection,
+//the print button and the flag row colours render and silently do nothing.
+window.initTransactionView = function () {
+    var grid = getTransactionGridView();
+
+    grid.find('tr').off('click.transactionView').on('click.transactionView', function () {
+        var checkBox = $(this).find('td input:checkbox');
+        toogleSelection(checkBox);
+    });
+
+    getPrintButton().off('click.transactionView').on('click.transactionView', function () {
+        printTransactionGridView();
+    });
+
+    updateFlagColor();
+    updatePreviewButtons();
+};
 
 function showCheckList(element) {
     var current = parseFloat2($(element).parent().parent().find("td:nth-child(3)").html());

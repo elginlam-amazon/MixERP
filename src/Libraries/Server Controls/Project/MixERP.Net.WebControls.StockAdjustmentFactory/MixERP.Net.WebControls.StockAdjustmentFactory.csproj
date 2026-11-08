@@ -1,99 +1,76 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{935FBCEF-5F6B-4BD3-B6F3-0C65FEA66A15}</ProjectGuid>
-    <OutputType>Library</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>MixERP.Net.WebControls.StockAdjustmentFactory</RootNamespace>
     <AssemblyName>MixERP.Net.WebControls.StockAdjustmentFactory</AssemblyName>
-    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <Nonshipping>true</Nonshipping>
-    <TargetFrameworkProfile>
-    </TargetFrameworkProfile>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <CodeAnalysisRuleSet>..\..\..\..\MixERP.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-  </PropertyGroup>
-  <PropertyGroup>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
     <SignAssembly>true</SignAssembly>
-  </PropertyGroup>
-  <PropertyGroup>
     <AssemblyOriginatorKeyFile>Mix Open Foundation.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <CodeAnalysisRuleSet>../../../../MixERP.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+
+  <!-- Assembly metadata migrated from the former Properties/AssemblyInfo.cs. -->
+  <PropertyGroup>
+    <AssemblyTitle>MixERP.Net.WebControls.StockAdjustmentFactory</AssemblyTitle>
+    <Description></Description>
+    <Company>MixERP Inc.</Company>
+    <Product>MixERP.Net.WebControls.StockAdjustmentFactory</Product>
+    <Copyright>Copyright ©  2014-2015</Copyright>
+    <!-- The original AssemblyInfo.cs emitted [assembly: AssemblyConfiguration("")]. The SDK
+         otherwise defaults this to $(Configuration) and would emit Debug/Release. -->
+    <AssemblyConfiguration></AssemblyConfiguration>
+    <NeutralLanguage>en</NeutralLanguage>
+    <AssemblyVersion>1.2.0.1</AssemblyVersion>
+    <FileVersion>1.2.0.1</FileVersion>
+    <InformationalVersion>1.2.0.1 RC</InformationalVersion>
+  </PropertyGroup>
+
+  <!-- [assembly: ComVisible(false)] and the COM typelib GUID, copied VERBATIM from the former
+       Properties/AssemblyInfo.cs. That file declared NO [assembly: CLSCompliant], so none is
+       emitted here (unlike the StockTransactionFactory precedent, whose AssemblyInfo did). -->
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
-    <Reference Include="System.Xml.Linq" />
-    <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Web" />
+    <AssemblyAttribute Include="System.Runtime.InteropServices.ComVisibleAttribute">
+      <_Parameter1>false</_Parameter1>
+      <_Parameter1_TypeName>System.Boolean</_Parameter1_TypeName>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.InteropServices.GuidAttribute">
+      <_Parameter1>b36002da-56f2-4f4a-adce-0ed7a48cae1f</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
+
+  <!-- ComponentBase, [Parameter] and Microsoft.JSInterop (IJSRuntime) come from the ASP.NET
+       Core shared framework on net10.0; the Razor SDK alone does not supply them. Replaces the
+       former bare System/System.Core/System.Xml.Linq/System.Data.DataSetExtensions/
+       Microsoft.CSharp/System.Drawing/System.Web references. -->
   <ItemGroup>
-    <Compile Include="FormView\GridInlineForm.cs" />
-    <Compile Include="FormView\Header.cs" />
-    <Compile Include="FormView\JavaScript.cs" />
-    <Compile Include="FormView\Control.cs" />
-    <Compile Include="FormView\BottomPanel.cs" />
-    <Compile Include="FormView\GridPanel.cs" />
-    <Compile Include="FormView\TopPanel.cs" />
-    <Compile Include="FormView\Properties.cs" />
-    <Compile Include="Helpers\FormHelper.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
+
+  <!-- FormView.js stays an embedded resource. It moved to Includes/Script/ to match the
+       StockTransactionFactory layout, so LogicalName PINS the original manifest name
+       "MixERP.Net.WebControls.StockAdjustmentFactory.FormView.js" that AddJavascript() passes
+       to JSUtility; the host serves it through JSUtility.WebResourceRoutePrefix (PartyControl
+       precedent). Changing either side silently 404s the script and the form goes dead. -->
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Logic\MixERP.Net.Common\MixERP.Net.Common.csproj">
-      <Project>{D5A09C22-8F48-4FB2-A14D-C62C8C8FCEC0}</Project>
-      <Name>MixERP.Net.Common</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\Logic\MixERP.Net.Entities\MixERP.Net.Entities.csproj">
-      <Project>{BDE918B1-DD9B-41C9-A41F-F3DDEC18B6D8}</Project>
-      <Name>MixERP.Net.Entities</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\Logic\MixERP.Net.i18n\MixERP.Net.i18n.csproj">
-      <Project>{2ECD1C2E-D7D0-4A24-896A-E625B0566DB5}</Project>
-      <Name>MixERP.Net.i18n</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\MixERP.Net.WebControls.Common\MixERP.Net.WebControls.Common.csproj">
-      <Project>{2D961540-6597-4E7B-969C-974D71D820DD}</Project>
-      <Name>MixERP.Net.WebControls.Common</Name>
-    </ProjectReference>
+    <EmbeddedResource Include="Includes/Script/FormView.js">
+      <LogicalName>MixERP.Net.WebControls.StockAdjustmentFactory.FormView.js</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
+
   <ItemGroup>
-    <Folder Include="Services\" />
+    <ProjectReference Include="../../../Logic/MixERP.Net.Common/MixERP.Net.Common.csproj" />
+    <ProjectReference Include="../../../Logic/MixERP.Net.Entities/MixERP.Net.Entities.csproj" />
+    <ProjectReference Include="../../../Logic/MixERP.Net.i18n/MixERP.Net.i18n.csproj" />
+    <ProjectReference Include="../MixERP.Net.WebControls.Common/MixERP.Net.WebControls.Common.csproj" />
   </ItemGroup>
+
   <ItemGroup>
-    <EmbeddedResource Include="FormView.js" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="app.config" />
     <None Include="Mix Open Foundation.snk" />
   </ItemGroup>
-  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
-  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
+
 </Project>
