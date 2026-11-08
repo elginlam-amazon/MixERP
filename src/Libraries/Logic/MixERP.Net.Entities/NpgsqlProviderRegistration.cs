@@ -13,7 +13,11 @@ namespace MixERP.Net.Entities
     /// </summary>
     internal static class NpgsqlProviderRegistration
     {
+        // Intentional library module initializer: every host (web app, utilities) that loads this
+        // assembly needs the provider registered before PetaPoco resolves it by invariant name.
+#pragma warning disable CA2255
         [ModuleInitializer]
+#pragma warning restore CA2255
         internal static void Register()
         {
             if (!DbProviderFactories.GetProviderInvariantNames().Contains("Npgsql"))

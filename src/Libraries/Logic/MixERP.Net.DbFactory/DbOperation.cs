@@ -38,6 +38,7 @@ namespace MixERP.Net.DbFactory
         ///     NpgsqlError type; PostgresNotice is its replacement. Note that the notice text
         ///     is exposed as <see cref="PostgresNotice.MessageText" />, not "Message".
         /// </summary>
+        [System.CLSCompliant(false)]
         public PostgresNotice Notice { get; set; }
 
         public string Message { get; set; }
@@ -354,6 +355,7 @@ namespace MixERP.Net.DbFactory
             return false;
         }
 
+        [System.CLSCompliant(false)]
         public void ListenNonQuery(string catalog, NpgsqlCommand command)
         {
             try

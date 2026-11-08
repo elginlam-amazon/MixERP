@@ -19,6 +19,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace MixERP.Net.Framework.Controls
 {
+    // Derives from ASP.NET Core ComponentBase, which is not CLS-compliant.
+    [System.CLSCompliant(false)]
     public abstract class MixERPWidget: MixERPUserControlBase, IWidget
     {
         public override AccessLevel AccessLevel

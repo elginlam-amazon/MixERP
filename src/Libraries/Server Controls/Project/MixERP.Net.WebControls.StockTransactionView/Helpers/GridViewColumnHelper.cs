@@ -264,48 +264,46 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory.Helpers
 
             private static void Render(RenderTreeBuilder builder, object row, Func<object, string> previewUrlProvider, Func<object, string> checklistUrlProvider)
             {
-                int sequence = 0;
-
                 string checklistUrl = checklistUrlProvider == null ? null : checklistUrlProvider(row);
                 string previewUrl = previewUrlProvider == null ? null : previewUrlProvider(row);
 
                 //Checklist anchor.
-                builder.OpenElement(sequence++, "a");
-                builder.AddAttribute(sequence++, "id", "ChecklistAnchor");
-                builder.AddAttribute(sequence++, "title", Labels.GoToChecklistWindow);
+                builder.OpenElement(0, "a");
+                builder.AddAttribute(1, "id", "ChecklistAnchor");
+                builder.AddAttribute(2, "title", Labels.GoToChecklistWindow);
 
                 if (!string.IsNullOrWhiteSpace(checklistUrl))
                 {
-                    builder.AddAttribute(sequence++, "href", checklistUrl);
+                    builder.AddAttribute(3, "href", checklistUrl);
                 }
 
-                builder.OpenElement(sequence++, "i");
-                builder.AddAttribute(sequence++, "class", "list icon");
+                builder.OpenElement(4, "i");
+                builder.AddAttribute(5, "class", "list icon");
                 builder.CloseElement();
                 builder.CloseElement();
 
                 //Print anchor.
-                builder.OpenElement(sequence++, "a");
-                builder.AddAttribute(sequence++, "id", "PrintAnchor");
-                builder.AddAttribute(sequence++, "title", Titles.Print);
+                builder.OpenElement(6, "a");
+                builder.AddAttribute(7, "id", "PrintAnchor");
+                builder.AddAttribute(8, "title", Titles.Print);
 
                 if (!string.IsNullOrWhiteSpace(previewUrl))
                 {
-                    builder.AddAttribute(sequence++, "onclick", "showWindow('" + previewUrl + "');return false;");
+                    builder.AddAttribute(9, "onclick", "showWindow('" + previewUrl + "');return false;");
                 }
 
-                builder.OpenElement(sequence++, "i");
-                builder.AddAttribute(sequence++, "class", "print icon");
+                builder.OpenElement(10, "i");
+                builder.AddAttribute(11, "class", "print icon");
                 builder.CloseElement();
                 builder.CloseElement();
 
                 //Go-to-top anchor. It carried no id in the original.
-                builder.OpenElement(sequence++, "a");
-                builder.AddAttribute(sequence++, "title", Labels.GoToTop);
-                builder.AddAttribute(sequence++, "onclick", "window.scroll(0);");
+                builder.OpenElement(12, "a");
+                builder.AddAttribute(13, "title", Labels.GoToTop);
+                builder.AddAttribute(14, "onclick", "window.scroll(0);");
 
-                builder.OpenElement(sequence++, "i");
-                builder.AddAttribute(sequence++, "class", "arrow up icon");
+                builder.OpenElement(15, "i");
+                builder.AddAttribute(16, "class", "arrow up icon");
                 builder.CloseElement();
                 builder.CloseElement();
             }

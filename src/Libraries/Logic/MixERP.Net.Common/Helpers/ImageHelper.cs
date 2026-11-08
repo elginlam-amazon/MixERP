@@ -49,6 +49,7 @@ namespace MixERP.Net.Common.Helpers
         /// Returns the encoder registered for the supplied image format. Replaces the
         /// System.Drawing ImageCodecInfo lookup, which is Windows-only and removed here.
         /// </summary>
+        [System.CLSCompliant(false)]
         public static IImageEncoder GetEncoder(IImageFormat format)
         {
             if (format == null)
@@ -71,6 +72,7 @@ namespace MixERP.Net.Common.Helpers
         /// Returns the primary file extension of the supplied format, upper-cased and dot
         /// prefixed (for example ".JPG"), exactly as the System.Drawing version did.
         /// </summary>
+        [System.CLSCompliant(false)]
         public static string GetFileExtension(IImageFormat format)
         {
             if (format == null)
@@ -93,6 +95,7 @@ namespace MixERP.Net.Common.Helpers
             return extension.ToUpperInvariant();
         }
 
+        [System.CLSCompliant(false)]
         public static IImageFormat GetImageFormat(String path)
         {
             switch (Path.GetExtension(path))
@@ -105,6 +108,7 @@ namespace MixERP.Net.Common.Helpers
             return JpegFormat.Instance;
         }
 
+        [System.CLSCompliant(false)]
         public static byte[] GetResizedImage(Image image, int width, int height)
         {
             if (image == null)

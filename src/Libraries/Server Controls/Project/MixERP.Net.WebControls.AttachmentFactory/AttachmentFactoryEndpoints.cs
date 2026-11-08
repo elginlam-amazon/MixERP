@@ -69,6 +69,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory
         ///     handlers were registered for. Call this from the host's <c>Program.cs</c>:
         ///     <c>app.MapAttachmentFactoryEndpoints();</c>
         /// </summary>
+        [System.CLSCompliant(false)]
         public static IEndpointRouteBuilder MapAttachmentFactoryEndpoints(this IEndpointRouteBuilder endpoints)
         {
             ArgumentNullException.ThrowIfNull(endpoints);

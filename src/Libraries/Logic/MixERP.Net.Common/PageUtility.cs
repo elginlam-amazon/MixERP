@@ -96,6 +96,7 @@ namespace MixERP.Net.Common
             return string.Empty;
         }
 
+        [System.CLSCompliant(false)]
         public static void CheckInvalidAttempts(NavigationManager page)
         {
             if (page != null)
@@ -263,6 +264,7 @@ namespace MixERP.Net.Common
         ///     The absolute path (no scheme, host or query) of the page currently being served.
         ///     <para>SIGNATURE CHANGE: <c>Page</c> → <see cref="NavigationManager" />.</para>
         /// </summary>
+        [System.CLSCompliant(false)]
         public static string GetCurrentPageUrl(NavigationManager p)
         {
             if (p == null)
@@ -304,6 +306,7 @@ namespace MixERP.Net.Common
             return string.Empty;
         }
 
+        [System.CLSCompliant(false)]
         public static int InvalidPasswordAttempts(ISession session, int increment = 0)
         {
             if (session == null)
@@ -340,6 +343,7 @@ namespace MixERP.Net.Common
         ///     the same host the current request was served from.
         ///     <para>SIGNATURE CHANGE: <c>Page</c> → <see cref="NavigationManager" />.</para>
         /// </summary>
+        [System.CLSCompliant(false)]
         public static bool IsLocalUrl(Uri url, NavigationManager page)
         {
             if (page == null)
@@ -375,6 +379,7 @@ namespace MixERP.Net.Common
         ///     it is identical to the local address of the connection.
         ///     <para>SIGNATURE CHANGE: <c>Page</c> → <see cref="NavigationManager" />.</para>
         /// </summary>
+        [System.CLSCompliant(false)]
         public static bool IsLocalhost(NavigationManager page)
         {
             if (page == null)
@@ -420,6 +425,7 @@ namespace MixERP.Net.Common
         ///     behaviour (query string dropped).
         ///     <para>SIGNATURE CHANGE: <c>Page</c> → <see cref="NavigationManager" />.</para>
         /// </summary>
+        [System.CLSCompliant(false)]
         public static void RefreshPage(NavigationManager page)
         {
             if (page != null)
@@ -446,6 +452,7 @@ namespace MixERP.Net.Common
         ///         old de-duplication by registration key.
         ///     </para>
         /// </summary>
+        [System.CLSCompliant(false)]
         public static void RegisterJavascript(string key, string javaScript, IJSRuntime page, bool addScriptTags)
         {
             if (page == null)
@@ -498,6 +505,7 @@ namespace MixERP.Net.Common
         ///     authority of the current request.
         ///     <para>SIGNATURE CHANGE: <c>Page</c> → <see cref="NavigationManager" />.</para>
         /// </summary>
+        [System.CLSCompliant(false)]
         public static string ResolveAbsoluteUrl(NavigationManager page, string relativeUrl)
         {
             if (page != null)

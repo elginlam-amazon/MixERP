@@ -239,30 +239,28 @@ namespace MixERP.Net.WebControls.TransactionViewFactory.Helpers
 
             private static void Render(RenderTreeBuilder builder)
             {
-                int sequence = 0;
-
                 //Checklist icon.
-                builder.OpenElement(sequence++, "i");
-                builder.AddAttribute(sequence++, "class", "icon list layout");
-                builder.AddAttribute(sequence++, "onclick", "showCheckList(this);");
+                builder.OpenElement(0, "i");
+                builder.AddAttribute(1, "class", "icon list layout");
+                builder.AddAttribute(2, "onclick", "showCheckList(this);");
                 builder.CloseElement();
 
                 //Preview (GL advice report) icon - updatePreviewButtons() hides/shows this.
-                builder.OpenElement(sequence++, "i");
-                builder.AddAttribute(sequence++, "class", "icon print");
-                builder.AddAttribute(sequence++, "onclick", "showPreview(this);");
+                builder.OpenElement(3, "i");
+                builder.AddAttribute(4, "class", "icon print");
+                builder.AddAttribute(5, "onclick", "showPreview(this);");
                 builder.CloseElement();
 
                 //Stock detail icon - updatePreviewButtons() hides/shows this.
-                builder.OpenElement(sequence++, "i");
-                builder.AddAttribute(sequence++, "class", "icon grid layout");
-                builder.AddAttribute(sequence++, "onclick", "showStockDetail(this);");
+                builder.OpenElement(6, "i");
+                builder.AddAttribute(7, "class", "icon grid layout");
+                builder.AddAttribute(8, "onclick", "showStockDetail(this);");
                 builder.CloseElement();
 
                 //Go to top icon.
-                builder.OpenElement(sequence++, "i");
-                builder.AddAttribute(sequence++, "class", "icon chevron circle up");
-                builder.AddAttribute(sequence++, "onclick", "window.scroll(0);");
+                builder.OpenElement(9, "i");
+                builder.AddAttribute(10, "class", "icon chevron circle up");
+                builder.AddAttribute(11, "onclick", "window.scroll(0);");
                 builder.CloseElement();
             }
         }

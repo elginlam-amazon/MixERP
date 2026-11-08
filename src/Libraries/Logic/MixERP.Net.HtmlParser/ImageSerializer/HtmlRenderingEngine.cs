@@ -135,7 +135,13 @@ namespace MixERP.Net.HtmlParser.ImageSerializer
 
                 if (url == null)
                 {
-                    await page.SetContentAsync(html ?? string.Empty, navigation).ConfigureAwait(false);
+                    //SetContent ignores the networkidle wait conditions, so wait for the load event
+                    //and then explicitly for network idle (images/CSS referenced by the HTML).
+                    await page.SetContentAsync(html ?? string.Empty, new SetContentOptions
+                    {
+                        WaitUntil = new[] { WaitUntilNavigation.Load }
+                    }).ConfigureAwait(false);
+                    await page.WaitForNetworkIdleAsync().ConfigureAwait(false);
                 }
                 else
                 {

@@ -57,6 +57,8 @@ namespace MixERP.Net.Framework.Controls
     ///         replaced, the url is not).
     ///     </para>
     /// </summary>
+    // Derives from ASP.NET Core ComponentBase, which is not CLS-compliant.
+    [System.CLSCompliant(false)]
     public abstract class MixERPUserControl : MixERPUserControlBase
     {
         [Parameter]

@@ -31,6 +31,7 @@ namespace MixERP.Net.Messaging.Email
         ///     Replaces System.Net.Mail.Attachment (obsolete together with SmtpClient) with
         ///     MimeKit's MimePart, keeping every content-disposition field that was set before.
         /// </summary>
+        [System.CLSCompliant(false)]
         public static IEnumerable<MimeEntity> GetAttachments(params string[] files)
         {
             Collection<MimeEntity> attachments = new Collection<MimeEntity>();

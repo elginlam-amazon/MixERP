@@ -82,6 +82,7 @@ namespace MixERP.Net.WebControls.Common
         ///     ScrudFactory's select-checkbox column). When set it renders instead of the
         ///     formatted value.
         /// </summary>
+        [System.CLSCompliant(false)]
         public RenderFragment<object> Template { get; set; }
     }
 }

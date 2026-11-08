@@ -26,6 +26,7 @@ namespace MixERP.Net.Common.PostgresHelper
 {
     public static class ParameterHelper
     {
+        [System.CLSCompliant(false)]
         public static IEnumerable<NpgsqlParameter> AddBigintArrayParameter(Collection<long> items, string parameterPrefix)
         {
             Collection<NpgsqlParameter> collection = new Collection<NpgsqlParameter>();

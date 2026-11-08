@@ -32,6 +32,7 @@ namespace MixERP.Net.Common
 {
     public static class Conversion
     {
+        [System.CLSCompliant(false)]
         public static byte[] ConvertImageToByteArray(Image imageToConvert, IImageFormat formatOfImage)
         {
             if (imageToConvert == null)
@@ -156,6 +157,7 @@ namespace MixERP.Net.Common
             return retVal;
         }
 
+        [System.CLSCompliant(false)]
         public static byte[] TryCastByteArray(Image image)
         {
             if (image == null)

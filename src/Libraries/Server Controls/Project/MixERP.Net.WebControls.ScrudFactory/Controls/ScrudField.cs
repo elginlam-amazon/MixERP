@@ -219,6 +219,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
         ///     The browser file chosen for a <c>bytea</c> column, set by <c>ScrudFieldRow</c>'s
         ///     <c>InputFile</c> change handler. <c>ScrudFileUpload.UploadFileAsync</c> persists it.
         /// </summary>
+        [System.CLSCompliant(false)]
         public IBrowserFile File { get; set; }
 
         /// <summary>

@@ -42,6 +42,7 @@ namespace MixERP.Net.ApplicationState
         /// <summary>
         ///     Supplies the DI-managed <see cref="IHttpContextAccessor" /> to this library.
         /// </summary>
+        [System.CLSCompliant(false)]
         public static void UseHttpContextAccessor(IHttpContextAccessor httpContextAccessor)
         {
             if (httpContextAccessor == null)

@@ -41,6 +41,7 @@ namespace MixERP.Net.Framework.Errors
         private readonly MixERPErrorState errorState;
         private readonly NavigationManager navigationManager;
 
+        [System.CLSCompliant(false)]
         public MixERPErrorHandler(MixERPErrorState errorState, NavigationManager navigationManager)
         {
             if (errorState == null)

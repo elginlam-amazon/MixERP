@@ -74,6 +74,8 @@ namespace MixERP.Net.WebControls.ScrudFactory
     ///     </para>
     /// </summary>
     ////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Derives from ASP.NET Core ComponentBase, which is not CLS-compliant.
+    [System.CLSCompliant(false)]
     public partial class ScrudForm : IDisposable
     {
         //==============================================================================================

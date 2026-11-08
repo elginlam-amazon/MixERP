@@ -45,6 +45,7 @@ namespace MixERP.Net.Common.jQueryHelper
         ///     want the script without running it can use
         ///     <see cref="GetjQueryUIDatePickerScript(string, DateTime?, DateTime?)" />.
         /// </remarks>
+        [System.CLSCompliant(false)]
         public static void AddjQueryUIDatePicker(IJSRuntime p, string controlId, DateTime? minDate, DateTime? maxDate)
         {
             if (string.IsNullOrWhiteSpace(controlId))

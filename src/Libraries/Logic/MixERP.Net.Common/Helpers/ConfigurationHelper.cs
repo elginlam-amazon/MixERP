@@ -41,6 +41,7 @@ namespace MixERP.Net.Common.Helpers
         ///     One-time initialization of the configuration seam, including the HTTP context accessor
         ///     used by the session and request helpers.
         /// </summary>
+        [System.CLSCompliant(false)]
         public static void Initialize(IConfiguration configuration, string contentRootPath, IHttpContextAccessor httpContextAccessor)
         {
             MixERPConfiguration.Initialize(configuration, contentRootPath, httpContextAccessor);

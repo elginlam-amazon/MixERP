@@ -56,6 +56,8 @@ namespace MixERP.Net.Framework.Controls
     ///         the HOST — see <see cref="MixERPUserControl" /> for the full rationale.
     ///     </para>
     /// </summary>
+    // Derives from ASP.NET Core ComponentBase, which is not CLS-compliant.
+    [System.CLSCompliant(false)]
     public abstract class TransactionCheckListControl : MixERPUserControl
     {
     }

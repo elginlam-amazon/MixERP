@@ -48,6 +48,7 @@ namespace MixERP.Net.Framework.Controls
         /// <summary>
         ///     Content added to this region, in insertion order.
         /// </summary>
+        [System.CLSCompliant(false)]
         public IReadOnlyList<RenderFragment> Children
         {
             get { return this.children; }
@@ -69,6 +70,7 @@ namespace MixERP.Net.Framework.Controls
         /// <summary>
         ///     Adds content to this region. Equivalent of <c>Controls.Add(control)</c>.
         /// </summary>
+        [System.CLSCompliant(false)]
         public void Add(RenderFragment content)
         {
             if (content == null)
@@ -128,6 +130,7 @@ namespace MixERP.Net.Framework.Controls
         ///     All content of this region as a single fragment, for rendering from markup:
         ///     <c>@Region.Content</c>.
         /// </summary>
+        [System.CLSCompliant(false)]
         public RenderFragment Content
         {
             get
@@ -145,6 +148,7 @@ namespace MixERP.Net.Framework.Controls
         /// <summary>
         ///     Renders this region's content into an existing render tree.
         /// </summary>
+        [System.CLSCompliant(false)]
         public void Render(RenderTreeBuilder builder)
         {
             if (builder == null)

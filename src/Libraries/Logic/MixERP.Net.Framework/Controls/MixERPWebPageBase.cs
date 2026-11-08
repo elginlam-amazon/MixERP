@@ -31,6 +31,8 @@ namespace MixERP.Net.Framework.Controls
     ///     Blazor keeps component state on the server for the lifetime of the circuit and has no ViewState
     ///     at all, so the no-op persister has no counterpart and its removal changes no behavior.
     /// </summary>
+    // Derives from ASP.NET Core ComponentBase, which is not CLS-compliant.
+    [System.CLSCompliant(false)]
     public class MixERPWebPageBase : ComponentBase
     {
         private readonly MixERPContentRegion masterPageRegion = new MixERPContentRegion("Master");

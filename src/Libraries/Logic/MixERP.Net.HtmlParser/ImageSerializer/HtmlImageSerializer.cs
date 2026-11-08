@@ -11,6 +11,7 @@ namespace MixERP.Net.HtmlParser.ImageSerializer
     {
         public string TempDirectory { get; set; }
         public string Html { get; set; }
+        [System.CLSCompliant(false)]
         public IImageFormat ImageFormat { get; set; }
         public event EventHandler<ImageSavedEventArgs> ImageSaved;
 

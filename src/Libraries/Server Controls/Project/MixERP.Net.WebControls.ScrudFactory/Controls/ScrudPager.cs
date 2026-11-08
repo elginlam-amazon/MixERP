@@ -95,22 +95,20 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
 
             return builder =>
             {
-                int sequence = 0;
-
                 //HtmlGenericControl("div") with Attributes.Add("class", this.CssClass)
-                builder.OpenElement(sequence++, "div");
-                builder.AddAttribute(sequence++, "class", this.CssClass);
+                builder.OpenElement(0, "div");
+                builder.AddAttribute(1, "class", this.CssClass);
 
-                this.FirstItem(builder, ref sequence);
-                this.PreviousItem(builder, ref sequence);
-                this.GetAnchor(builder, ref sequence, 1);
+                builder.AddContent(2, this.FirstItem());
+                builder.AddContent(3, this.PreviousItem());
+                builder.AddContent(4, this.GetAnchor(1));
 
                 //The previous page block
                 string title;
                 if (start - this.BlockCount > 0)
                 {
                     title = string.Format(Thread.CurrentThread.CurrentCulture, Titles.PageN, start - 1);
-                    this.GetEllipsisAnchor(builder, ref sequence, start - 1, title);
+                    builder.AddContent(5, this.GetEllipsisAnchor(start - 1, title));
                 }
 
                 //Paged items
@@ -125,26 +123,26 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                         continue;
                     }
 
-                    this.GetAnchor(builder, ref sequence, i);
+                    builder.AddContent(6, this.GetAnchor(i));
                 }
 
                 //The next page block
                 if (start + this.BlockCount < this.TotalPages)
                 {
                     title = string.Format(Thread.CurrentThread.CurrentCulture, Titles.PageN, end + 1);
-                    this.GetEllipsisAnchor(builder, ref sequence, end + 1, title);
+                    builder.AddContent(7, this.GetEllipsisAnchor(end + 1, title));
                 }
 
-                this.GetAnchor(builder, ref sequence, this.TotalPages);
-                this.NextItem(builder, ref sequence);
-                this.LastItem(builder, ref sequence);
+                builder.AddContent(8, this.GetAnchor(this.TotalPages));
+                builder.AddContent(9, this.NextItem());
+                builder.AddContent(10, this.LastItem());
 
                 builder.CloseElement();
             };
         }
 
         /// <summary>Port of <c>FirstItem()</c> — <c>Titles.FirstPage</c>, inert on page 1.</summary>
-        private void FirstItem(RenderTreeBuilder builder, ref int sequence)
+        private RenderFragment FirstItem()
         {
             int page = 0;
 
@@ -153,11 +151,11 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 page = 1;
             }
 
-            this.GetIconAnchor(builder, ref sequence, "icon item", "chevron circle left icon", page, Titles.FirstPage);
+            return this.GetIconAnchor("icon item", "chevron circle left icon", page, Titles.FirstPage);
         }
 
         /// <summary>Port of <c>PreviousItem()</c> — <c>Titles.PreviousPage</c>, inert on page 1.</summary>
-        private void PreviousItem(RenderTreeBuilder builder, ref int sequence)
+        private RenderFragment PreviousItem()
         {
             int page = 0;
             if (this.CurrentPage > 1)
@@ -165,11 +163,11 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 page = this.CurrentPage - 1;
             }
 
-            this.GetIconAnchor(builder, ref sequence, "icon item", "arrow circle left icon", page, Titles.PreviousPage);
+            return this.GetIconAnchor("icon item", "arrow circle left icon", page, Titles.PreviousPage);
         }
 
         /// <summary>Port of <c>NextItem()</c> — <c>Titles.NextPage</c>, inert on the last page.</summary>
-        private void NextItem(RenderTreeBuilder builder, ref int sequence)
+        private RenderFragment NextItem()
         {
             int page = 0;
 
@@ -178,11 +176,11 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 page = this.CurrentPage + 1;
             }
 
-            this.GetIconAnchor(builder, ref sequence, "icon item", "arrow circle right icon", page, Titles.NextPage);
+            return this.GetIconAnchor("icon item", "arrow circle right icon", page, Titles.NextPage);
         }
 
         /// <summary>Port of <c>LastItem()</c> — <c>Titles.LastPage</c>, inert on the last page.</summary>
-        private void LastItem(RenderTreeBuilder builder, ref int sequence)
+        private RenderFragment LastItem()
         {
             int page = 0;
 
@@ -191,7 +189,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 page = this.TotalPages;
             }
 
-            this.GetIconAnchor(builder, ref sequence, "icon item", "chevron circle right icon", page, Titles.LastPage);
+            return this.GetIconAnchor("icon item", "chevron circle right icon", page, Titles.LastPage);
         }
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -206,27 +204,30 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
         ///     </para>
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
-        private void GetAnchor(RenderTreeBuilder builder, ref int sequence, int pageNumber)
+        private RenderFragment GetAnchor(int pageNumber)
         {
-            builder.OpenElement(sequence++, "a");
-
-            if (pageNumber.Equals(this.CurrentPage))
+            return builder =>
             {
-                builder.AddAttribute(sequence++, "class", "active item");
-            }
-            else
-            {
-                builder.AddAttribute(sequence++, "class", "item");
-            }
+                builder.OpenElement(0, "a");
 
-            builder.AddAttribute(sequence++, "href", this.GetPageUrl(pageNumber));
+                if (pageNumber.Equals(this.CurrentPage))
+                {
+                    builder.AddAttribute(1, "class", "active item");
+                }
+                else
+                {
+                    builder.AddAttribute(2, "class", "item");
+                }
 
-            string title = string.Format(Thread.CurrentThread.CurrentCulture, Titles.PageN, pageNumber);
-            builder.AddAttribute(sequence++, "title", title);
+                builder.AddAttribute(3, "href", this.GetPageUrl(pageNumber));
 
-            builder.AddContent(sequence++, pageNumber.ToString(Thread.CurrentThread.CurrentCulture));
+                string title = string.Format(Thread.CurrentThread.CurrentCulture, Titles.PageN, pageNumber);
+                builder.AddAttribute(4, "title", title);
 
-            builder.CloseElement();
+                builder.AddContent(5, pageNumber.ToString(Thread.CurrentThread.CurrentCulture));
+
+                builder.CloseElement();
+            };
         }
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -243,26 +244,29 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
         ///     </para>
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
-        private void GetIconAnchor(RenderTreeBuilder builder, ref int sequence, string cssClass, string iconCssClass, int pageNumber, string title)
+        private RenderFragment GetIconAnchor(string cssClass, string iconCssClass, int pageNumber, string title)
         {
-            builder.OpenElement(sequence++, "a");
-            builder.AddAttribute(sequence++, "class", cssClass);
-
-            string href = this.GetIconAnchorUrl(pageNumber);
-
-            if (href != null)
+            return builder =>
             {
-                builder.AddAttribute(sequence++, "href", href);
-            }
+                builder.OpenElement(0, "a");
+                builder.AddAttribute(1, "class", cssClass);
 
-            builder.AddAttribute(sequence++, "title", title);
+                string href = this.GetIconAnchorUrl(pageNumber);
 
-            //HtmlGenericControl("i") with Attributes.Add("class", iconCssClass)
-            builder.OpenElement(sequence++, "i");
-            builder.AddAttribute(sequence++, "class", iconCssClass);
-            builder.CloseElement();
+                if (href != null)
+                {
+                    builder.AddAttribute(2, "href", href);
+                }
 
-            builder.CloseElement();
+                builder.AddAttribute(3, "title", title);
+
+                //HtmlGenericControl("i") with Attributes.Add("class", iconCssClass)
+                builder.OpenElement(4, "i");
+                builder.AddAttribute(5, "class", iconCssClass);
+                builder.CloseElement();
+
+                builder.CloseElement();
+            };
         }
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -278,22 +282,25 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
         ///     </para>
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
-        private void GetEllipsisAnchor(RenderTreeBuilder builder, ref int sequence, int pageNumber, string title)
+        private RenderFragment GetEllipsisAnchor(int pageNumber, string title)
         {
-            builder.OpenElement(sequence++, "a");
-            builder.AddAttribute(sequence++, "class", "icon item");
-
-            string href = this.GetIconAnchorUrl(pageNumber);
-
-            if (href != null)
+            return builder =>
             {
-                builder.AddAttribute(sequence++, "href", href);
-            }
+                builder.OpenElement(0, "a");
+                builder.AddAttribute(1, "class", "icon item");
 
-            builder.AddAttribute(sequence++, "title", title);
-            builder.AddContent(sequence++, "...");
+                string href = this.GetIconAnchorUrl(pageNumber);
 
-            builder.CloseElement();
+                if (href != null)
+                {
+                    builder.AddAttribute(2, "href", href);
+                }
+
+                builder.AddAttribute(3, "title", title);
+                builder.AddContent(4, "...");
+
+                builder.CloseElement();
+            };
         }
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////

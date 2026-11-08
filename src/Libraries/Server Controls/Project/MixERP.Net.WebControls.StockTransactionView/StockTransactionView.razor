@@ -295,16 +295,18 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
     private string dateFrom;
     private string dateTo;
-    private string office;
-    private string party;
+    //Text filters start as string.Empty (WebForms TextBox.Text was never null); the SQL
+    //view filters with LIKE '%' || lower(x) || '%', so a NULL filter would match no rows.
+    private string office = string.Empty;
+    private string party = string.Empty;
 
     //Stays string.Empty when the PriceType field is not rendered (the ported null-guard
     //of "if (this.priceTypeInputText != null)").
     private string priceType = string.Empty;
 
-    private string user;
-    private string referenceNumber;
-    private string statementReference;
+    private string user = string.Empty;
+    private string referenceNumber = string.Empty;
+    private string statementReference = string.Empty;
     private string selectedValues;
     private string errorMessage;
 

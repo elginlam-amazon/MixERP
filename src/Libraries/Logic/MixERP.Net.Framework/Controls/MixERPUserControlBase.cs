@@ -29,9 +29,10 @@ namespace MixERP.Net.Framework.Controls
     ///     <see cref="OnControlLoad" /> replaces the WebForms <c>Load</c> handler and is invoked once from
     ///     <see cref="OnInitialized" /> (the Blazor equivalent of <c>Page_Load</c> on a non-postback).
     /// </summary>
+    // Derives from ASP.NET Core ComponentBase, which is not CLS-compliant.
+    [System.CLSCompliant(false)]
     public abstract class MixERPUserControlBase : ComponentBase, IControl
     {
-        private MixERPValidateRequestMode validDateRequest = MixERPValidateRequestMode.Inherit;
         private bool loaded;
 
         public abstract AccessLevel AccessLevel { get; }
@@ -42,11 +43,7 @@ namespace MixERP.Net.Framework.Controls
         ///     <see cref="MixERPValidateRequestMode.Inherit" />.
         /// </summary>
         [Parameter]
-        public MixERPValidateRequestMode ValidDateRequest
-        {
-            get { return this.validDateRequest; }
-            set { this.validDateRequest = value; }
-        }
+        public MixERPValidateRequestMode ValidDateRequest { get; set; } = MixERPValidateRequestMode.Inherit;
 
         [Parameter]
         public string MasterPageId { get; set; }
@@ -71,7 +68,7 @@ namespace MixERP.Net.Framework.Controls
                 return new MarkupString(string.Empty);
             }
 
-            if (this.validDateRequest == MixERPValidateRequestMode.Disabled)
+            if (this.ValidDateRequest == MixERPValidateRequestMode.Disabled)
             {
                 return new MarkupString(value);
             }

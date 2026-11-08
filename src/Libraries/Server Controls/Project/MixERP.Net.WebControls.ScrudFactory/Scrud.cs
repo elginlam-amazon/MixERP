@@ -79,6 +79,8 @@ using MixERP.Net.Framework.Security;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
+    // Derives from ASP.NET Core ComponentBase, which is not CLS-compliant.
+    [System.CLSCompliant(false)]
     public sealed class Scrud : ScrudForm
     {
         [Inject]

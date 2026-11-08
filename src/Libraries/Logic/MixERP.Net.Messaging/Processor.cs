@@ -55,6 +55,7 @@ namespace MixERP.Net.Messaging.Email
 
         public string Catalog { get; set; }
 
+        [System.CLSCompliant(false)]
         public void Send(string sendTo, string subject, string body, IEnumerable<MimeEntity> attachments)
         {
             EmailMessage email;
@@ -66,12 +67,14 @@ namespace MixERP.Net.Messaging.Email
             this.Send(email, host, credentials, attachments);
         }
 
+        [System.CLSCompliant(false)]
         public Task SendAsync(string sendTo, string subject, string body,
             IEnumerable<MimeEntity> attachments)
         {
             return this.SendAsync(sendTo, subject, body, attachments, CancellationToken.None);
         }
 
+        [System.CLSCompliant(false)]
         public Task SendAsync(string sendTo, string subject, string body,
             IEnumerable<MimeEntity> attachments, CancellationToken cancellationToken)
         {
@@ -89,6 +92,7 @@ namespace MixERP.Net.Messaging.Email
         ///     former ThreadPool.QueueUserWorkItem call provided. Failures are observed and
         ///     logged rather than being lost on an unobserved task.
         /// </summary>
+        [System.CLSCompliant(false)]
         public void Send(EmailMessage email, SmtpHost host, ICredentials credentials,
             IEnumerable<MimeEntity> attachments)
         {
@@ -126,12 +130,14 @@ namespace MixERP.Net.Messaging.Email
             });
         }
 
+        [System.CLSCompliant(false)]
         public Task SendAsync(EmailMessage email, SmtpHost host, ICredentials credentials,
             IEnumerable<MimeEntity> attachments)
         {
             return this.SendAsync(email, host, credentials, attachments, CancellationToken.None);
         }
 
+        [System.CLSCompliant(false)]
         public async Task SendAsync(EmailMessage email, SmtpHost host, ICredentials credentials,
             IEnumerable<MimeEntity> attachments, CancellationToken cancellationToken)
         {

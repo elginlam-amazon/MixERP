@@ -112,35 +112,33 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
 
             return builder =>
             {
-                int sequence = 0;
+                builder.OpenElement(0, "div");
+                builder.AddAttribute(1, "role", "toolbar");
+                builder.AddAttribute(2, "class", this.CssClass);
 
-                builder.OpenElement(sequence++, "div");
-                builder.AddAttribute(sequence++, "role", "toolbar");
-                builder.AddAttribute(sequence++, "class", this.CssClass);
-
-                this.AddSelectButton(builder, ref sequence);
-                this.AddShowCompactButton(builder, ref sequence);
-                this.AddShowAllButton(builder, ref sequence);
-                this.AddAddButton(builder, ref sequence);
-                this.AddEditButtonHidden(builder, ref sequence, controlSuffix);
-                this.AddEditButtonVisible(builder, ref sequence, controlSuffix);
-                this.AddDeleteButtonHidden(builder, ref sequence, controlSuffix);
-                this.AddDeleteButtonVisible(builder, ref sequence, controlSuffix);
-                this.AddPrintButton(builder, ref sequence);
+                builder.AddContent(3, this.AddSelectButton());
+                builder.AddContent(4, this.AddShowCompactButton());
+                builder.AddContent(5, this.AddShowAllButton());
+                builder.AddContent(6, this.AddAddButton());
+                builder.AddContent(7, this.AddEditButtonHidden(controlSuffix));
+                builder.AddContent(8, this.AddEditButtonVisible(controlSuffix));
+                builder.AddContent(9, this.AddDeleteButtonHidden(controlSuffix));
+                builder.AddContent(10, this.AddDeleteButtonVisible(controlSuffix));
+                builder.AddContent(11, this.AddPrintButton());
 
                 builder.CloseElement();
             };
         }
 
         /// <summary>Port of <c>AddAddButton</c> — <c>Titles.AddNew</c>, <c>scrudAddNew()</c>.</summary>
-        private void AddAddButton(RenderTreeBuilder builder, ref int sequence)
+        private RenderFragment AddAddButton()
         {
             if (this.DenyAdd)
             {
-                return;
+                return null;
             }
 
-            this.GetInputButton(builder, ref sequence, "CTRL + SHIFT + A", "return(scrudAddNew());", Titles.AddNew, this.ButtonCssClass, this.AddButtonIconCssClass);
+            return this.GetInputButton("CTRL + SHIFT + A", "return(scrudAddNew());", Titles.AddNew, this.ButtonCssClass, this.AddButtonIconCssClass);
         }
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -160,86 +158,94 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
         ///     </para>
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
-        private void AddDeleteButtonHidden(RenderTreeBuilder builder, ref int sequence, string controlSuffix)
+        private RenderFragment AddDeleteButtonHidden(string controlSuffix)
         {
-            builder.OpenElement(sequence++, "button");
-            builder.AddAttribute(sequence++, "type", "button");
-            builder.AddAttribute(sequence++, "id", "DeleteButton" + controlSuffix);
-            builder.AddAttribute(sequence++, "class", "hidden");
-            builder.AddAttribute(sequence++, "title", "CTRL + SHIFT + D");
-            builder.AddAttribute(sequence++, "onclick", this.DeleteButtonClick);
-            builder.AddContent(sequence++, Titles.DeleteSelected);
-            builder.CloseElement();
+            return builder =>
+            {
+                builder.OpenElement(0, "button");
+                builder.AddAttribute(1, "type", "button");
+                builder.AddAttribute(2, "id", "DeleteButton" + controlSuffix);
+                builder.AddAttribute(3, "class", "hidden");
+                builder.AddAttribute(4, "title", "CTRL + SHIFT + D");
+                builder.AddAttribute(5, "onclick", this.DeleteButtonClick);
+                builder.AddContent(6, Titles.DeleteSelected);
+                builder.CloseElement();
+            };
         }
 
         /// <summary>Port of <c>AddDeleteButtonVisible</c> — clicks the hidden button by id.</summary>
-        private void AddDeleteButtonVisible(RenderTreeBuilder builder, ref int sequence, string controlSuffix)
+        private RenderFragment AddDeleteButtonVisible(string controlSuffix)
         {
             if (this.DenyDelete)
             {
-                return;
+                return null;
             }
 
             string onclick = "if(scrudConfirmAction()){$('#DeleteButton" + controlSuffix + "').click();}return false;";
 
-            this.GetInputButton(builder, ref sequence, "CTRL + SHIFT + D", onclick, Titles.DeleteSelected, this.ButtonCssClass, this.DeleteButtonIconCssClass);
+            return this.GetInputButton("CTRL + SHIFT + D", onclick, Titles.DeleteSelected, this.ButtonCssClass, this.DeleteButtonIconCssClass);
         }
 
         /// <summary>
         ///     Port of <c>AddEditButtonHidden</c>, including its <c>role="edit"</c> attribute
         ///     (<c>Scrud.js</c> selects on it).
         /// </summary>
-        private void AddEditButtonHidden(RenderTreeBuilder builder, ref int sequence, string controlSuffix)
+        private RenderFragment AddEditButtonHidden(string controlSuffix)
         {
-            builder.OpenElement(sequence++, "button");
-            builder.AddAttribute(sequence++, "type", "button");
-            builder.AddAttribute(sequence++, "role", "edit");
-            builder.AddAttribute(sequence++, "id", "EditButton" + controlSuffix);
-            builder.AddAttribute(sequence++, "class", "hidden");
-            builder.AddAttribute(sequence++, "title", "CTRL + SHIFT + E");
-            builder.AddAttribute(sequence++, "onclick", this.EditButtonClick);
-            builder.AddContent(sequence++, Titles.EditSelected);
-            builder.CloseElement();
+            return builder =>
+            {
+                builder.OpenElement(0, "button");
+                builder.AddAttribute(1, "type", "button");
+                builder.AddAttribute(2, "role", "edit");
+                builder.AddAttribute(3, "id", "EditButton" + controlSuffix);
+                builder.AddAttribute(4, "class", "hidden");
+                builder.AddAttribute(5, "title", "CTRL + SHIFT + E");
+                builder.AddAttribute(6, "onclick", this.EditButtonClick);
+                builder.AddContent(7, Titles.EditSelected);
+                builder.CloseElement();
+            };
         }
 
         /// <summary>Port of <c>AddEditButtonVisible</c> — clicks the hidden button by id.</summary>
-        private void AddEditButtonVisible(RenderTreeBuilder builder, ref int sequence, string controlSuffix)
+        private RenderFragment AddEditButtonVisible(string controlSuffix)
         {
             if (this.DenyEdit)
             {
-                return;
+                return null;
             }
 
             string onclick = "if(scrudConfirmAction()){$('#EditButton" + controlSuffix + "').click();}return false;";
 
-            this.GetInputButton(builder, ref sequence, "CTRL + SHIFT + E", onclick, Titles.EditSelected, this.ButtonCssClass, this.EditButtonIconCssClass);
+            return this.GetInputButton("CTRL + SHIFT + E", onclick, Titles.EditSelected, this.ButtonCssClass, this.EditButtonIconCssClass);
         }
 
         /// <summary>Port of <c>AddPrintButton</c> — <c>Titles.Print</c>, <c>scrudPrintGridView()</c>.</summary>
-        private void AddPrintButton(RenderTreeBuilder builder, ref int sequence)
+        private RenderFragment AddPrintButton()
         {
-            this.GetInputButton(builder, ref sequence, "CTRL + SHIFT + P", "scrudPrintGridView();", Titles.Print, this.ButtonCssClass, this.PrintButtonIconCssClass);
+            return this.GetInputButton("CTRL + SHIFT + P", "scrudPrintGridView();", Titles.Print, this.ButtonCssClass, this.PrintButtonIconCssClass);
         }
 
         /// <summary>Port of <c>AddSelectButton</c> — modal-only, <c>Titles.Select</c>.</summary>
-        private void AddSelectButton(RenderTreeBuilder builder, ref int sequence)
+        private RenderFragment AddSelectButton()
         {
             if (this.IsModal())
             {
-                this.GetInputButton(builder, ref sequence, "RETURN", "scrudSelectAndClose();", Titles.Select, this.ButtonCssClass, this.SelectButtonIconCssClass);
+                return this.GetInputButton("RETURN", "scrudSelectAndClose();", Titles.Select, this.ButtonCssClass, this.SelectButtonIconCssClass);
             }
+
+            return null;
         }
 
         /// <summary>Port of <c>AddShowAllButton</c> — <c>Titles.ShowAll</c>, <c>scrudShowAll()</c>.</summary>
-        private void AddShowAllButton(RenderTreeBuilder builder, ref int sequence)
+        private RenderFragment AddShowAllButton()
         {
-            this.GetInputButton(builder, ref sequence, "CTRL + SHIFT + S", "scrudShowAll();", Titles.ShowAll, this.ButtonCssClass, this.AllButtonIconCssClass);
+            return this.GetInputButton("CTRL + SHIFT + S", "scrudShowAll();", Titles.ShowAll, this.ButtonCssClass, this.AllButtonIconCssClass);
         }
 
         /// <summary>Port of <c>AddShowCompactButton</c> — <c>Titles.ShowCompact</c>.</summary>
-        private void AddShowCompactButton(RenderTreeBuilder builder, ref int sequence)
+        private RenderFragment AddShowCompactButton()
         {
-            this.GetInputButton(builder, ref sequence, "CTRL + SHIFT + C", "scrudShowCompact();", Titles.ShowCompact, this.ButtonCssClass, this.CompactButtonIconCssClass);
+            return this.GetInputButton("CTRL + SHIFT + C", "scrudShowCompact();", Titles.ShowCompact, this.ButtonCssClass, this.CompactButtonIconCssClass);
         }
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -250,28 +256,31 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
         ///     markup string, which renders the identical DOM.
         /// </summary>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
-        private void GetInputButton(RenderTreeBuilder builder, ref int sequence, string title, string onclick, string value, string cssClass, string iconCssClass)
+        private RenderFragment GetInputButton(string title, string onclick, string value, string cssClass, string iconCssClass)
         {
-            builder.OpenElement(sequence++, "button");
-            builder.AddAttribute(sequence++, "class", cssClass);
-            builder.AddAttribute(sequence++, "type", "button");
-            builder.AddAttribute(sequence++, "title", title);
-            builder.AddAttribute(sequence++, "onclick", onclick);
-
-            if (!string.IsNullOrWhiteSpace(iconCssClass))
+            return builder =>
             {
-                builder.OpenElement(sequence++, "i");
-                builder.AddAttribute(sequence++, "class", iconCssClass);
+                builder.OpenElement(0, "button");
+                builder.AddAttribute(1, "class", cssClass);
+                builder.AddAttribute(2, "type", "button");
+                builder.AddAttribute(3, "title", title);
+                builder.AddAttribute(4, "onclick", onclick);
+
+                if (!string.IsNullOrWhiteSpace(iconCssClass))
+                {
+                    builder.OpenElement(5, "i");
+                    builder.AddAttribute(6, "class", iconCssClass);
+                    builder.CloseElement();
+
+                    builder.AddContent(7, " " + value);
+                }
+                else
+                {
+                    builder.AddContent(8, value);
+                }
+
                 builder.CloseElement();
-
-                builder.AddContent(sequence++, " " + value);
-            }
-            else
-            {
-                builder.AddContent(sequence++, value);
-            }
-
-            builder.CloseElement();
+            };
         }
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////

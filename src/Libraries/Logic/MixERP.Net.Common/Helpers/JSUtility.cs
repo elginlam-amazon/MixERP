@@ -41,6 +41,7 @@ namespace MixERP.Net.Common.Helpers
         ///         preserving the original <c>addScriptTags: false</c> call.
         ///     </para>
         /// </summary>
+        [System.CLSCompliant(false)]
         public static void AddJSReference(IJSRuntime page, string resourceName, string key, Type type)
         {
             if (page != null)
