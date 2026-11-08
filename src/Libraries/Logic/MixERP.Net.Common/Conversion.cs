@@ -186,6 +186,19 @@ namespace MixERP.Net.Common
                     return (DateTime) value;
                 }
 
+                //Npgsql 6+ maps PostgreSQL "date" to DateOnly and "time" to TimeOnly.
+                //Neither is IConvertible, so Convert.ToDateTime would throw and collapse
+                //the value to DateTime.MinValue. Map them explicitly to preserve the
+                //DateTime semantics callers had under Npgsql 2.x.
+                if (value is DateOnly dateOnly)
+                {
+                    return dateOnly.ToDateTime(TimeOnly.MinValue);
+                }
+
+                if (value is TimeOnly timeOnly)
+                {
+                    return DateTime.MinValue.Add(timeOnly.ToTimeSpan());
+                }
 
                 return Convert.ToDateTime(value, CultureInfo.DefaultThreadCurrentCulture);
             }

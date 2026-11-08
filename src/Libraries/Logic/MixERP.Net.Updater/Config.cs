@@ -1,6 +1,4 @@
-﻿using System.Configuration;
-using System.Web.Hosting;
-using MixERP.Net.Common.Helpers;
+﻿using MixERP.Net.Common.Helpers;
 
 namespace MixERP.Net.Updater
 {
@@ -27,21 +25,40 @@ namespace MixERP.Net.Updater
         public static string UpdateKeyword { get { return GetConfigValue("UpdateKeyword"); } }
         public static string TempPath { get { return GetConfigValue("TempPath"); } }
         public static string Migrate { get { return GetConfigValue("Migrate"); } }
-        public static string ApplicationPath { get { return GetApplicationPath();  } }
+        public static string ApplicationPath { get { return GetApplicationPath(); } }
 
         private static string GetApplicationPath()
         {
             if (IsDevelopmentMode())
             {
-                return @"C:\inetpub\wwwroot\MixERP";
+                //The original code hardcoded "C:\inetpub\wwwroot\MixERP" here, which cannot work
+                //on a cross-platform host. The development path is now configuration driven
+                //("DevelopmentApplicationPath"), falling back to the content root so development
+                //mode always resolves to a real directory.
+                string developmentPath = MixERPConfiguration.GetAppSetting("DevelopmentApplicationPath");
+
+                if (!string.IsNullOrWhiteSpace(developmentPath))
+                {
+                    return MixERPConfiguration.MapPath(developmentPath);
+                }
             }
 
-            return HostingEnvironment.MapPath("~");
+            return MixERPConfiguration.MapPath("~");
         }
 
         public static bool IsDevelopmentMode()
         {
-            return ConfigurationManager.AppSettings["IsIDE"].ToUpperInvariant().StartsWith("T");
+            //ConfigurationManager.AppSettings["IsIDE"] → the IConfiguration seam. The original
+            //threw a NullReferenceException when the key was absent; a missing key now simply
+            //means "not development mode".
+            string isIde = MixERPConfiguration.GetAppSetting("IsIDE");
+
+            if (string.IsNullOrWhiteSpace(isIde))
+            {
+                return false;
+            }
+
+            return isIde.ToUpperInvariant().StartsWith("T");
         }
 
         private static string GetConfigValue(string key)

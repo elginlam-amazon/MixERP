@@ -17,19 +17,23 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using MimeKit;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Net.Mail;
-using System.Net.Mime;
 
 namespace MixERP.Net.Messaging.Email
 {
     public static class AttachmentFactory
     {
-        public static IEnumerable<Attachment> GetAttachments(params string[] files)
+        /// <summary>
+        ///     Builds MIME attachment parts for the supplied files.
+        ///     Replaces System.Net.Mail.Attachment (obsolete together with SmtpClient) with
+        ///     MimeKit's MimePart, keeping every content-disposition field that was set before.
+        /// </summary>
+        public static IEnumerable<MimeEntity> GetAttachments(params string[] files)
         {
-            Collection<Attachment> attachments = new Collection<Attachment>();
+            Collection<MimeEntity> attachments = new Collection<MimeEntity>();
 
             if (files != null)
             {
@@ -37,19 +41,30 @@ namespace MixERP.Net.Messaging.Email
                 {
                     if (!string.IsNullOrWhiteSpace(file))
                     {
-                        using (Attachment attachment = new Attachment(file, MediaTypeNames.Application.Octet))
+                        //MediaTypeNames.Application.Octet == "application/octet-stream".
+                        MimePart attachment = new MimePart("application", "octet-stream")
                         {
-                            ContentDisposition disposition = attachment.ContentDisposition;
-                            disposition.CreationDate = File.GetCreationTime(file);
-                            disposition.ModificationDate = File.GetLastWriteTime(file);
-                            disposition.ReadDate = File.GetLastAccessTime(file);
+                            Content = new MimeContent(File.OpenRead(file)),
+                            ContentTransferEncoding = ContentEncoding.Base64
+                        };
 
-                            disposition.FileName = Path.GetFileName(file);
-                            disposition.Size = new FileInfo(file).Length;
-                            disposition.DispositionType = DispositionTypeNames.Attachment;
+                        ContentDisposition disposition =
+                            new ContentDisposition(ContentDisposition.Attachment)
+                            {
+                                CreationDate = File.GetCreationTime(file),
+                                ModificationDate = File.GetLastWriteTime(file),
+                                ReadDate = File.GetLastAccessTime(file),
+                                FileName = Path.GetFileName(file),
+                                Size = new FileInfo(file).Length
+                            };
 
-                            attachments.Add(attachment);
-                        }
+                        attachment.ContentDisposition = disposition;
+
+                        //The original code wrapped the attachment in a "using" block and then
+                        //returned it, disposing the file stream before the message was ever
+                        //sent. The attachments are owned by the caller (the MimeMessage, which
+                        //disposes them with the message), so they are not disposed here.
+                        attachments.Add(attachment);
                     }
                 }
             }
