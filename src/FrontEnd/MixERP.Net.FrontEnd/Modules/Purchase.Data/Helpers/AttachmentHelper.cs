@@ -19,6 +19,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Entities.Core;
 using Npgsql;
+using NpgsqlTypes;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -36,10 +38,18 @@ namespace MixERP.Net.Core.Modules.Purchase.Data
             {
                 for (int i = 0; i < attachments.Count; i++)
                 {
-                    collection.Add(new NpgsqlParameter("@Comment" + i, attachments[i].Comment));
-                    collection.Add(new NpgsqlParameter("@FilePath" + i, attachments[i].FilePath));
-                    collection.Add(new NpgsqlParameter("@OriginalFileName" + i, attachments[i].OriginalFileName));
-                    collection.Add(new NpgsqlParameter("@Extension" + i, Path.GetExtension(attachments[i].OriginalFileName)));
+                    // Npgsql 6+ no longer infers a PostgreSQL type for a boxed CLR value passed to
+                    // the NpgsqlParameter(name, value) constructor (and rejects a CLR null), so
+                    // every ROW(...) member is bound with its explicit NpgsqlDbType.
+                    collection.Add(new NpgsqlParameter("@Comment" + i, NpgsqlDbType.Text) { Value = (object)attachments[i].Comment ?? DBNull.Value });
+                    collection.Add(new NpgsqlParameter("@FilePath" + i, NpgsqlDbType.Text) { Value = (object)attachments[i].FilePath ?? DBNull.Value });
+                    collection.Add(new NpgsqlParameter("@OriginalFileName" + i, NpgsqlDbType.Text) { Value = (object)attachments[i].OriginalFileName ?? DBNull.Value });
+
+                    string extension = attachments[i].OriginalFileName == null
+                        ? null
+                        : Path.GetExtension(attachments[i].OriginalFileName);
+
+                    collection.Add(new NpgsqlParameter("@Extension" + i, NpgsqlDbType.Text) { Value = (object)extension ?? DBNull.Value });
                 }
             }
 

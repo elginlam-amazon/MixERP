@@ -24,6 +24,7 @@ using MixERP.Net.DbFactory;
 using MixERP.Net.Entities.Core;
 using MixERP.Net.Entities.Models.Transactions;
 using Npgsql;
+using NpgsqlTypes;
 using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -58,14 +59,18 @@ namespace MixERP.Net.Core.Modules.Sales.Data.Transactions
 
             using (NpgsqlCommand command = new NpgsqlCommand(sql))
             {
-                command.Parameters.AddWithValue("@Book", book);
+                command.Parameters.AddWithValue("@Book", book ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("@OfficeId", officeId);
                 command.Parameters.AddWithValue("@UserId", userId);
                 command.Parameters.AddWithValue("@LoginId", loginId);
-                command.Parameters.AddWithValue("@ValueDate", valueDate);
-                command.Parameters.AddWithValue("@ReferenceNumber", referenceNumber);
-                command.Parameters.AddWithValue("@StatementReference", statementReference);
-                command.Parameters.AddWithValue("@PartyCode", stockMaster.PartyCode);
+
+                //Npgsql 6+ maps the PostgreSQL "date" type to DateOnly, so a DateTime must be
+                //bound with an explicit NpgsqlDbType.Date for the function argument to resolve.
+                command.Parameters.Add(new NpgsqlParameter("@ValueDate", NpgsqlDbType.Date) { Value = valueDate.Date });
+
+                command.Parameters.AddWithValue("@ReferenceNumber", referenceNumber ?? (object)DBNull.Value);
+                command.Parameters.AddWithValue("@StatementReference", statementReference ?? (object)DBNull.Value);
+                command.Parameters.AddWithValue("@PartyCode", stockMaster.PartyCode ?? (object)DBNull.Value);
 
                 if (stockMaster.PriceTypeId.Equals(0))
                 {
@@ -79,7 +84,7 @@ namespace MixERP.Net.Core.Modules.Sales.Data.Transactions
                 command.Parameters.AddWithValue("@NonTaxable", nonTaxable);
                 command.Parameters.AddWithValue("@SalesPersonId", stockMaster.SalespersonId);
                 command.Parameters.AddWithValue("@ShipperId", stockMaster.ShipperId);
-                command.Parameters.AddWithValue("@ShippingAddressCode", stockMaster.ShippingAddressCode);
+                command.Parameters.AddWithValue("@ShippingAddressCode", stockMaster.ShippingAddressCode ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("@StoreId", stockMaster.StoreId);
 
                 command.Parameters.AddRange(ParameterHelper.AddBigintArrayParameter(transactionIdCollection, "@TranId").ToArray());

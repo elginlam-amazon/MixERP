@@ -21,6 +21,7 @@ using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.DbFactory;
 using Npgsql;
+using NpgsqlTypes;
 using System;
 using System.Data;
 
@@ -33,8 +34,10 @@ namespace MixERP.Net.Core.Modules.Finance.Data.Reports
             const string sql = "SELECT transactions.get_cash_flow_statement(@From::date, @To::date, @UserId::integer, @OfficeId::integer, @Factor::integer);";
             using (NpgsqlCommand command = new NpgsqlCommand(sql))
             {
-                command.Parameters.AddWithValue("@From", from);
-                command.Parameters.AddWithValue("@To", to);
+                // Npgsql 6+ infers "timestamp" for an untyped DateTime, which does not bind to
+                // the ::date casts in the SQL above. Bind these parameters as "date" explicitly.
+                command.Parameters.Add(new NpgsqlParameter("@From", NpgsqlDbType.Date) { Value = from.Date });
+                command.Parameters.Add(new NpgsqlParameter("@To", NpgsqlDbType.Date) { Value = to.Date });
                 command.Parameters.AddWithValue("@UserId", userId);
                 command.Parameters.AddWithValue("@OfficeId", officeId);
                 command.Parameters.AddWithValue("@Factor", factor);

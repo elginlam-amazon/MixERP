@@ -1,0 +1,102 @@
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+
+/*
+    Scoped replacement for the former embedded web resource
+    MixERP.Net.WebControls.StockTransactionFactory.Includes.Style.StockTransactionFactory.css
+    (Control/Stylesheet.cs injected it with an HtmlLink built from
+    Page.ClientScript.GetWebResourceUrl - both are removed WebForms APIs).
+
+    Every selector is preserved byte-identically. ::deep is added to the selectors that
+    must reach nodes StockTransactionForm.js generates (the #ProductGridView body rows and
+    their cells/inputs), because scoped css only rewrites markup this component emits.
+
+    HOST OBLIGATION: scoped RCL css reaches the browser through the host's css bundle, so
+    the host page must reference <link href="<HostAssembly>.styles.css" rel="stylesheet" />
+    (e.g. MixERP.Net.FrontEnd.styles.css). Without it the grid/form column widths are lost -
+    no other behaviour changes.
+*/
+
+::deep table input[type=radio] {
+    margin: 4px;
+}
+
+::deep #ProductGridView th:nth-child(1) {
+    width: 7%;
+}
+
+::deep #ProductGridView th:nth-child(2) {
+    width: 18%;
+}
+
+::deep #ProductGridView th:nth-child(3) {
+    width: 5%;
+}
+
+::deep #ProductGridView th:nth-child(4) {
+    width: 9%;
+}
+
+::deep #ProductGridView th:nth-child(5) {
+    width: 9%;
+}
+
+::deep #ProductGridView th:nth-child(6) {
+    width: 9%;
+}
+
+::deep #ProductGridView th:nth-child(7) {
+    width: 6%;
+}
+
+::deep #ProductGridView th:nth-child(8) {
+    width: 7%;
+}
+
+::deep #ProductGridView th:nth-child(9) {
+    width: 7%;
+}
+
+::deep #ProductGridView th:nth-child(10) {
+    width: 9%;
+}
+
+::deep #ProductGridView th:nth-child(11) {
+    width: 6%;
+}
+
+::deep table.form {
+    width: 100%;
+}
+
+    ::deep table.form td:nth-child(1), ::deep table.form td:nth-child(2), ::deep table.form td:nth-child(3), ::deep table.form td:nth-child(6) {
+        width: 10%;
+    }
+
+    ::deep table.form td:nth-child(5) {
+        max-width: 10%;
+    }
+
+    ::deep table.form td:nth-child(4) {
+        width: 24%;
+    }
+
+    ::deep table.form .ui.toggle.checkbox {
+        width: 150px;
+    }

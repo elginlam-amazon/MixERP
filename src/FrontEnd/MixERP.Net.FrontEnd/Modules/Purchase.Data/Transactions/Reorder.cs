@@ -24,6 +24,8 @@ using System.Linq;
 using MixERP.Net.DbFactory;
 using MixERP.Net.Entities.Transactions;
 using Npgsql;
+using NpgsqlTypes;
+using System;
 using PetaPoco;
 
 namespace MixERP.Net.Core.Modules.Purchase.Data.Transactions
@@ -38,12 +40,15 @@ namespace MixERP.Net.Core.Modules.Purchase.Data.Transactions
             {
                 for (int i = 0; i < details.Count; i++)
                 {
-                    collection.Add(new NpgsqlParameter("@ItemId" + i, details[i].ItemId));
-                    collection.Add(new NpgsqlParameter("@SupplierCode" + i, details[i].SupplierCode));
-                    collection.Add(new NpgsqlParameter("@UnitId" + i, details[i].UnitId));
-                    collection.Add(new NpgsqlParameter("@Price" + i, details[i].Price));
-                    collection.Add(new NpgsqlParameter("@Tax" + i, details[i].Tax ?? string.Empty));
-                    collection.Add(new NpgsqlParameter("@OrderQuantity" + i, details[i].OrderQuantity));
+                    // Npgsql 6+ no longer infers a PostgreSQL type for a boxed CLR value passed to
+                    // the NpgsqlParameter(name, value) constructor (and rejects a CLR null), so
+                    // every ROW(...) member is bound with its explicit NpgsqlDbType.
+                    collection.Add(new NpgsqlParameter("@ItemId" + i, NpgsqlDbType.Integer) { Value = details[i].ItemId });
+                    collection.Add(new NpgsqlParameter("@SupplierCode" + i, NpgsqlDbType.Varchar) { Value = (object)details[i].SupplierCode ?? DBNull.Value });
+                    collection.Add(new NpgsqlParameter("@UnitId" + i, NpgsqlDbType.Integer) { Value = details[i].UnitId });
+                    collection.Add(new NpgsqlParameter("@Price" + i, NpgsqlDbType.Numeric) { Value = details[i].Price });
+                    collection.Add(new NpgsqlParameter("@Tax" + i, NpgsqlDbType.Varchar) { Value = details[i].Tax ?? string.Empty });
+                    collection.Add(new NpgsqlParameter("@OrderQuantity" + i, NpgsqlDbType.Integer) { Value = details[i].OrderQuantity });
                 }
             }
 

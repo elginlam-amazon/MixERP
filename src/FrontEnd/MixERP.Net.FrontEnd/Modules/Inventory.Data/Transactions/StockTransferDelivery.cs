@@ -69,9 +69,9 @@ namespace MixERP.Net.Core.Modules.Inventory.Data.Transactions
                 command.Parameters.AddWithValue("@UserId", userId);
                 command.Parameters.AddWithValue("@LoginId", loginId);
                 command.Parameters.AddWithValue("@RequestId", requestId);
-                command.Parameters.AddWithValue("@ValueDate", valueDate);
-                command.Parameters.AddWithValue("@ReferenceNumber", referenceNumber);
-                command.Parameters.AddWithValue("@StatementReference", statementReference);
+                command.Parameters.AddWithValue("@ValueDate", DateOnly.FromDateTime(valueDate));
+                command.Parameters.AddWithValue("@ReferenceNumber", (object)referenceNumber ?? DBNull.Value);
+                command.Parameters.AddWithValue("@StatementReference", (object)statementReference ?? DBNull.Value);
                 command.Parameters.AddWithValue("@ShipperId", shipperId);
                 command.Parameters.AddWithValue("@SourceStoreId", sourceStoreId);
                 command.Parameters.AddRange(ParameterHelper.AddStockTransferModelParameter(details).ToArray());

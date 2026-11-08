@@ -24,6 +24,7 @@ using MixERP.Net.DbFactory;
 using MixERP.Net.Entities.Core;
 using MixERP.Net.Entities.Models.Transactions;
 using Npgsql;
+using NpgsqlTypes;
 using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -57,22 +58,32 @@ namespace MixERP.Net.Core.Modules.Purchase.Data.Transactions
             string sql = string.Format(CultureInfo.InvariantCulture, "SELECT * FROM transactions.post_purchase(@BookName::national character varying(48), @OfficeId::integer, @UserId::integer, @LoginId::bigint, @ValueDate::date, @CostCenterId::integer, @ReferenceNumber::national character varying(12), @StatementReference::text, @IsCredit::boolean, @PartyCode::national character varying(12), @PriceTypeId::integer, @ShipperId::integer, @StoreId::integer, ARRAY[{0}]::bigint[], ARRAY[{1}], ARRAY[{2}])", tranIds, detail, attachment);
             using (NpgsqlCommand command = new NpgsqlCommand(sql))
             {
-                command.Parameters.AddWithValue("@BookName", book);
+                command.Parameters.Add(new NpgsqlParameter("@BookName", NpgsqlDbType.Varchar) { Value = (object)book ?? DBNull.Value });
                 command.Parameters.AddWithValue("@OfficeId", officeId);
                 command.Parameters.AddWithValue("@UserId", userId);
                 command.Parameters.AddWithValue("@LoginId", loginId);
-                command.Parameters.AddWithValue("@ValueDate", valueDate);
+
+                // Npgsql 6+ infers the PostgreSQL type from DateTime.Kind: Utc maps to
+                // "timestamptz" (whose ::date cast is evaluated in the session TimeZone and can
+                // shift the calendar date) and Local can throw. The target parameter is cast to
+                // ::date, so bind it explicitly as a date to preserve the Npgsql 2.x behavior for
+                // every DateTime.Kind a caller may supply.
+                command.Parameters.Add(new NpgsqlParameter("@ValueDate", NpgsqlDbType.Date) { Value = valueDate.Date });
+
                 command.Parameters.AddWithValue("@CostCenterId", costCenterId);
-                command.Parameters.AddWithValue("@ReferenceNumber", referenceNumber);
-                command.Parameters.AddWithValue("@StatementReference", statementReference);
+
+                // Npgsql 6+ rejects a CLR null passed to AddWithValue, so the nullable string
+                // parameters are bound explicitly with DBNull.Value when absent.
+                command.Parameters.Add(new NpgsqlParameter("@ReferenceNumber", NpgsqlDbType.Varchar) { Value = (object)referenceNumber ?? DBNull.Value });
+                command.Parameters.Add(new NpgsqlParameter("@StatementReference", NpgsqlDbType.Text) { Value = (object)statementReference ?? DBNull.Value });
 
 
                 command.Parameters.AddWithValue("@IsCredit", stockMaster.IsCredit);
-                command.Parameters.AddWithValue("@PartyCode", stockMaster.PartyCode);
+                command.Parameters.Add(new NpgsqlParameter("@PartyCode", NpgsqlDbType.Varchar) { Value = (object)stockMaster.PartyCode ?? DBNull.Value });
 
                 if (stockMaster.PriceTypeId.Equals(0))
                 {
-                    command.Parameters.AddWithValue("@PriceTypeId", DBNull.Value);
+                    command.Parameters.Add(new NpgsqlParameter("@PriceTypeId", NpgsqlDbType.Integer) { Value = DBNull.Value });
                 }
                 else
                 {
@@ -81,7 +92,7 @@ namespace MixERP.Net.Core.Modules.Purchase.Data.Transactions
 
                 if (stockMaster.ShipperId.Equals(0))
                 {
-                    command.Parameters.AddWithValue("@ShipperId", DBNull.Value);
+                    command.Parameters.Add(new NpgsqlParameter("@ShipperId", NpgsqlDbType.Integer) { Value = DBNull.Value });
                 }
                 else
                 {

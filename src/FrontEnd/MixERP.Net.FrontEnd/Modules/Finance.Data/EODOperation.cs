@@ -21,6 +21,7 @@ using MixERP.Net.Common;
 using MixERP.Net.Common.Events;
 using MixERP.Net.DbFactory;
 using Npgsql;
+using NpgsqlTypes;
 using System;
 using System.Data;
 
@@ -82,7 +83,10 @@ namespace MixERP.Net.Core.Modules.Finance.Data
             {
                 command.Parameters.AddWithValue("@UserId", userId);
                 command.Parameters.AddWithValue("@OfficeId", officeId);
-                command.Parameters.AddWithValue("@ValueDate", valueDate);
+
+                // Npgsql 6+ infers "timestamp" for an untyped DateTime, which does not bind to
+                // the @ValueDate::date cast. Bind the parameter as "date" explicitly.
+                command.Parameters.Add(new NpgsqlParameter("@ValueDate", NpgsqlDbType.Date) { Value = valueDate.Date });
 
                 DbOperation.ExecuteNonQuery(catalog, command);
             }
@@ -118,7 +122,9 @@ namespace MixERP.Net.Core.Modules.Finance.Data
 
                 if (e.Notice != null && e.Notice.Severity.ToUpperInvariant().Equals("INFO"))
                 {
-                    MixERPPGEventArgs args = new MixERPPGEventArgs(e.Notice.Message, e.Notice.Detail, 0);
+                    // PostgresNotice (Npgsql's replacement for the removed NpgsqlError) exposes
+                    // the notice text as MessageText; the legacy "Message" member is gone.
+                    MixERPPGEventArgs args = new MixERPPGEventArgs(e.Notice.MessageText, e.Notice.Detail, 0);
 
                     notificationReceived(this, args);
                 }

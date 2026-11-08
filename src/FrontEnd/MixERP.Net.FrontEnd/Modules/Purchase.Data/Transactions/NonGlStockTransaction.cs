@@ -24,6 +24,7 @@ using MixERP.Net.DbFactory;
 using MixERP.Net.Entities.Core;
 using MixERP.Net.Entities.Models.Transactions;
 using Npgsql;
+using NpgsqlTypes;
 using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -58,18 +59,26 @@ namespace MixERP.Net.Core.Modules.Purchase.Data.Transactions
 
             using (NpgsqlCommand command = new NpgsqlCommand(sql))
             {
-                command.Parameters.AddWithValue("@Book", book);
+                command.Parameters.Add(new NpgsqlParameter("@Book", NpgsqlDbType.Varchar) { Value = (object)book ?? DBNull.Value });
                 command.Parameters.AddWithValue("@OfficeId", officeId);
                 command.Parameters.AddWithValue("@UserId", userId);
                 command.Parameters.AddWithValue("@LoginId", loginId);
-                command.Parameters.AddWithValue("@ValueDate", valueDate);
-                command.Parameters.AddWithValue("@ReferenceNumber", referenceNumber);
-                command.Parameters.AddWithValue("@StatementReference", statementReference);
-                command.Parameters.AddWithValue("@PartyCode", stockMaster.PartyCode);
+
+                // Npgsql 6+ infers the PostgreSQL type from DateTime.Kind: Utc maps to
+                // "timestamptz" (whose ::date cast is evaluated in the session TimeZone and can
+                // shift the calendar date) and Local can throw. The target parameter is cast to
+                // ::date, so bind it explicitly as a date to preserve the Npgsql 2.x behavior.
+                command.Parameters.Add(new NpgsqlParameter("@ValueDate", NpgsqlDbType.Date) { Value = valueDate.Date });
+
+                // Npgsql 6+ rejects a CLR null passed to AddWithValue, so the nullable string
+                // parameters are bound explicitly with DBNull.Value when absent.
+                command.Parameters.Add(new NpgsqlParameter("@ReferenceNumber", NpgsqlDbType.Varchar) { Value = (object)referenceNumber ?? DBNull.Value });
+                command.Parameters.Add(new NpgsqlParameter("@StatementReference", NpgsqlDbType.Text) { Value = (object)statementReference ?? DBNull.Value });
+                command.Parameters.Add(new NpgsqlParameter("@PartyCode", NpgsqlDbType.Varchar) { Value = (object)stockMaster.PartyCode ?? DBNull.Value });
 
                 if (stockMaster.PriceTypeId.Equals(0))
                 {
-                    command.Parameters.AddWithValue("@PriceTypeId", DBNull.Value);
+                    command.Parameters.Add(new NpgsqlParameter("@PriceTypeId", NpgsqlDbType.Integer) { Value = DBNull.Value });
                 }
                 else
                 {
@@ -78,7 +87,7 @@ namespace MixERP.Net.Core.Modules.Purchase.Data.Transactions
 
                 if (stockMaster.SalespersonId.Equals(0))
                 {
-                    command.Parameters.AddWithValue("@SalesPersonId", DBNull.Value);
+                    command.Parameters.Add(new NpgsqlParameter("@SalesPersonId", NpgsqlDbType.Integer) { Value = DBNull.Value });
                 }
                 else
                 {
@@ -87,18 +96,18 @@ namespace MixERP.Net.Core.Modules.Purchase.Data.Transactions
 
                 if (stockMaster.ShipperId.Equals(0))
                 {
-                    command.Parameters.AddWithValue("@ShipperId", DBNull.Value);
+                    command.Parameters.Add(new NpgsqlParameter("@ShipperId", NpgsqlDbType.Integer) { Value = DBNull.Value });
                 }
                 else
                 {
                     command.Parameters.AddWithValue("@ShipperId", stockMaster.ShipperId);
                 }
 
-                command.Parameters.AddWithValue("@ShippingAddressCode", stockMaster.ShippingAddressCode);
+                command.Parameters.Add(new NpgsqlParameter("@ShippingAddressCode", NpgsqlDbType.Varchar) { Value = (object)stockMaster.ShippingAddressCode ?? DBNull.Value });
 
                 if (stockMaster.StoreId.Equals(0))
                 {
-                    command.Parameters.AddWithValue("@StoreId", DBNull.Value);
+                    command.Parameters.Add(new NpgsqlParameter("@StoreId", NpgsqlDbType.Integer) { Value = DBNull.Value });
                 }
                 else
                 {

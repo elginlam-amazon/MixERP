@@ -21,68 +21,68 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 /*global addDanger, ajaxDataBind, ajaxUpdateVal, appendParameter, fadeThis, getAjax, getColumnText, getData, getFormattedNumber, Resources, Resources, isDate, isNullOrWhiteSpace, isSales, logError, makeDirty, parseFloat, parseFormattedNumber, removeDirty, repaint, rowData, selectDropDownListByValue, setColumnText, shortcut, showWindow, sumOfColumn, tableToJSON, tranBook, unitId, uploadedFilesHidden, verifyStock, parseInt */
 
 //Controls
-var addButton = $("#AddButton");
-var amountInputText = $("#AmountInputText");
-var attachmentToggler = $("#attachmentToggler");
-var cashTransactionInputCheckBox = $("#CashTransactionInputCheckBox");
-var costCenterSelect = $("#CostCenterSelect");
+var addButton;
+var amountInputText;
+var attachmentToggler;
+var cashTransactionInputCheckBox;
+var costCenterSelect;
 
-var dateTextBox = $("#DateTextBox");
-var discountInputText = $("#DiscountInputText");
+var dateTextBox;
+var discountInputText;
 
-var errorLabel = $("#ErrorLabel");
-var errorLabelBottom = $("#ErrorLabelBottom");
+var errorLabel;
+var errorLabelBottom;
 
-var grandTotalInputText = $("#GrandTotalInputText");
+var grandTotalInputText;
 
-var itemCodeInputText = $("#ItemCodeInputText");
-var itemIdHidden = $("#ItemIdHidden");
-var itemSelect = $("#ItemSelect");
+var itemCodeInputText;
+var itemIdHidden;
+var itemSelect;
 
-var partyIdHidden = $("#PartyIdHidden");
-var partySelect = $("#PartySelect");
-var partyCodeInputText = $("#PartyCodeInputText");
-var paymentTermSelect = $("#PaymentTermSelect");
-var productGridView = $("#ProductGridView");
-var productGridViewDataHidden = $("#ProductGridViewDataHidden");
-var priceInputText = $("#PriceInputText");
-var priceTypeSelect = $("#PriceTypeSelect");
-var priceTypeIdHidden = $("#PriceTypeIdHidden");
+var partyIdHidden;
+var partySelect;
+var partyCodeInputText;
+var paymentTermSelect;
+var productGridView;
+var productGridViewDataHidden;
+var priceInputText;
+var priceTypeSelect;
+var priceTypeIdHidden;
 
-var quantityInputText = $("#QuantityInputText");
+var quantityInputText;
 
-var runningTotalInputText = $("#RunningTotalInputText");
-var referenceNumberInputText = $("#ReferenceNumberInputText");
+var runningTotalInputText;
+var referenceNumberInputText;
 
-var salesTypeSelect = $("#SalesTypeSelect");
-var saveButton = $("#SaveButton");
+var salesTypeSelect;
+var saveButton;
 
-var salesPersonSelect = $("#SalesPersonSelect");
+var salesPersonSelect;
 
-var shippingAddressSelect = $("#ShippingAddressSelect");
-var shippingAddressTextArea = $("#ShippingAddressTextArea");
-var shippingChargeInputText = $("#ShippingChargeInputText");
-var shippingCompanySelect = $("#ShippingCompanySelect");
+var shippingAddressSelect;
+var shippingAddressTextArea;
+var shippingChargeInputText;
+var shippingCompanySelect;
 
-var storeIdHidden = $("#StoreIdHidden");
-var shipperIdHidden = $("#ShipperIdHidden");
-var shippingAddressCodeHidden = $("#ShippingAddressCodeHidden");
-var salesPersonIdHidden = $("#SalesPersonIdHidden");
+var storeIdHidden;
+var shipperIdHidden;
+var shippingAddressCodeHidden;
+var salesPersonIdHidden;
 
-var statementReferenceTextArea = $("#StatementReferenceTextArea");
-var storeSelect = $("#StoreSelect");
-var subTotalInputText = $("#SubTotalInputText");
+var statementReferenceTextArea;
+var storeSelect;
+var subTotalInputText;
 
-var taxTotalInputText = $("#TaxTotalInputText");
+var taxTotalInputText;
 
-var taxSelect = $("#TaxSelect");
-var taxInputText = $("#TaxInputText");
+var taxSelect;
+var taxInputText;
 
-var tranIdCollectionHiddenField = $("#TranIdCollectionHiddenField");
+var tranIdCollectionHiddenField;
 
-var unitIdHidden = $("#UnitIdHidden");
-var unitSelect = $("#UnitSelect");
-var unitNameHidden = $("#UnitNameHidden");
+var unitIdHidden;
+var unitSelect;
+var unitNameHidden;
 
 //Variables
 var salespersonId;
@@ -115,25 +115,6 @@ var url;
 
 var valueDate;
 
-//Page Load Event
-$(document).ready(function () {
-    $(".form-table td").each(function () {
-        var content = $(this).html();
-        if (!content.trim()) {
-            $(this).html("");
-            $(this).hide();
-        };
-    });
-
-    if (cashTransactionInputCheckBox.length === 1) {
-        if (cashTransactionInputCheckBox.is(':checked')) {
-            paymentTermSelect.hide();
-        };
-    };
-
-    addShortcuts();
-    initializeAjaxData();
-});
 
 function initializeAjaxData() {
 
@@ -172,38 +153,7 @@ function initializeAjaxData() {
     restoreData();
 };
 
-itemSelect.keydown(function (event) {
-    if (event.ctrlKey) {
-        if (event.key === "Enter") {
-            itemSelect_OnBlur();
-            return false;
-        };
-    };
 
-    return true;
-});
-
-shippingCompanySelect.blur(function () {
-    var shippingCharge = parseFloat(shippingChargeInputText.val() || 0);
-    var shippingCompanyId = parseInt(shippingCompanySelect.getSelectedValue() || 0);
-
-    if (shippingCompanyId) {
-        shippingChargeInputText.removeAttr("readonly");
-
-        if (!shippingCharge) {
-            shippingCharge = parseFloat(shippingChargeInputText.data("val") || 0);
-            shippingChargeInputText.removeData("val");
-
-            if (shippingCharge) {
-                shippingChargeInputText.val(shippingCharge);
-            };
-        };
-    } else {
-        shippingChargeInputText.attr("readonly", "readonly");
-        shippingChargeInputText.data("val", shippingCharge);
-        shippingChargeInputText.val("");
-    };
-});
 
 function itemSelect_OnBlur() {
     itemCodeInputText.val(itemSelect.getSelectedValue());
@@ -276,69 +226,15 @@ function taxRequired() {
     return salesTax;
 };
 
-addButton.click(function () {
-    var isCompoundItem = itemSelect.find(":selected").closest("optgroup").data("compound-item");
-
-    if (isCompoundItem) {
-        addCompoundItems();
-        return;
-    };
 
 
-    if (updateTax() === -1) {
-        if (taxRequired()) {
-            logError("Please select a tax form");
-            return;
-        };
-    };
 
-    calculateAmount();
-    addRow();
-});
 
-amountInputText.blur(function () {
-    updateTax();
-    calculateAmount();
-});
 
-attachmentToggler.click(function () {
-    $('#attachment').toggle(500).after(function () {
-        $('#attachment').removeClass("initially hidden");
-        repaint();
-    });
-});
 
-discountInputText.blur(function () {
-    updateTax();
-    calculateAmount();
-    getDefaultSalesTax();
-});
 
-shippingChargeInputText.blur(function () {
-    calculateAmount();
-});
 
-itemCodeInputText.blur(function () {
-    selectDropDownListByValue(this.id, 'ItemSelect');
-});
 
-partyCodeInputText.blur(function () {
-    selectDropDownListByValue(this.id, 'PartySelect');
-});
-
-priceInputText.blur(function () {
-    updateTax();
-    calculateAmount();
-});
-
-quantityInputText.blur(function () {
-    updateTax();
-    calculateAmount();
-});
-
-taxSelect.blur(function () {
-    updateTax();
-});
 
 function updateTax() {
     if (!taxRequired() && taxSelect.find("option").length === 1) {
@@ -583,27 +479,10 @@ var validateProductControl = function () {
     return true;
 };
 
-cashTransactionInputCheckBox.change(function () {
-    var checked = !cashTransactionInputCheckBox.is(":checked");
-    setVisible(paymentTermSelect, checked, 500);
-});
 
-shippingAddressSelect.change(function () {
-    showShippingAddress();
-});
 
-shippingChargeInputText.blur(function () {
-    summate();
-});
 
-unitSelect.change(function () {
-    unitNameHidden.val($(this).getSelectedText());
-    unitIdHidden.val($(this).getSelectedValue());
-});
 
-unitSelect.blur(function () {
-    getPrice();
-});
 
 function loadAddresses() {
     var partyCode = partyCodeInputText.val();
@@ -1235,3 +1114,260 @@ function editRow(el) {
 
     addButton.attr("data-update-index", selectedIndex);
 };
+
+//---------------------------------------------------------------------------------------
+// RE-ENTRANCY WRAPPER (migration: PartyControl precedent).
+//
+// JSUtility/PageUtility inject this file's <script> only ONCE per key, whereas WebForms
+// re-executed it on every page load. This file used to cache all 46 jQuery handles at top
+// level and wire its events + run its initial load at load time, so the SECOND instantiation
+// of the StockTransactionForm component (SPA navigate away and back) would leave every handle
+// bound to detached nodes: green build, form renders, Add/Save silently dead.
+//
+// The handle lookups, the event wirings, addShortcuts() and the initial data load therefore
+// live in the idempotent window.initStockTransactionForm() below. The guard flag is kept on a
+// DOM NODE (#ProductGridView) rather than in a module variable, so a freshly rendered form
+// re-initialises while a re-render of the SAME form does not. There is no $(document).ready
+// self-initialisation (see the note at the bottom): the component calls it from
+// OnAfterRenderAsync for EVERY instance, after it has seeded the server-owned node values.
+//
+// Handler bodies, the 22 *.asmx urls, the 11 keyboard shortcuts and the two *.mix popup urls
+// are unchanged.
+//---------------------------------------------------------------------------------------
+
+function bindStockTransactionFormControls() {
+    addButton = $("#AddButton");
+    amountInputText = $("#AmountInputText");
+    attachmentToggler = $("#attachmentToggler");
+    cashTransactionInputCheckBox = $("#CashTransactionInputCheckBox");
+    costCenterSelect = $("#CostCenterSelect");
+
+    dateTextBox = $("#DateTextBox");
+    discountInputText = $("#DiscountInputText");
+
+    errorLabel = $("#ErrorLabel");
+    errorLabelBottom = $("#ErrorLabelBottom");
+
+    grandTotalInputText = $("#GrandTotalInputText");
+
+    itemCodeInputText = $("#ItemCodeInputText");
+    itemIdHidden = $("#ItemIdHidden");
+    itemSelect = $("#ItemSelect");
+
+    partyIdHidden = $("#PartyIdHidden");
+    partySelect = $("#PartySelect");
+    partyCodeInputText = $("#PartyCodeInputText");
+    paymentTermSelect = $("#PaymentTermSelect");
+    productGridView = $("#ProductGridView");
+    productGridViewDataHidden = $("#ProductGridViewDataHidden");
+    priceInputText = $("#PriceInputText");
+    priceTypeSelect = $("#PriceTypeSelect");
+    priceTypeIdHidden = $("#PriceTypeIdHidden");
+
+    quantityInputText = $("#QuantityInputText");
+
+    runningTotalInputText = $("#RunningTotalInputText");
+    referenceNumberInputText = $("#ReferenceNumberInputText");
+
+    salesTypeSelect = $("#SalesTypeSelect");
+    saveButton = $("#SaveButton");
+
+    salesPersonSelect = $("#SalesPersonSelect");
+
+    shippingAddressSelect = $("#ShippingAddressSelect");
+    shippingAddressTextArea = $("#ShippingAddressTextArea");
+    shippingChargeInputText = $("#ShippingChargeInputText");
+    shippingCompanySelect = $("#ShippingCompanySelect");
+
+    storeIdHidden = $("#StoreIdHidden");
+    shipperIdHidden = $("#ShipperIdHidden");
+    shippingAddressCodeHidden = $("#ShippingAddressCodeHidden");
+    salesPersonIdHidden = $("#SalesPersonIdHidden");
+
+    statementReferenceTextArea = $("#StatementReferenceTextArea");
+    storeSelect = $("#StoreSelect");
+    subTotalInputText = $("#SubTotalInputText");
+
+    taxTotalInputText = $("#TaxTotalInputText");
+
+    taxSelect = $("#TaxSelect");
+    taxInputText = $("#TaxInputText");
+
+    tranIdCollectionHiddenField = $("#TranIdCollectionHiddenField");
+
+    unitIdHidden = $("#UnitIdHidden");
+    unitSelect = $("#UnitSelect");
+    unitNameHidden = $("#UnitNameHidden");
+}
+
+function wireStockTransactionFormEvents() {
+itemSelect.keydown(function (event) {
+    if (event.ctrlKey) {
+        if (event.key === "Enter") {
+            itemSelect_OnBlur();
+            return false;
+        };
+    };
+
+    return true;
+});
+
+shippingCompanySelect.blur(function () {
+    var shippingCharge = parseFloat(shippingChargeInputText.val() || 0);
+    var shippingCompanyId = parseInt(shippingCompanySelect.getSelectedValue() || 0);
+
+    if (shippingCompanyId) {
+        shippingChargeInputText.removeAttr("readonly");
+
+        if (!shippingCharge) {
+            shippingCharge = parseFloat(shippingChargeInputText.data("val") || 0);
+            shippingChargeInputText.removeData("val");
+
+            if (shippingCharge) {
+                shippingChargeInputText.val(shippingCharge);
+            };
+        };
+    } else {
+        shippingChargeInputText.attr("readonly", "readonly");
+        shippingChargeInputText.data("val", shippingCharge);
+        shippingChargeInputText.val("");
+    };
+});
+
+addButton.click(function () {
+    var isCompoundItem = itemSelect.find(":selected").closest("optgroup").data("compound-item");
+
+    if (isCompoundItem) {
+        addCompoundItems();
+        return;
+    };
+
+
+    if (updateTax() === -1) {
+        if (taxRequired()) {
+            logError("Please select a tax form");
+            return;
+        };
+    };
+
+    calculateAmount();
+    addRow();
+});
+
+amountInputText.blur(function () {
+    updateTax();
+    calculateAmount();
+});
+
+attachmentToggler.click(function () {
+    $('#attachment').toggle(500).after(function () {
+        $('#attachment').removeClass("initially hidden");
+        repaint();
+    });
+});
+
+discountInputText.blur(function () {
+    updateTax();
+    calculateAmount();
+    getDefaultSalesTax();
+});
+
+shippingChargeInputText.blur(function () {
+    calculateAmount();
+});
+
+itemCodeInputText.blur(function () {
+    selectDropDownListByValue(this.id, 'ItemSelect');
+});
+
+partyCodeInputText.blur(function () {
+    selectDropDownListByValue(this.id, 'PartySelect');
+});
+
+priceInputText.blur(function () {
+    updateTax();
+    calculateAmount();
+});
+
+quantityInputText.blur(function () {
+    updateTax();
+    calculateAmount();
+});
+
+taxSelect.blur(function () {
+    updateTax();
+});
+
+cashTransactionInputCheckBox.change(function () {
+    var checked = !cashTransactionInputCheckBox.is(":checked");
+    setVisible(paymentTermSelect, checked, 500);
+});
+
+shippingAddressSelect.change(function () {
+    showShippingAddress();
+});
+
+shippingChargeInputText.blur(function () {
+    summate();
+});
+
+unitSelect.change(function () {
+    unitNameHidden.val($(this).getSelectedText());
+    unitIdHidden.val($(this).getSelectedValue());
+});
+
+unitSelect.blur(function () {
+    getPrice();
+});
+}
+
+window.initStockTransactionForm = function () {
+    var root = document.getElementById("ProductGridView");
+
+    if (!root) {
+        //The form is not in the DOM (yet). Nothing to initialize.
+        return;
+    };
+
+    if (root.getAttribute("data-stock-transaction-form-initialized") === "true") {
+        //This very form instance has already been initialized.
+        return;
+    };
+
+    root.setAttribute("data-stock-transaction-form-initialized", "true");
+
+    bindStockTransactionFormControls();
+    wireStockTransactionFormEvents();
+
+    //Former $(document).ready body, unchanged.
+    $(".form-table td").each(function () {
+        var content = $(this).html();
+        if (!content.trim()) {
+            $(this).html("");
+            $(this).hide();
+        };
+    });
+
+    if (cashTransactionInputCheckBox.length === 1) {
+        if (cashTransactionInputCheckBox.is(':checked')) {
+            paymentTermSelect.hide();
+        };
+    };
+
+    addShortcuts();
+    initializeAjaxData();
+};
+
+//Page Load Event
+//
+//There is deliberately NO $(document).ready() self-initialisation here. The file is appended
+//to an already-ready document, so a ready handler would fire the instant the file executes -
+//i.e. BEFORE the component has seeded the nodes the server owns the initial value of
+//(#ProductGridViewDataHidden above all, which initializeAjaxData() -> restoreData() reads).
+//The guard flag would then make the component's own init call a no-op and the merged product
+//rows would never be restored.
+//
+//window.initStockTransactionForm() is therefore the public init contract: the component calls
+//it from OnAfterRenderAsync, after seeding, for every instance. It stays idempotent, so a
+//re-render of the same form does nothing while a freshly rendered form re-initialises.
+

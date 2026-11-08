@@ -19,6 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.DbFactory;
 using Npgsql;
+using NpgsqlTypes;
 using System;
 using System.Data;
 
@@ -31,8 +32,10 @@ namespace MixERP.Net.Core.Modules.Finance.Data.Reports
             const string sql = "SELECT * FROM transactions.get_balance_sheet(@Previous::date, @Current::date, @UserId::integer, @OfficeId::integer, @Factor::integer)";
             using (NpgsqlCommand command = new NpgsqlCommand(sql))
             {
-                command.Parameters.AddWithValue("@Previous", previousPeriod);
-                command.Parameters.AddWithValue("@Current", currentPeriod);
+                // Npgsql 6+ infers "timestamp" for an untyped DateTime, which does not bind to
+                // the ::date casts in the SQL above. Bind these parameters as "date" explicitly.
+                command.Parameters.Add(new NpgsqlParameter("@Previous", NpgsqlDbType.Date) { Value = previousPeriod.Date });
+                command.Parameters.Add(new NpgsqlParameter("@Current", NpgsqlDbType.Date) { Value = currentPeriod.Date });
                 command.Parameters.AddWithValue("@UserId", userId);
                 command.Parameters.AddWithValue("@OfficeId", officeId);
                 command.Parameters.AddWithValue("@Factor", factor);

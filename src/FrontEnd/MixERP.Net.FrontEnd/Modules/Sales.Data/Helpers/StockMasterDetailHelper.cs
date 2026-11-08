@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using System;
 using MixERP.Net.Entities.Models.Transactions;
 using Npgsql;
 using System.Collections.Generic;
@@ -36,13 +37,13 @@ namespace MixERP.Net.Core.Modules.Sales.Data
                 for (int i = 0; i < details.Count; i++)
                 {
                     collection.Add(new NpgsqlParameter("@StoreId" + i, details[i].StoreId));
-                    collection.Add(new NpgsqlParameter("@ItemCode" + i, details[i].ItemCode));
+                    collection.Add(new NpgsqlParameter("@ItemCode" + i, details[i].ItemCode ?? (object)DBNull.Value));
                     collection.Add(new NpgsqlParameter("@Quantity" + i, details[i].Quantity));
-                    collection.Add(new NpgsqlParameter("@UnitName" + i, details[i].UnitName));
+                    collection.Add(new NpgsqlParameter("@UnitName" + i, details[i].UnitName ?? (object)DBNull.Value));
                     collection.Add(new NpgsqlParameter("@Price" + i, details[i].Price));
                     collection.Add(new NpgsqlParameter("@Discount" + i, details[i].Discount));
                     collection.Add(new NpgsqlParameter("@ShippingCharge" + i, details[i].ShippingCharge));
-                    collection.Add(new NpgsqlParameter("@TaxForm" + i, details[i].TaxForm));
+                    collection.Add(new NpgsqlParameter("@TaxForm" + i, details[i].TaxForm ?? (object)DBNull.Value));
                     collection.Add(new NpgsqlParameter("@Tax" + i, details[i].Tax));
                 }
             }

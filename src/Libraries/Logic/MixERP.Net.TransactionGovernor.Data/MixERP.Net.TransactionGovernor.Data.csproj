@@ -38,10 +38,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MixERP.Net.Common\MixERP.Net.Common.csproj" />
-    <ProjectReference Include="..\MixERP.Net.DbFactory\MixERP.Net.DBFactory.csproj" />
-    <ProjectReference Include="..\MixERP.Net.Entities\MixERP.Net.Entities.csproj" />
-    <ProjectReference Include="..\PetaPoco\PetaPoco.csproj" />
+    <ProjectReference Include="../MixERP.Net.Common/MixERP.Net.Common.csproj" />
+    <ProjectReference Include="../MixERP.Net.DbFactory/MixERP.Net.DBFactory.csproj" />
+    <ProjectReference Include="../MixERP.Net.Entities/MixERP.Net.Entities.csproj" />
+    <ProjectReference Include="../PetaPoco/PetaPoco.csproj" />
   </ItemGroup>
 
   <ItemGroup>

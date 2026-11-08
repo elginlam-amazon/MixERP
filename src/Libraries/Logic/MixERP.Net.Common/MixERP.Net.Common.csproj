@@ -62,9 +62,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MixERP.Net.Framework\MixERP.Net.Framework.csproj" />
-    <ProjectReference Include="..\MixERP.Net.i18n\MixERP.Net.i18n.csproj" />
-    <ProjectReference Include="..\PetaPoco\PetaPoco.csproj" />
+    <ProjectReference Include="../MixERP.Net.Framework/MixERP.Net.Framework.csproj" />
+    <ProjectReference Include="../MixERP.Net.i18n/MixERP.Net.i18n.csproj" />
+    <ProjectReference Include="../PetaPoco/PetaPoco.csproj" />
   </ItemGroup>
 
   <ItemGroup>

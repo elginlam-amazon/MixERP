@@ -37,7 +37,9 @@ namespace MixERP.Net.Core.Modules.Inventory.Data.Reports
         {
             const string sql =
                 "SELECT * FROM transactions.get_stock_account_statement(@0::date, @1::date, @2::integer, @3::text, @4::integer);";
-            return Factory.Get<DbGetStockAccountStatementResult>(catalog, sql, from, to, userId, itemCode, storeId);
+            // The @0/@1 placeholders are cast to ::date in SQL; modern Npgsql maps PostgreSQL
+            // 'date' to DateOnly, so the DateTime arguments are narrowed before binding.
+            return Factory.Get<DbGetStockAccountStatementResult>(catalog, sql, DateOnly.FromDateTime(from), DateOnly.FromDateTime(to), userId, itemCode, storeId);
         }
     }
 }

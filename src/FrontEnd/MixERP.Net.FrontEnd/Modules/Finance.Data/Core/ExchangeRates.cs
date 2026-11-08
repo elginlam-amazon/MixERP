@@ -22,6 +22,7 @@ using MixERP.Net.Core.Modules.Finance.Data.Models;
 using MixERP.Net.DbFactory;
 using Npgsql;
 using Serilog;
+using System;
 using System.Collections.Generic;
 
 namespace MixERP.Net.Core.Modules.Finance.Data.Core
@@ -63,8 +64,12 @@ namespace MixERP.Net.Core.Modules.Finance.Data.Core
                             using (NpgsqlCommand rate = new NpgsqlCommand(sql, connection))
                             {
                                 rate.Parameters.AddWithValue("@ExchangeRateId", exchangeRateId);
-                                rate.Parameters.AddWithValue("@LocalCurrencyCode", baseCurrency);
-                                rate.Parameters.AddWithValue("@ForiegnCurrencyCode", exchangeRate.CurrencyCode);
+
+                                // Npgsql 6+ refuses a CLR null in AddWithValue; an absent currency
+                                // code must still reach PostgreSQL as SQL NULL. The misspelled
+                                // "@ForiegnCurrencyCode" name is kept because it matches the SQL.
+                                rate.Parameters.AddWithValue("@LocalCurrencyCode", (object)baseCurrency ?? DBNull.Value);
+                                rate.Parameters.AddWithValue("@ForiegnCurrencyCode", (object)exchangeRate.CurrencyCode ?? DBNull.Value);
                                 rate.Parameters.AddWithValue("@ExchangeRate", exchangeRate.Rate);
 
                                 rate.ExecuteNonQuery();
