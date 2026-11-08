@@ -22,94 +22,59 @@ using MixERP.Net.WebControls.ScrudFactory.Controls;
 using MixERP.Net.WebControls.ScrudFactory.Controls.ListControls;
 using MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes;
 using System.Linq;
-using System.Threading;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Helpers
 {
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     The per-column dispatcher that makes the scrud form schema-driven: given one row of
+    ///     PostgreSQL column metadata it decides which field renderer to use.
+    ///     <para>
+    ///         WHAT MOVED. The two row builders this class used to own —
+    ///         <c>AddRow(HtmlTable, label, params Control[])</c> and
+    ///         <c>AddDropDownList(HtmlTable, label, DropDownList, HtmlAnchor, RequiredFieldValidator)</c>
+    ///         — existed only to assemble <c>HtmlTableRow</c>/<c>HtmlTableCell</c>/<c>Literal</c>
+    ///         trees, all of which are removed types. Their MARKUP (the <c>label-cell</c> /
+    ///         <c>control-cell</c> row, the <c>&lt;label for&gt;</c>, the nested
+    ///         <c>role="item-selector-table"</c> table and its 24px selector cell) is ported to
+    ///         <c>Controls/ScrudFieldRow.razor</c>, which renders one
+    ///         <see cref="MixERP.Net.WebControls.ScrudFactory.Controls.ScrudField" />. The renderers
+    ///         therefore append a field to a
+    ///         <see cref="MixERP.Net.WebControls.ScrudFactory.Controls.ScrudFieldTable" /> instead of
+    ///         mutating an <c>HtmlTable</c>, and the label composition each one performed (including
+    ///         the <c>Titles.RequiredFieldIndicator</c> suffix) is unchanged.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
     internal static class ScrudFactoryHelper
     {
-        internal static void AddDropDownList(HtmlTable htmlTable, string label, DropDownList dropDownList, HtmlAnchor itemSelectorAnchor, RequiredFieldValidator required)
-        {
-            if (htmlTable == null)
-            {
-                return;
-            }
-
-            if (dropDownList == null)
-            {
-                return;
-            }
-
-            using (HtmlTableCell labelCell = new HtmlTableCell())
-            {
-                using (HtmlTableCell controlContainer = new HtmlTableCell())
-                {
-                    using (Literal labelLiteral = new Literal())
-                    {
-                        labelLiteral.Text = string.Format(Thread.CurrentThread.CurrentCulture, "<label for='{0}'>{1}</label>", dropDownList.ID, label);
-                        labelCell.Attributes.Add("class", "label-cell");
-
-                        labelCell.Controls.Add(labelLiteral);
-                        controlContainer.Attributes.Add("class", "control-cell");
-
-                        using (HtmlTable controlTable = new HtmlTable())
-                        {
-                            using (HtmlTableRow row = new HtmlTableRow())
-                            {
-                                using (HtmlTableCell controlCell = new HtmlTableCell())
-                                {
-                                    controlCell.Controls.Add(dropDownList);
-
-                                    if (required != null)
-                                    {
-                                        controlCell.Controls.Add(required);
-                                    }
-
-                                    row.Cells.Add(controlCell);
-                                }
-
-                                using (HtmlTableCell itemSelectorCell = new HtmlTableCell())
-                                {
-                                    if (itemSelectorAnchor != null)
-                                    {
-                                        itemSelectorCell.Controls.Add(itemSelectorAnchor);
-                                        itemSelectorCell.Style.Add("width", "24px");
-                                    }
-
-                                    row.Cells.Add(itemSelectorCell);
-                                }
-
-                                controlTable.Style.Add("width", "100%");
-                                controlTable.Style.Add("border-collapse", "collapse");
-                                controlTable.Rows.Add(row);
-                                controlTable.Attributes.Add("role", "item-selector-table");
-
-                                controlContainer.Controls.Add(controlTable);
-
-                                using (HtmlTableRow newRow = new HtmlTableRow())
-                                {
-                                    newRow.Cells.Add(labelCell);
-                                    newRow.Cells.Add(controlContainer);
-                                    htmlTable.Rows.Add(newRow);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        internal static void AddField(string catalog, HtmlTable htmlTable, string resourceClassName, string itemSelectorPath, string columnName, string defaultValue, bool isSerial, bool isNullable, string dataType, string domain, int maxLength, string parentTableSchema, string parentTable, string parentTableColumn, string displayFields, string displayViews, bool useDisplayFieldAsParent, string selectedValues, string errorCssClass, bool disabled)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>AddField(...)</c>. The DISPATCH ORDER and EVERY BRANCH are preserved,
+        ///     because this is what makes the form schema-driven:
+        ///     <list type="number">
+        ///         <item>a SERIAL column is forced <c>disabled</c>;</item>
+        ///         <item>a column with NO parent column is matched against <c>ScrudTypes</c> in the
+        ///         original order — Strings, then Shorts/Integers/Longs, then Decimals, then Bools,
+        ///         then Dates, then Files. The checks are independent <c>if</c>s, not an
+        ///         <c>else if</c> chain, exactly as before (a data type that appeared in two of the
+        ///         arrays would render two fields — no array overlaps today, but the structure is
+        ///         kept rather than "tidied" into a chain that would silently change behaviour);</item>
+        ///         <item>a column WITH a parent column is always a drop-down list, whatever its data
+        ///         type — this is the foreign-key branch.</item>
+        ///     </list>
+        ///     Boolean columns are fed the <c>Titles.Yes,Titles.No</c> / <c>true,false</c> key-value
+        ///     pair verbatim.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        internal static void AddField(string catalog, ScrudFieldTable fieldTable, string resourceClassName, string itemSelectorPath, string columnName, string defaultValue, bool isSerial, bool isNullable, string dataType, string domain, int maxLength, string parentTableSchema, string parentTable, string parentTableColumn, string displayFields, string displayViews, bool useDisplayFieldAsParent, string selectedValues, string errorCssClass, bool disabled)
         {
             if (isSerial)
             {
                 disabled = true;
             }
 
-            if (htmlTable == null)
+            if (fieldTable == null)
             {
                 return;
             }
@@ -123,117 +88,84 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
             {
                 if (ScrudTypes.Strings.Contains(dataType))
                 {
-                    ScrudTextBox.AddTextBox(htmlTable, resourceClassName, columnName, dataType, defaultValue, isNullable, maxLength, errorCssClass, disabled);
+                    ScrudTextBox.AddTextBox(fieldTable, resourceClassName, columnName, dataType, defaultValue, isNullable, maxLength, errorCssClass, disabled);
                 }
 
                 if (ScrudTypes.Shorts.Contains(dataType) || ScrudTypes.Integers.Contains(dataType) || ScrudTypes.Longs.Contains(dataType))
                 {
-                    ScrudNumberTextBox.AddNumberTextBox(htmlTable, resourceClassName, columnName, defaultValue, isSerial, isNullable, maxLength, domain, errorCssClass, disabled);
+                    ScrudNumberTextBox.AddNumberTextBox(fieldTable, resourceClassName, columnName, defaultValue, isSerial, isNullable, maxLength, domain, errorCssClass, disabled);
                 }
 
                 if (ScrudTypes.Decimals.Contains(dataType))
                 {
-                    ScrudDecimalTextBox.AddDecimalTextBox(htmlTable, resourceClassName, columnName, defaultValue, isNullable, maxLength, domain, errorCssClass, disabled);
+                    ScrudDecimalTextBox.AddDecimalTextBox(fieldTable, resourceClassName, columnName, defaultValue, isNullable, maxLength, domain, errorCssClass, disabled);
                 }
 
                 if (ScrudTypes.Bools.Contains(dataType))
                 {
-                    ScrudRadioButtonList.AddRadioButtonList(htmlTable, resourceClassName, columnName, isNullable, Titles.Yes + "," + Titles.No, "true,false", defaultValue, errorCssClass, disabled);
+                    ScrudRadioButtonList.AddRadioButtonList(fieldTable, resourceClassName, columnName, isNullable, Titles.Yes + "," + Titles.No, "true,false", defaultValue, errorCssClass, disabled);
                 }
 
                 if (ScrudTypes.Dates.Contains(dataType))
                 {
-                    ScrudDateTextBox.AddDateTextBox(htmlTable, resourceClassName, columnName, defaultValue, isNullable, errorCssClass, disabled);
+                    ScrudDateTextBox.AddDateTextBox(fieldTable, resourceClassName, columnName, defaultValue, isNullable, errorCssClass, disabled);
                 }
 
                 if (ScrudTypes.Files.Contains(dataType))
                 {
-                    ScrudFileUpload.AddFileUpload(htmlTable, resourceClassName, columnName, isNullable, errorCssClass);
+                    ScrudFileUpload.AddFileUpload(fieldTable, resourceClassName, columnName, isNullable, errorCssClass);
                 }
             }
             else
             {
-                ScrudDropDownList.AddDropDownList(catalog, htmlTable, resourceClassName, itemSelectorPath, columnName, isNullable, parentTableSchema, parentTable, parentTableColumn, defaultValue, displayFields, displayViews, useDisplayFieldAsParent, selectedValues, errorCssClass, disabled);
+                ScrudDropDownList.AddDropDownList(catalog, fieldTable, resourceClassName, itemSelectorPath, columnName, isNullable, parentTableSchema, parentTable, parentTableColumn, defaultValue, displayFields, displayViews, useDisplayFieldAsParent, selectedValues, errorCssClass, disabled);
+            }
+
+            //The field now carries the PostgreSQL data type it was generated from, which is what
+            //ScrudForm.GetFormCollection passes to ScrudParser.ParseValue(value, dataType). The
+            //legacy code re-read the data type from the schema DataRow at collection time; keeping
+            //it on the field removes that second lookup without changing the value parsed.
+            ScrudField added = fieldTable.FindFieldByColumn(columnName);
+
+            if (added != null && string.IsNullOrWhiteSpace(added.DataType))
+            {
+                added.DataType = dataType;
             }
         }
 
-        internal static void AddRow(HtmlTable htmlTable, string label, params Control[] controls)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>GetRequiredFieldValidator(Control, string)</c>. The
+        ///     <c>System.Web.UI.WebControls.RequiredFieldValidator</c> it returned is a removed type,
+        ///     so the RULE is re-expressed as a
+        ///     <see cref="MixERP.Net.WebControls.ScrudFactory.Controls.ScrudValidationRule" /> which
+        ///     <see cref="MixERP.Net.WebControls.ScrudFactory.Controls.ScrudField.Validate" />
+        ///     enforces in C# on the server — the replacement for the
+        ///     <c>Page.Validate()</c>/<c>Page.IsValid</c> gate the save path used.
+        ///     <para>
+        ///         The validator id suffix (<c>RequiredValidator</c>), the css class and the error
+        ///         message (<c>"&lt;br/&gt;" + Titles.RequiredField</c>, leading break included) are
+        ///         carried verbatim, so the rendered message is unchanged.
+        ///         <c>EnableClientScript</c> and <c>SetFocusOnError</c> have no modern counterpart
+        ///         (see the Common precedent §2); <c>ValidatorDisplay.Dynamic</c> is reproduced by
+        ///         <c>ScrudFieldRow.razor</c>, which emits the message span only while the rule fails.
+        ///     </para>
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        internal static ScrudValidationRule GetRequiredFieldValidator(ScrudField fieldToValidate, string cssClass)
         {
-            if (htmlTable == null)
-            {
-                return;
-            }
-
-            if (controls == null)
-            {
-                return;
-            }
-
-            if (controls.Length.Equals(0))
-            {
-                return;
-            }
-
-            using (HtmlTableCell labelCell = new HtmlTableCell())
-            {
-                using (HtmlTableCell controlCell = new HtmlTableCell())
-                {
-                    using (Literal labelLiteral = new Literal())
-                    {
-                        labelLiteral.Text = string.Format(Thread.CurrentThread.CurrentCulture, "<label for='{0}'>{1}</label>", controls[0].ID, label);
-                        labelCell.Attributes.Add("class", "label-cell");
-
-                        labelCell.Controls.Add(labelLiteral);
-                        controlCell.Attributes.Add("class", "control-cell");
-
-                        foreach (Control control in controls)
-                        {
-                            if (control != null)
-                            {
-                                if (control is WebControl)
-                                {
-                                    using (WebControl c = control as WebControl)
-                                    {
-                                        controlCell.Controls.Add(c);
-                                    }
-                                }
-                                else
-                                {
-                                    controlCell.Controls.Add(control);
-                                }
-                            }
-                        }
-
-                        using (HtmlTableRow newRow = new HtmlTableRow())
-                        {
-                            newRow.Cells.Add(labelCell);
-                            newRow.Cells.Add(controlCell);
-                            htmlTable.Rows.Add(newRow);
-                        }
-                    }
-                }
-            }
-        }
-
-        internal static RequiredFieldValidator GetRequiredFieldValidator(Control controlToValidate, string cssClass)
-        {
-            if (controlToValidate == null)
+            if (fieldToValidate == null)
             {
                 return null;
             }
 
-            using (RequiredFieldValidator validator = new RequiredFieldValidator())
-            {
-                validator.ID = controlToValidate.ID + "RequiredValidator";
-                validator.ErrorMessage = @"<br/>" + Titles.RequiredField;
-                validator.CssClass = cssClass;
-                validator.ControlToValidate = controlToValidate.ID;
-                validator.EnableClientScript = true;
-                validator.SetFocusOnError = true;
-                validator.Display = ValidatorDisplay.Dynamic;
+            ScrudValidationRule validator = new ScrudValidationRule();
+            validator.Id = fieldToValidate.ElementId + "RequiredValidator";
+            validator.ErrorMessage = @"<br/>" + Titles.RequiredField;
+            validator.CssClass = cssClass;
+            validator.DataType = ScrudValidationDataType.None;
 
-                return validator;
-            }
+            return validator;
         }
     }
 }

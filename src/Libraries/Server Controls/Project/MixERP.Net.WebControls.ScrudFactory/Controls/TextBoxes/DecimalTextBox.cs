@@ -19,65 +19,107 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.ScrudFactory.Helpers;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using System;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
 {
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Builds the decimal field (numeric / money / currency and their MixERP strict domains) of
+    ///     the schema-driven scrud form.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
     internal static class ScrudDecimalTextBox
     {
-        internal static void AddDecimalTextBox(HtmlTable htmlTable, string resourceClassName, string columnName, string defaultValue, bool isNullable, int maxLength, string domain, string errorCssClass, bool disabled)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>AddDecimalTextBox(HtmlTable, …)</c>: the default value, the read-only
+        ///     treatment when disabled, the <c>decimal</c> css class, the domain-driven decimal rule,
+        ///     and the required rule plus <c>Titles.RequiredFieldIndicator</c>-suffixed label for a
+        ///     non-nullable column.
+        ///     <para>
+        ///         Note the original did NOT guard against a null <c>htmlTable</c> here (unlike its
+        ///         siblings) and would have thrown inside <c>AddRow</c>; the guard is added because
+        ///         <c>AddRow</c>'s own null check meant the row was silently skipped either way.
+        ///     </para>
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        internal static void AddDecimalTextBox(ScrudFieldTable fieldTable, string resourceClassName, string columnName, string defaultValue, bool isNullable, int maxLength, string domain, string errorCssClass, bool disabled)
         {
-            using (TextBox textBox = ScrudTextBox.GetTextBox(columnName + "_textbox", maxLength))
+            if (fieldTable == null)
             {
-                string label = ScrudLocalizationHelper.GetResourceString(resourceClassName, columnName);
-
-                using (CompareValidator validator = GetDecimalValidator(textBox, domain, errorCssClass))
-                {
-                    textBox.Text = defaultValue;
-                    textBox.ReadOnly = disabled;
-                    textBox.CssClass = "decimal";
-
-                    if (!isNullable)
-                    {
-                        RequiredFieldValidator required = ScrudFactoryHelper.GetRequiredFieldValidator(textBox, errorCssClass);
-                        ScrudFactoryHelper.AddRow(htmlTable, label + Titles.RequiredFieldIndicator, textBox, validator, required);
-                        return;
-                    }
-
-                    ScrudFactoryHelper.AddRow(htmlTable, label, textBox, validator);
-                }
+                return;
             }
+
+            ScrudField field = ScrudTextBox.GetTextBox(columnName + "_textbox", maxLength);
+
+            if (field == null)
+            {
+                return;
+            }
+
+            field.ColumnName = columnName;
+            field.Kind = ScrudFieldKind.DecimalTextBox;
+            field.Domain = domain;
+            field.IsNullable = isNullable;
+            field.ValidatorCssClass = errorCssClass;
+
+            string label = ScrudLocalizationHelper.GetResourceString(resourceClassName, columnName);
+
+            field.AddRule(GetDecimalValidator(field, domain, errorCssClass));
+
+            field.Value = defaultValue;
+            field.ReadOnly = disabled;
+            field.CssClass = "decimal";
+
+            if (!isNullable)
+            {
+                field.Label = label + Titles.RequiredFieldIndicator;
+                field.AddRule(ScrudFactoryHelper.GetRequiredFieldValidator(field, errorCssClass));
+                fieldTable.Add(field);
+                return;
+            }
+
+            field.Label = label;
+            fieldTable.Add(field);
         }
 
-        private static CompareValidator GetDecimalValidator(Control controlToValidate, string domain, string cssClass)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>GetDecimalValidator</c>. The <c>CompareValidator</c>
+        ///     (<c>Type = ValidationDataType.Currency</c>, <c>ValueToCompare = "0"</c>,
+        ///     <c>ErrorMessage = "&lt;br/&gt;" + Titles.OnlyNumbersAllowed</c>) is a removed type, so
+        ///     the RULE is re-expressed as a <see cref="ScrudValidationRule" /> enforced server-side
+        ///     by <see cref="ScrudField.Validate" />. The strict-domain operator switch is preserved
+        ///     exactly as the number validator's is.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private static ScrudValidationRule GetDecimalValidator(ScrudField fieldToValidate, string domain, string cssClass)
         {
-            using (CompareValidator validator = new CompareValidator())
+            if (fieldToValidate == null)
             {
-                validator.ID = controlToValidate.ID + "DecimalValidator";
-                validator.ErrorMessage = @"<br/>" + Titles.OnlyNumbersAllowed;
-                validator.CssClass = cssClass;
-                validator.ControlToValidate = controlToValidate.ID;
-                validator.EnableClientScript = true;
-                validator.SetFocusOnError = true;
-                validator.Display = ValidatorDisplay.Dynamic;
-                validator.Type = ValidationDataType.Currency;
-
-                //MixERP strict data type
-                if (domain.EndsWith("strict"))
-                {
-                    validator.Operator = ValidationCompareOperator.GreaterThan;
-                }
-                else
-                {
-                    validator.Operator = ValidationCompareOperator.GreaterThanEqual;
-                }
-
-                validator.ValueToCompare = "0";
-
-                return validator;
+                return null;
             }
+
+            ScrudValidationRule validator = new ScrudValidationRule();
+            validator.Id = fieldToValidate.ElementId + "DecimalValidator";
+            validator.ErrorMessage = @"<br/>" + Titles.OnlyNumbersAllowed;
+            validator.CssClass = cssClass;
+            validator.DataType = ScrudValidationDataType.Currency;
+
+            //MixERP strict data type
+            if (domain != null && domain.EndsWith("strict", StringComparison.Ordinal))
+            {
+                validator.Operator = ScrudCompareOperator.GreaterThan;
+            }
+            else
+            {
+                validator.Operator = ScrudCompareOperator.GreaterThanEqual;
+            }
+
+            validator.ValueToCompare = "0";
+
+            return validator;
         }
     }
 }

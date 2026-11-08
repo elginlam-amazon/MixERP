@@ -19,57 +19,87 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.ScrudFactory.Helpers;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
 {
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Builds the radio-button-list field of the schema-driven scrud form — in practice the
+    ///     boolean columns, which <c>ScrudFactoryHelper.AddField</c> feeds with the
+    ///     <c>Titles.Yes,Titles.No</c> / <c>true,false</c> key-value pair.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
     internal static class ScrudRadioButtonList
     {
-        internal static void AddRadioButtonList(HtmlTable htmlTable, string resourceClassName, string columnName, bool isNullable, string keys, string values, string selectedValue, string errorCssClass, bool disabled)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>AddRadioButtonList(HtmlTable, …)</c>: the
+        ///     <c>{column}_radiobuttonlist</c> id (load-bearing — <c>GetFormCollection</c> reads the
+        ///     value back by it), the <c>Enabled = !disabled</c> treatment, and the required rule
+        ///     plus <c>Titles.RequiredFieldIndicator</c>-suffixed label for a non-nullable column.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        internal static void AddRadioButtonList(ScrudFieldTable fieldTable, string resourceClassName, string columnName, bool isNullable, string keys, string values, string selectedValue, string errorCssClass, bool disabled)
         {
-            if (htmlTable == null)
+            if (fieldTable == null)
             {
                 return;
             }
 
-            using (RadioButtonList radioButtonList = GetRadioButtonList(columnName + "_radiobuttonlist", keys, values, selectedValue))
+            ScrudField field = GetRadioButtonList(columnName + "_radiobuttonlist", keys, values, selectedValue);
+
+            if (field == null)
             {
-                string label = ScrudLocalizationHelper.GetResourceString(resourceClassName, columnName);
-
-                radioButtonList.Enabled = !disabled;
-
-                if (!isNullable)
-                {
-                    using (RequiredFieldValidator required = ScrudFactoryHelper.GetRequiredFieldValidator(radioButtonList, errorCssClass))
-                    {
-                        ScrudFactoryHelper.AddRow(htmlTable, label + Titles.RequiredFieldIndicator, radioButtonList, required);
-                        return;
-                    }
-                }
-
-                ScrudFactoryHelper.AddRow(htmlTable, label, radioButtonList);
+                return;
             }
+
+            field.ColumnName = columnName;
+            field.IsNullable = isNullable;
+            field.ValidatorCssClass = errorCssClass;
+
+            string label = ScrudLocalizationHelper.GetResourceString(resourceClassName, columnName);
+
+            //RadioButtonList.Enabled = !disabled rendered the inputs with disabled="disabled".
+            field.Disabled = disabled;
+
+            if (!isNullable)
+            {
+                field.Label = label + Titles.RequiredFieldIndicator;
+                field.AddRule(ScrudFactoryHelper.GetRequiredFieldValidator(field, errorCssClass));
+                fieldTable.Add(field);
+                return;
+            }
+
+            field.Label = label;
+            fieldTable.Add(field);
         }
 
-        private static RadioButtonList GetRadioButtonList(string id, string keys, string values, string selectedValues)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>GetRadioButtonList(id, keys, values, selectedValues)</c>.
+        ///     <para>
+        ///         <c>ClientIDMode.Static</c> is replaced by the
+        ///         <see cref="ScrudField.ElementId" /> contract, and
+        ///         <c>RepeatDirection.Horizontal</c> — which made the control emit a single-row
+        ///         table of radio/label pairs — is reproduced by <c>ScrudFieldRow.razor</c>'s
+        ///         radio-button-list markup.
+        ///     </para>
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private static ScrudField GetRadioButtonList(string id, string keys, string values, string selectedValues)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
                 return null;
             }
 
-            using (RadioButtonList list = new RadioButtonList())
-            {
-                list.ID = id;
-                list.ClientIDMode = ClientIDMode.Static;
-                list.RepeatDirection = RepeatDirection.Horizontal;
+            ScrudField field = new ScrudField();
+            field.ElementId = id;
+            field.Kind = ScrudFieldKind.RadioButtonList;
 
-                Helper.AddListItems(list, keys, values, selectedValues);
-                
-                return list;
-            }
+            Helper.AddListItems(field, keys, values, selectedValues);
+
+            return field;
         }
     }
 }

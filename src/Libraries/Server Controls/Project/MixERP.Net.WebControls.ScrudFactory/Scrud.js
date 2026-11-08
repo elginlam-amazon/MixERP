@@ -62,7 +62,17 @@ var scrudGetSelectedRadioValue = function () {
 
 var scrudSelectRadioById = function (id) {
     $('[id^="SelectRadio"]').prop("checked", false);
-    $("#" + id).prop("checked", true);
+
+    var radio = $("#" + id);
+    radio.prop("checked", true);
+
+    //  jQuery .prop() does NOT fire a change event, so the radio's Blazor @onchange handler
+    //  never runs and the component would keep an empty selection - which silently killed
+    //  edit/delete and forced every save down the INSERT branch. In WebForms the radio was a
+    //  posted form field, so no notification was needed. Push the selection explicitly.
+    if (scrudComponentRef) {
+        scrudComponentRef.invokeMethodAsync("SelectRow", radio.val());
+    };
 };
 
 var scrudPrintGridView = function () {
@@ -73,18 +83,57 @@ var scrudPrintGridView = function () {
     printGridView(reportTemplatePath, reportHeaderPath, title, formGridViewId, date, user, office, 'ScrudReport', 1, 0);
 };
 
-Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () {
-    //Fired on each ASP.net AJAX request.
-    scrudInitialize();
-});
+//--------------------------------------------------------------------------------------------
+// MIGRATION NOTE (checklist task 81). "Sys.WebForms.PageRequestManager" was the ASP.NET AJAX
+// partial-postback manager, shipped by the ScriptManager control. That control has no modern
+// equivalent and was dropped (checklist task 32), so the object no longer exists and an
+// unguarded reference here would throw while this file is being evaluated - killing EVERY
+// function below it. The hook is kept, guarded, so a page that still runs the legacy
+// ScriptManager behaves exactly as before, and its modern replacement is initScrud(), which
+// ScrudForm invokes from OnAfterRenderAsync after every Blazor re-render.
+//--------------------------------------------------------------------------------------------
+if (typeof Sys !== "undefined" && Sys.WebForms && Sys.WebForms.PageRequestManager) {
+    Sys.WebForms.PageRequestManager.getInstance().add_endRequest(function () {
+        //Fired on each ASP.net AJAX request.
+        scrudInitialize();
+    });
+};
 
 $(document).ready(function () {
     scrudInitialize();
 });
 
+//--------------------------------------------------------------------------------------------
+// The IDEMPOTENT re-initialization entry point (checklist task 81).
+//
+// Scrud.js wired its handlers from $(document).ready and re-wired them from the ASP.NET AJAX
+// add_endRequest hook above. Neither fires after a Blazor re-render, so a grid the component
+// re-rendered would come back with dead row-click handlers. ScrudForm calls this through
+// JSRuntime.InvokeVoidAsync("initScrud") after every render; it is safe to call any number of
+// times because scrudInitialize() now un-binds its namespaced handler before binding it.
+//--------------------------------------------------------------------------------------------
+//  The component reference ScrudForm publishes so a row click can reach the server.
+//  Kept at module scope so a later initScrud() call without an argument (or a call made
+//  before the component is ready) does not drop an already-good reference.
+var scrudComponentRef = null;
+
+window.initScrud = function (componentRef) {
+    if (componentRef) {
+        scrudComponentRef = componentRef;
+    };
+
+    if (typeof jQuery === "undefined") {
+        return;
+    };
+
+    scrudInitialize();
+};
+
 var scrudInitialize = function () {
     //Registering grid row click event to automatically select the radio.
-    $('#' + formGridViewId + ' tr').click(function () {
+    //The ".scrud" event namespace plus the leading "off" is what makes repeated calls
+    //idempotent: without it every re-render would stack another click handler on every row.
+    $('#' + formGridViewId + ' tr').off('click.scrud').on('click.scrud', function () {
         //Grid row was clicked. Now, searching the radio button.
         var radio = $(this).find('td input:radio');
 
@@ -99,7 +148,13 @@ var scrudInitialize = function () {
 
 function scrudOnServerError() {
     var errorField = $("#ScrudError");
-    if (errorField.length) {
+
+    //  #ScrudError is now rendered UNCONDITIONALLY (it is this script's write target on an
+    //  ajax failure), so its mere existence no longer means "there was an error". The legacy
+    //  control only assigned the id at the moment it had something to say, which is what this
+    //  test reproduced. Testing CONTENT restores that meaning - otherwise displayForm() ran on
+    //  every single render and permanently hid the browse grid.
+    if (errorField.length && $.trim(errorField.text()).length) {
         displayForm();
     };
 };
@@ -303,7 +358,16 @@ $(document).ready(function () {
 });
 
 function scrudClientValidation() {
-    if (Page_ClientValidate("")) {
+    //MIGRATION NOTE. "Page_ClientValidate" was emitted by the WebForms validation pipeline,
+    //which no longer exists: the authoritative gate is now ScrudForm.Validate()/IsValid, which
+    //enforces every rule SERVER-side before anything is persisted. The function is kept because
+    //consumers' own scripts call it (and it still raises the loading affordance and still honours
+    //a page-supplied scrudCustomValidator), but the missing global is guarded instead of
+    //throwing - with no client validator present it simply proceeds, exactly as the server gate
+    //expects.
+    var clientValid = typeof Page_ClientValidate !== "function" || Page_ClientValidate("");
+
+    if (clientValid) {
         scrudDispalyLoading();
 
         if (typeof scrudCustomValidator === "function") {

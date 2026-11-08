@@ -17,16 +17,41 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Rendering;
 using MixERP.Net.i18n.Resources;
 using System;
 using System.Globalization;
 using System.Threading;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls
 {
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     The scrud grid's pagination menu.
+    ///     <para>
+    ///         This was never a WebForms <c>Control</c> — it was a plain class that assembled a
+    ///         <c>System.Web.UI.HtmlControls.HtmlGenericControl</c> tree of
+    ///         <c>HtmlAnchor</c>/<c>&lt;i&gt;</c> pairs and handed it to the caller to add to its own
+    ///         control collection. <c>HtmlGenericControl</c> and <c>HtmlAnchor</c> are removed on
+    ///         net10.0, so <see cref="GetPager" /> now returns a
+    ///         <see cref="RenderFragment" /> instead. Every one of the ten members, all of the page
+    ///         arithmetic and the complete anchor markup are unchanged — the render calls below map
+    ///         one-for-one onto the original's <c>Controls.Add</c> / <c>Attributes.Add</c> calls, in
+    ///         the same order, so the emitted DOM is identical.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
     internal class ScrudPager
     {
+        /// <summary>
+        ///     The special query string the party item-selector popup runs under. The original
+        ///     compared against this literal in BOTH anchor builders to decide whether to carry the
+        ///     modal callback parameters into every page link; it is hoisted to a constant so the two
+        ///     comparisons cannot drift, but the string itself is byte-identical.
+        /// </summary>
+        private const string ModalPartyQueryString = "modal=1&CallBackFunctionName=processCallBackActions&AssociatedControlId=PartyIdHidden";
+
         private int TotalPages;
         internal int TotalRecords { get; set; }
         internal int CurrentPage { get; set; }
@@ -38,7 +63,20 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
         internal string QueryString { get; set; }
         public int BlockCount { get; set; }
 
-        internal HtmlGenericControl GetPager()
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>GetPager()</c>. The page arithmetic is VERBATIM, including the
+        ///     <c>PageSize == 0</c> fallback to <see cref="BlockCount" /> and the
+        ///     <c>Decimal.Ceiling(Decimal.Divide(...))</c> rounding (which is not the same as integer
+        ///     division — it rounds UP, so a partial last page still gets a link).
+        ///     <para>
+        ///         Item order, unchanged: first, previous, page 1, the "previous block" ellipsis, the
+        ///         pages of the current block (page 1 and the last page skipped, because they are
+        ///         emitted explicitly), the "next block" ellipsis, the last page, next, last.
+        ///     </para>
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        internal RenderFragment GetPager()
         {
             if (this.PageSize.Equals(0))
             {
@@ -55,28 +93,24 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 end = this.TotalPages;
             }
 
-
-            using (HtmlGenericControl paginationMenu = new HtmlGenericControl("div"))
+            return builder =>
             {
-                paginationMenu.Attributes.Add("class", this.CssClass);
+                int sequence = 0;
 
-                paginationMenu.Controls.Add(this.FirstItem());
-                paginationMenu.Controls.Add(this.PreviousItem());
-                paginationMenu.Controls.Add(this.GetAnchor(1));
+                //HtmlGenericControl("div") with Attributes.Add("class", this.CssClass)
+                builder.OpenElement(sequence++, "div");
+                builder.AddAttribute(sequence++, "class", this.CssClass);
 
+                this.FirstItem(builder, ref sequence);
+                this.PreviousItem(builder, ref sequence);
+                this.GetAnchor(builder, ref sequence, 1);
 
                 //The previous page block
                 string title;
                 if (start - this.BlockCount > 0)
                 {
-                    using (HtmlAnchor anchor = this.GetIconAnchor("icon item", "", start - 1))
-                    {
-                        title = string.Format(Thread.CurrentThread.CurrentCulture, Titles.PageN, start - 1);
-                        anchor.Attributes.Add("title", title);
-
-                        anchor.InnerText = "...";
-                        paginationMenu.Controls.Add(anchor);
-                    }
+                    title = string.Format(Thread.CurrentThread.CurrentCulture, Titles.PageN, start - 1);
+                    this.GetEllipsisAnchor(builder, ref sequence, start - 1, title);
                 }
 
                 //Paged items
@@ -84,40 +118,33 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 {
                     //Do not create the first and last page
                     //because we will create them explicitly
-                    //which will be followed/led 
+                    //which will be followed/led
                     //by next/previous page blocks
                     if (i.Equals(1) || i.Equals(this.TotalPages))
                     {
                         continue;
                     }
 
-                    paginationMenu.Controls.Add(this.GetAnchor(i));
+                    this.GetAnchor(builder, ref sequence, i);
                 }
-
 
                 //The next page block
                 if (start + this.BlockCount < this.TotalPages)
                 {
-                    using (HtmlAnchor anchor = this.GetIconAnchor("icon item", "", end + 1))
-                    {
-                        title = string.Format(Thread.CurrentThread.CurrentCulture, Titles.PageN, end + 1);
-                        anchor.Attributes.Add("title", title);
-
-                        anchor.InnerText = "...";
-                        paginationMenu.Controls.Add(anchor);
-                    }
+                    title = string.Format(Thread.CurrentThread.CurrentCulture, Titles.PageN, end + 1);
+                    this.GetEllipsisAnchor(builder, ref sequence, end + 1, title);
                 }
 
-                paginationMenu.Controls.Add(this.GetAnchor(this.TotalPages));
-                paginationMenu.Controls.Add(this.NextItem());
-                paginationMenu.Controls.Add(this.LastItem());
+                this.GetAnchor(builder, ref sequence, this.TotalPages);
+                this.NextItem(builder, ref sequence);
+                this.LastItem(builder, ref sequence);
 
-
-                return paginationMenu;
-            }
+                builder.CloseElement();
+            };
         }
 
-        private HtmlAnchor FirstItem()
+        /// <summary>Port of <c>FirstItem()</c> — <c>Titles.FirstPage</c>, inert on page 1.</summary>
+        private void FirstItem(RenderTreeBuilder builder, ref int sequence)
         {
             int page = 0;
 
@@ -126,14 +153,11 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 page = 1;
             }
 
-            using (HtmlAnchor anchor = this.GetIconAnchor("icon item", "chevron circle left icon", page))
-            {
-                anchor.Attributes.Add("title", Titles.FirstPage);
-                return anchor;
-            }
+            this.GetIconAnchor(builder, ref sequence, "icon item", "chevron circle left icon", page, Titles.FirstPage);
         }
 
-        private HtmlAnchor PreviousItem()
+        /// <summary>Port of <c>PreviousItem()</c> — <c>Titles.PreviousPage</c>, inert on page 1.</summary>
+        private void PreviousItem(RenderTreeBuilder builder, ref int sequence)
         {
             int page = 0;
             if (this.CurrentPage > 1)
@@ -141,14 +165,11 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 page = this.CurrentPage - 1;
             }
 
-            using (HtmlAnchor anchor = this.GetIconAnchor("icon item", "arrow circle left icon", page))
-            {
-                anchor.Attributes.Add("title", Titles.PreviousPage);
-                return anchor;
-            }
+            this.GetIconAnchor(builder, ref sequence, "icon item", "arrow circle left icon", page, Titles.PreviousPage);
         }
 
-        private HtmlAnchor NextItem()
+        /// <summary>Port of <c>NextItem()</c> — <c>Titles.NextPage</c>, inert on the last page.</summary>
+        private void NextItem(RenderTreeBuilder builder, ref int sequence)
         {
             int page = 0;
 
@@ -157,14 +178,11 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 page = this.CurrentPage + 1;
             }
 
-            using (HtmlAnchor anchor = this.GetIconAnchor("icon item", "arrow circle right icon", page))
-            {
-                anchor.Attributes.Add("title", Titles.NextPage);
-                return anchor;
-            }
+            this.GetIconAnchor(builder, ref sequence, "icon item", "arrow circle right icon", page, Titles.NextPage);
         }
 
-        private HtmlAnchor LastItem()
+        /// <summary>Port of <c>LastItem()</c> — <c>Titles.LastPage</c>, inert on the last page.</summary>
+        private void LastItem(RenderTreeBuilder builder, ref int sequence)
         {
             int page = 0;
 
@@ -173,80 +191,163 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 page = this.TotalPages;
             }
 
-            using (HtmlAnchor anchor = this.GetIconAnchor("icon item", "chevron circle right icon", page))
-            {
-                anchor.Attributes.Add("title", Titles.LastPage);
-                return anchor;
-            }
+            this.GetIconAnchor(builder, ref sequence, "icon item", "chevron circle right icon", page, Titles.LastPage);
         }
 
-        private HtmlAnchor GetAnchor(int pageNumber)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>GetAnchor(int pageNumber)</c>: a numbered page link, classed
+        ///     <c>"active item"</c> when it is the current page and <c>"item"</c> otherwise.
+        ///     <para>
+        ///         NOTE: the original used those two LITERALS and never read
+        ///         <see cref="ActiveCssClass" /> / <see cref="ItemCssClass" />. The literals are kept
+        ///         (changing them would restyle every pager) and the two properties are kept as well,
+        ///         because they are part of the type's member set and a caller still assigns them.
+        ///     </para>
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private void GetAnchor(RenderTreeBuilder builder, ref int sequence, int pageNumber)
         {
-            using (HtmlAnchor anchor = new HtmlAnchor())
+            builder.OpenElement(sequence++, "a");
+
+            if (pageNumber.Equals(this.CurrentPage))
             {
-                if (pageNumber.Equals(this.CurrentPage))
-                {
-                    anchor.Attributes.Add("class", "active item");
-                }
-                else
-                {
-                    anchor.Attributes.Add("class", "item");
-                }
-
-                anchor.InnerText = pageNumber.ToString(Thread.CurrentThread.CurrentCulture);
-
-                if (this.QueryString == "modal=1&CallBackFunctionName=processCallBackActions&AssociatedControlId=PartyIdHidden")
-                {
-                    anchor.HRef = string.Format(CultureInfo.InvariantCulture, "{0}?page={1}&modal=1&CallBackFunctionName=processCallBackActions&AssociatedControlId=PartyIdHidden", this.CurrentPageUrl, pageNumber);
-                }
-                else if (this.QueryString == (string.Format(CultureInfo.InvariantCulture, "page={0}&modal=1&CallBackFunctionName=processCallBackActions&AssociatedControlId=PartyIdHidden", this.CurrentPage)))
-                {
-                    anchor.HRef = string.Format(CultureInfo.InvariantCulture, "{0}?page={1}&modal=1&CallBackFunctionName=processCallBackActions&AssociatedControlId=PartyIdHidden", this.CurrentPageUrl, pageNumber);
-                }
-                else
-                {
-                    anchor.HRef = string.Format(CultureInfo.InvariantCulture, "{0}?page={1}", this.CurrentPageUrl, pageNumber);
-                }
-
-
-                string title = string.Format(Thread.CurrentThread.CurrentCulture, Titles.PageN, pageNumber);
-                anchor.Attributes.Add("title", title);
-
-                return anchor;
+                builder.AddAttribute(sequence++, "class", "active item");
             }
+            else
+            {
+                builder.AddAttribute(sequence++, "class", "item");
+            }
+
+            builder.AddAttribute(sequence++, "href", this.GetPageUrl(pageNumber));
+
+            string title = string.Format(Thread.CurrentThread.CurrentCulture, Titles.PageN, pageNumber);
+            builder.AddAttribute(sequence++, "title", title);
+
+            builder.AddContent(sequence++, pageNumber.ToString(Thread.CurrentThread.CurrentCulture));
+
+            builder.CloseElement();
         }
 
-        private HtmlAnchor GetIconAnchor(string cssClass, string iconCssClass, int pageNumber)
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>GetIconAnchor(cssClass, iconCssClass, pageNumber)</c> plus the
+        ///     <c>title</c> its four callers added: an anchor wrapping an <c>&lt;i&gt;</c> icon.
+        ///     <para>
+        ///         The <c>href</c> is emitted only when there is a page to go to — the original left
+        ///         <c>HtmlAnchor.HRef</c> unset for <c>pageNumber == 0</c>, which rendered no
+        ///         attribute at all and is what makes the first/previous links inert on page 1.
+        ///         The two modal-query-string branches, however, assigned the href
+        ///         UNCONDITIONALLY — so under the party item-selector popup these links always carry
+        ///         a href, even the inert ones. That asymmetry is preserved.
+        ///     </para>
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private void GetIconAnchor(RenderTreeBuilder builder, ref int sequence, string cssClass, string iconCssClass, int pageNumber, string title)
         {
-            using (HtmlAnchor anchor = new HtmlAnchor())
+            builder.OpenElement(sequence++, "a");
+            builder.AddAttribute(sequence++, "class", cssClass);
+
+            string href = this.GetIconAnchorUrl(pageNumber);
+
+            if (href != null)
             {
-                anchor.Attributes.Add("class", cssClass);
-
-                using (HtmlGenericControl icon = new HtmlGenericControl("i"))
-                {
-                    icon.Attributes.Add("class", iconCssClass);
-                    anchor.Controls.Add(icon);
-                }
-
-                if (this.QueryString == "modal=1&CallBackFunctionName=processCallBackActions&AssociatedControlId=PartyIdHidden")
-                {
-                    anchor.HRef = string.Format(CultureInfo.InvariantCulture, "{0}?page={1}&modal=1&CallBackFunctionName=processCallBackActions&AssociatedControlId=PartyIdHidden", this.CurrentPageUrl, pageNumber);
-                    return anchor;
-                }
-                
-                if (this.QueryString == (string.Format(CultureInfo.InvariantCulture, "page={0}&modal=1&CallBackFunctionName=processCallBackActions&AssociatedControlId=PartyIdHidden", this.CurrentPage)))
-                {
-                    anchor.HRef = string.Format(CultureInfo.InvariantCulture, "{0}?page={1}&modal=1&CallBackFunctionName=processCallBackActions&AssociatedControlId=PartyIdHidden", this.CurrentPageUrl, pageNumber);
-                    return anchor;
-                }
-
-                if (pageNumber > 0)
-                {
-                    anchor.HRef = string.Format(CultureInfo.InvariantCulture, "{0}?page={1}", this.CurrentPageUrl, pageNumber);
-                }
-
-                return anchor;
+                builder.AddAttribute(sequence++, "href", href);
             }
+
+            builder.AddAttribute(sequence++, "title", title);
+
+            //HtmlGenericControl("i") with Attributes.Add("class", iconCssClass)
+            builder.OpenElement(sequence++, "i");
+            builder.AddAttribute(sequence++, "class", iconCssClass);
+            builder.CloseElement();
+
+            builder.CloseElement();
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of the two "previous/next block" ellipsis anchors.
+        ///     <para>
+        ///         Both call sites built the anchor through <c>GetIconAnchor("icon item", "", page)</c>
+        ///         — which added an <c>&lt;i class=""&gt;</c> child — and then assigned
+        ///         <c>anchor.InnerText = "..."</c>. <c>HtmlAnchor.InnerText</c> REPLACES the control's
+        ///         children, so that icon was discarded and the rendered anchor contained only the
+        ///         ellipsis text. That is reproduced here (no <c>&lt;i&gt;</c> element) rather than
+        ///         emitting an empty icon the original never produced.
+        ///     </para>
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private void GetEllipsisAnchor(RenderTreeBuilder builder, ref int sequence, int pageNumber, string title)
+        {
+            builder.OpenElement(sequence++, "a");
+            builder.AddAttribute(sequence++, "class", "icon item");
+
+            string href = this.GetIconAnchorUrl(pageNumber);
+
+            if (href != null)
+            {
+                builder.AddAttribute(sequence++, "href", href);
+            }
+
+            builder.AddAttribute(sequence++, "title", title);
+            builder.AddContent(sequence++, "...");
+
+            builder.CloseElement();
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of the href composition in <c>GetAnchor</c>: either the plain
+        ///     <c>{url}?page={n}</c> or, under the party item-selector popup, the same link with the
+        ///     modal callback parameters appended so the popup survives paging.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private string GetPageUrl(int pageNumber)
+        {
+            if (this.IsModalPartyQueryString())
+            {
+                return string.Format(CultureInfo.InvariantCulture, "{0}?page={1}&" + ModalPartyQueryString, this.CurrentPageUrl, pageNumber);
+            }
+
+            return string.Format(CultureInfo.InvariantCulture, "{0}?page={1}", this.CurrentPageUrl, pageNumber);
+        }
+
+        /// <summary>
+        ///     Port of the href composition in <c>GetIconAnchor</c>, which — unlike
+        ///     <c>GetAnchor</c> — emitted NO href for page 0 outside the modal branches.
+        /// </summary>
+        /// <returns>The href, or null when none is to be emitted.</returns>
+        private string GetIconAnchorUrl(int pageNumber)
+        {
+            if (this.IsModalPartyQueryString())
+            {
+                return string.Format(CultureInfo.InvariantCulture, "{0}?page={1}&" + ModalPartyQueryString, this.CurrentPageUrl, pageNumber);
+            }
+
+            if (pageNumber > 0)
+            {
+                return string.Format(CultureInfo.InvariantCulture, "{0}?page={1}", this.CurrentPageUrl, pageNumber);
+            }
+
+            return null;
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of the two identical query-string comparisons both anchor builders performed: the
+        ///     request is the party item-selector popup either when the query string is exactly the
+        ///     modal parameter set, or when it is that set prefixed with the current page.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private bool IsModalPartyQueryString()
+        {
+            if (this.QueryString == ModalPartyQueryString)
+            {
+                return true;
+            }
+
+            return this.QueryString == string.Format(CultureInfo.InvariantCulture, "page={0}&" + ModalPartyQueryString, this.CurrentPage);
         }
     }
 }

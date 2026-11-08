@@ -40,3 +40,17 @@ document.onkeydown = function (evt) {
         top.close();
     }
 };
+
+//Idempotent entry point for the Blazor component (ScrudItemSelector.razor calls it from
+//OnAfterRenderAsync). The script body above ran ONCE per WebForms page load; a Blazor re-render
+//replaces the selector's DOM, so the Esc-to-close handler has to be (re)installed afterwards.
+//Assigning document.onkeydown (rather than adding a listener) is what makes repeated calls safe:
+//the handler can never stack up.
+function initScrudItemSelector() {
+    document.onkeydown = function (evt) {
+        evt = evt || window.event;
+        if (evt.keyCode === 27) {
+            top.close();
+        }
+    };
+};

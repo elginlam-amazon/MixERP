@@ -1,0 +1,343 @@
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Renders ONE row of the schema-driven scrud form.
+
+    This is the port of the two row builders in Helpers/ScrudFactoryHelper.cs —
+      AddRow(HtmlTable, label, params Control[])        -> the label-cell / control-cell <tr>
+      AddDropDownList(HtmlTable, label, DropDownList,
+                      HtmlAnchor, RequiredFieldValidator) -> the nested item-selector <table>
+    — together with the per-control markup the five field factories used to produce by newing up
+    a System.Web.UI.WebControls control (TextBox, DropDownList, RadioButtonList, FileUpload) and
+    adding it to a cell.
+
+    DOM CONTRACT. The input ids are LOAD-BEARING: Scrud.js and ScrudForm.GetFormCollection
+    round-trip every value through the literal strings {column}_textbox, {column}_dropdownlist,
+    {column}_radiobuttonlist and {column}_fileupload. The cell classes (label-cell / control-cell),
+    the nested role="item-selector-table" table and the role="item-selector" anchor are what the
+    suite's css and Scrud.js select on.
+
+    VALIDATION. The legacy validator controls (RequiredFieldValidator / CompareValidator /
+    RegularExpressionValidator) are removed types. Their rules live on ScrudField.Rules and are
+    ENFORCED server-side by ScrudField.Validate(); this markup renders a failed rule's message
+    exactly where ValidatorDisplay.Dynamic put it — inside the control cell, emitted only while the
+    rule fails, with its original CssClass and its original ErrorMessage (leading <br/> included).
+*@
+
+@namespace MixERP.Net.WebControls.ScrudFactory.Controls
+@using System
+@using System.Threading.Tasks
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+@using MixERP.Net.i18n.Resources
+@using MixERP.Net.WebControls.Common
+
+@if (this.Field != null)
+{
+    @if (this.Field.Kind.Equals(ScrudFieldKind.DropDownList))
+    {
+        @*
+            Port of ScrudFactoryHelper.AddDropDownList: the control cell holds a nested table whose
+            first cell carries the select (plus its required message) and whose second cell carries
+            the item-selector anchor. The 24px width was added ONLY when an anchor existed.
+        *@
+        <tr>
+            <td class="label-cell">
+                <label for="@this.Field.ElementId">@((MarkupString)(this.Field.Label ?? string.Empty))</label>
+            </td>
+            <td class="control-cell">
+                <table role="item-selector-table" style="width:100%;border-collapse:collapse">
+                    <tr>
+                        <td>
+                            @this.RenderDropDownList()
+                            @this.RenderMessages()
+                        </td>
+                        <td style="@(this.Field.ItemSelector != null ? "width:24px" : null)">
+                            @if (this.Field.ItemSelector != null)
+                            {
+                                <a class="@this.Field.ItemSelector.CssClass"
+                                   role="item-selector"
+                                   tabindex="10000"
+                                   data-title="@this.Field.ItemSelector.Title"
+                                   href="@this.Field.ItemSelector.Href"
+                                   style="@(this.Field.ItemSelector.Disabled ? "pointer-events:none;" : null)"></a>
+                            }
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    }
+    else
+    {
+        @*
+            Port of ScrudFactoryHelper.AddRow: label cell (class "label-cell", a <label for> pointing
+            at the FIRST control's id — which is this field's element id) then the control cell
+            (class "control-cell") holding the control followed by its validator messages.
+        *@
+        <tr>
+            <td class="label-cell">
+                <label for="@this.Field.ElementId">@((MarkupString)(this.Field.Label ?? string.Empty))</label>
+            </td>
+            <td class="control-cell">
+                @switch (this.Field.Kind)
+                {
+                    case ScrudFieldKind.DateTextBox:
+                        @*
+                            Port of ScrudDateTextBox.AddDateTextBox. The original built a plain
+                            TextBox and then called jQueryUI.AddjQueryUIDatePicker(page, id, …) to
+                            attach the picker. That whole job is already done by the migrated
+                            MixERP.Net.WebControls.Common.DateTextBox component, which owns the
+                            picker interop (OnAfterRenderAsync) and renders the same
+                            id/name/class="date" input — so this delegates to it rather than
+                            re-implementing a datepicker.
+
+                            EnableValidation is driven off the field's rules so the component's own
+                            Validate()/IsValid stays consistent with the scrud gate; the date rule
+                            itself is additionally enforced by ScrudField.Validate() so a client
+                            that bypasses the component cannot skip it.
+                        *@
+                        <DateTextBox ID="@this.Field.ElementId"
+                                     CssClass="@this.Field.CssClass"
+                                     Disabled="@this.Field.ReadOnly"
+                                     Required="@(!this.Field.IsNullable)"
+                                     EnableValidation="@(this.Field.Rules.Count > 0)"
+                                     ValidatorCssClass="@this.Field.ValidatorCssClass"
+                                     Text="@this.Field.Value"
+                                     TextChanged="@this.OnDateTextChanged" />
+                        break;
+                    case ScrudFieldKind.RadioButtonList:
+                        @this.RenderRadioButtonList()
+                        break;
+                    case ScrudFieldKind.FileUpload:
+                        @*
+                            Port of ScrudFileUpload.GetFileUpload. The legacy FileUpload rendered
+                            <input type="file" id="{column}_fileupload">; InputFile renders the same
+                            element and additionally gives the component the chosen IBrowserFile,
+                            which is what ScrudFileUpload.UploadFileAsync persists. The legacy
+                            "Todo" comment asked for exactly this (an async upload instead of a
+                            synchronous postback) — Blazor's InputFile is that mechanism.
+                        *@
+                        <InputFile id="@this.Field.ElementId"
+                                   name="@this.Field.ElementId"
+                                   class="@this.Field.CssClass"
+                                   disabled="@this.Field.Disabled"
+                                   OnChange="@this.OnFileChanged" />
+                        break;
+                    default:
+                        @this.RenderTextBox()
+                        break;
+                }
+
+                @this.RenderMessages()
+            </td>
+        </tr>
+    }
+}
+
+@code {
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     The field to render. Supplied by <c>ScrudForm</c>'s <c>LoadForm</c> as it walks
+    ///     <see cref="ScrudFieldTable.Fields" />.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    [Parameter]
+    public ScrudField Field { get; set; }
+
+    /// <summary>
+    ///     Raised after the user changes this field's value, so the hosting form can re-render
+    ///     and/or re-run its own gate. Replaces the WebForms postback that used to carry a changed
+    ///     value back to the server.
+    /// </summary>
+    [Parameter]
+    public EventCallback<ScrudField> FieldChanged { get; set; }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of ScrudTextBox.GetTextBox's rendered output, shared by the text, number and
+    ///     decimal renderers (all three built a TextBox through that one factory).
+    ///     <para>
+    ///         <c>name</c> is set to the plain element id. WebForms emitted the control's
+    ///         <c>UniqueID</c> there, but these controls were created with
+    ///         <c>ClientIDMode.Static</c> and <c>GetFormCollection</c> correlated them by
+    ///         <c>FindControl(id)</c>, so the plain id is both the value the client scripts already
+    ///         use and the value the form reads back.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private RenderFragment RenderTextBox()
+    {
+        return
+        @<input type="@(string.IsNullOrWhiteSpace(this.Field.InputType) ? "text" : this.Field.InputType)"
+                id="@this.Field.ElementId"
+                name="@this.Field.ElementId"
+                class="@this.Field.CssClass"
+                maxlength="@(this.Field.MaxLength > 0 ? this.Field.MaxLength.ToString() : null)"
+                value="@this.Field.Value"
+                readonly="@this.Field.ReadOnly"
+                disabled="@this.Field.Disabled"
+                @oninput="@this.OnValueInput" />;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of ScrudDropDownList.GetDropDownList plus the <c>disabled</c> attribute
+    ///     AddDropDownList added. The options come from <see cref="ScrudField.Items" />, which
+    ///     <c>SetDisplayFields</c> filled from the parent table and <c>SetSelectedValue</c> selected
+    ///     into.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private RenderFragment RenderDropDownList()
+    {
+        return
+        @<select id="@this.Field.ElementId"
+                 name="@this.Field.ElementId"
+                 class="@this.Field.CssClass"
+                 disabled="@this.Field.Disabled"
+                 value="@this.Field.Value"
+                 @onchange="@this.OnValueInput">
+            @foreach (ScrudListItem item in this.Field.Items)
+            {
+                <option value="@item.Value" selected="@item.Value.Equals(this.Field.Value, StringComparison.Ordinal)">@item.Text</option>
+            }
+        </select>;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of ScrudRadioButtonList.GetRadioButtonList's rendered output. A
+    ///     <c>RadioButtonList</c> with <c>RepeatDirection.Horizontal</c> emitted a single-row table
+    ///     of <c>input type="radio"</c> + <c>label</c> pairs; the inputs shared the list's name
+    ///     (<c>{column}_radiobuttonlist</c> — the load-bearing string) and each carried an
+    ///     index-suffixed id, which is what each label's <c>for</c> pointed at.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private RenderFragment RenderRadioButtonList()
+    {
+        return
+        @<table id="@this.Field.ElementId" class="@this.Field.CssClass" role="radio-button-list">
+            <tr>
+                @for (int i = 0; i < this.Field.Items.Count; i++)
+                {
+                    ScrudListItem item = this.Field.Items[i];
+                    string itemId = this.Field.ElementId + "_" + i.ToString();
+
+                    //The handler is hoisted into a local so the attribute value stays a simple
+                    //expression: a lambda written inline in this attribute cannot be bound to an
+                    //event-callback overload.
+                    EventCallback<ChangeEventArgs> radioChanged = EventCallback.Factory.Create<ChangeEventArgs>(this, args => this.OnRadioChanged(item));
+
+                    <td>
+                        <input type="radio"
+                               id="@itemId"
+                               name="@this.Field.ElementId"
+                               value="@item.Value"
+                               checked="@item.Selected"
+                               disabled="@this.Field.Disabled"
+                               @onchange="radioChanged" />
+                        <label for="@itemId">@item.Text</label>
+                    </td>
+                }
+            </tr>
+        </table>;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Renders the field's failed rules. This is the port of the validator controls the
+    ///     factories added to the control cell after the input: every one of them used
+    ///     <c>ValidatorDisplay.Dynamic</c>, so the span existed in the DOM only while its rule was
+    ///     failing, and the message string already begins with the <c>&lt;br/&gt;</c> the originals
+    ///     prefixed — hence the <c>MarkupString</c>.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private RenderFragment RenderMessages()
+    {
+        return
+        @<text>
+            @foreach (ScrudValidationRule rule in this.Field.Rules)
+            {
+                @if (rule.Failed)
+                {
+                    <span id="@rule.Id" class="@rule.CssClass">@((MarkupString)(rule.ErrorMessage ?? string.Empty))</span>
+                }
+            }
+        </text>;
+    }
+
+    /// <summary>
+    ///     Keeps <see cref="ScrudField.Value" /> in step with what the user types or selects — the
+    ///     replacement for the postback that used to repopulate <c>TextBox.Text</c> /
+    ///     <c>DropDownList.SelectedValue</c> from ViewState — and re-runs the field's rules, which
+    ///     is what the legacy client validators did on change.
+    /// </summary>
+    private async Task OnValueInput(ChangeEventArgs e)
+    {
+        this.Field.Value = e.Value == null ? string.Empty : e.Value.ToString();
+        this.Field.Validate();
+
+        await this.FieldChanged.InvokeAsync(this.Field);
+    }
+
+    /// <summary>Port of the date text box's value round-trip, driven by the delegated component.</summary>
+    private async Task OnDateTextChanged(string value)
+    {
+        this.Field.Value = value;
+        this.Field.Validate();
+
+        await this.FieldChanged.InvokeAsync(this.Field);
+    }
+
+    /// <summary>
+    ///     Port of <c>RadioButtonList.SelectedValue</c>: selecting one item clears the rest, which a
+    ///     <c>RadioButtonList</c> (as opposed to a <c>CheckBoxList</c>) enforced for itself.
+    /// </summary>
+    private async Task OnRadioChanged(ScrudListItem selected)
+    {
+        foreach (ScrudListItem item in this.Field.Items)
+        {
+            item.Selected = ReferenceEquals(item, selected);
+        }
+
+        this.Field.Value = selected.Value;
+        this.Field.Validate();
+
+        await this.FieldChanged.InvokeAsync(this.Field);
+    }
+
+    /// <summary>
+    ///     Captures the chosen file for a <c>bytea</c> column. The legacy <c>FileUpload</c> carried
+    ///     <c>HasFile</c>/<c>FileName</c>/<c>SaveAs</c>; the <c>IBrowserFile</c> stored here is what
+    ///     <c>ScrudFileUpload.UploadFileAsync</c> consumes, and its name is what the
+    ///     image-extension rule is evaluated against.
+    /// </summary>
+    private async Task OnFileChanged(InputFileChangeEventArgs e)
+    {
+        this.Field.File = e.FileCount > 0 ? e.File : null;
+        this.Field.Value = this.Field.File == null ? string.Empty : this.Field.File.Name;
+        this.Field.Validate();
+
+        await this.FieldChanged.InvokeAsync(this.Field);
+    }
+}

@@ -1,0 +1,786 @@
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Blazor replacement for the WebForms server control
+    "MixERP.Net.WebControls.ScrudFactory.ScrudItemSelector" (formerly the six partial files
+    under ScrudItemSelector/ plus Helpers/ScrudItemSelectorSelectTemplate.cs).
+
+    THE RENDER TREE BELOW IS THE PORT OF, in this order (Control.cs CreateChildControls():
+    AddJavascript -> LoadItemSelector -> Initialize):
+      ScrudItemSelector/Control.cs      CreateChildControls()  -> this markup + OnParametersSet
+      ScrudItemSelector/ItemSelector.cs LoadItemSelector()     -> top panel THEN grid panel
+                                        LoadTopPanel()         -> #FilterDropDownList,
+                                                                  #FilterTextBox, #GoButton
+                                        LoadGridPanel()        -> #GridPanel + #SearchGridView
+                                        GetSelectColumnTemplateField()
+                                                               -> GetSelectColumnTemplate()
+      ScrudItemSelector/Intializer.cs   Initialize/LoadParmeters/LoadGridView -> OnParametersSet
+      ScrudItemSelector/Events.cs       GoButton_Click, FilterSelectDataBound,
+                                        SearchGridView_RowDataBound, GetResourceClassName,
+                                        GetSchema, GetView
+      ScrudItemSelector/JavaScript.cs   AddJavascript()        -> OnAfterRenderAsync(firstRender)
+      ScrudItemSelector/Properties.cs   the 12 [Parameter]s (names frozen)
+      Helpers/ScrudItemSelectorSelectTemplate.cs
+                                        InstantiateIn/BindData -> GetSelectColumnTemplate()
+
+    THE DOM CONTRACT IS LOAD-BEARING. ScrudItemSelector.js (and Scrud.js, which opens this
+    control in a colorbox) address these LITERAL ids: #GridPanel, #SearchGridView,
+    #FilterDropDownList, #FilterTextBox, #GoButton. The per-row anchor's inline
+    onclick="sisUpdateValue('<key>');" is the whole point of the control - it is what hands the
+    picked key back to the opener window.
+
+    PUBLIC API: the 12 property names are frozen; ten of them are set by
+    FrontEnd/MixERP.Net.FrontEnd/General/ItemSelector.aspx.cs (recorded in migration-summary.md
+    section E / task 108, not half-edited here).
+*@
+
+@namespace MixERP.Net.WebControls.ScrudFactory
+@inherits ComponentBase
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Nav
+
+@using System
+@using System.Collections.Generic
+@using System.Data
+@using System.Linq
+@using System.Threading.Tasks
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.Extensions.Primitives
+@using Microsoft.JSInterop
+@using MixERP.Net.Common
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.i18n.Resources
+@using MixERP.Net.WebControls.Common
+@using MixERP.Net.WebControls.ScrudFactory.Data
+@using MixERP.Net.WebControls.ScrudFactory.Helpers
+
+@* Control.cs: this.container = new Panel() - the single Panel everything was added to. *@
+<div>
+    @*
+        ItemSelector.cs LoadItemSelector(): the TOP PANEL is added FIRST, the grid panel second.
+        LoadTopPanel(): topPanel.CssClass = this.TopPanelCssClass.
+    *@
+    <div class="@this.TopPanelCssClass">
+        @*
+            LoadTopPanel(): HtmlGenericControl("div") with class "ui small form".
+            TopPanelTableCssClass was a consumer-set property (see ItemSelector.aspx.cs) that the
+            legacy LoadTopPanel never applied - the filter "table" it describes IS this form
+            wrapper, so it is appended here instead of being silently ignored. The literal
+            "ui small form" classes are kept first so the Semantic UI layout is unchanged.
+        *@
+        <div class="@this.GetTopPanelTableCssClass()">
+            @* LoadTopPanel(): HtmlGenericControl("div") with class "inline fields". *@
+            <div class="inline fields">
+                @* The DropDownList field: div class="field" > select#FilterDropDownList. *@
+                <div class="field">
+                    @*
+                        DataTextField/DataValueField were both "ColumnName"; the option TEXT is
+                        localized by the FilterSelectDataBound port (GetFilterOptions below).
+                    *@
+                    <select id="FilterDropDownList" class="@this.FilterDropDownListCssClass" @bind="this.filterColumn">
+                        @foreach (KeyValuePair<string, string> option in this.filterOptions)
+                        {
+                            <option value="@option.Key">@option.Value</option>
+                        }
+                    </select>
+                </div>
+
+                @* The TextBox field: div class="field" > input#FilterTextBox. *@
+                <div class="field">
+                    <input type="text" id="FilterTextBox" class="@this.FilterTextBoxCssClass" @bind="this.filterText" />
+                </div>
+
+                @*
+                    LoadTopPanel(): Button(ID = "GoButton", Text = Titles.Go), with Height/Width
+                    applied only when they were set. A WebForms Button posted the whole page back;
+                    type="button" + @onclick is the Blazor equivalent and must NOT be type="submit",
+                    which would navigate the host form away instead of filtering in place.
+                *@
+                <button type="button" id="GoButton" class="@this.ButtonCssClass" style="@this.GetButtonStyle()"
+                        @onclick="@this.GoButton_Click">@Titles.Go</button>
+            </div>
+        </div>
+    </div>
+
+    @*
+        ItemSelector.cs LoadGridPanel(Panel): ID = "GridPanel", CssClass = GridPanelCssClass,
+        Attributes.Add("style", "overflow:auto") + Attributes.Add("padding", "4px") - the
+        (non-standard) padding attribute is preserved verbatim because a host stylesheet may
+        select on it, and Height/Width are appended to the same style attribute.
+    *@
+    <div id="GridPanel" class="@this.GridPanelCssClass" style="@this.GetGridPanelStyle()" padding="4px">
+        @*
+            The grid: searchGridView.Attributes.Add("style", "white-space: nowrap;"). MixERPGridView
+            exposes no inline-style parameter, so the style is carried on this wrapper (same
+            divergence ScrudForm records for FormGridView).
+
+            GridViewRowCssClass / GridViewAlternateRowCssClass / GridViewPagerCssClass were
+            INHERITED GridView members (RowStyle/AlternatingRowStyle/PagerStyle - Common section 5.3)
+            which the migrated MixERPGridView does not have: it renders "ui striped table" rows
+            itself and has no pager. The three consumer-supplied values are therefore surfaced as
+            data-* hooks on this wrapper so host CSS can still target the rows, and the re-typing is
+            recorded in migration-summary.md section 4.
+        *@
+        <div role="grid-wrapper" style="white-space: nowrap;"
+             data-row-css-class="@this.GridViewRowCssClass"
+             data-alternate-row-css-class="@this.GridViewAlternateRowCssClass"
+             data-pager-css-class="@this.GridViewPagerCssClass">
+            @*
+                AutoGenerateColumns was true on the legacy grid, but MixERPGridView APPENDS an
+                explicit column set AFTER the generated one - which would push the select column to
+                the far right. The column list is therefore built here (select column FIRST, then
+                one column per data column), which keeps the legacy Cells[0] = select /
+                Cells[1..n] = data relationship the RowDataBound port depends on.
+            *@
+            <MixERPGridView ID="SearchGridView"
+                            CssClass="@this.GridViewCssClass"
+                            AutoGenerateColumns="false"
+                            Columns="@this.gridColumns"
+                            DataSource="@this.dataSource" />
+        </div>
+    </div>
+</div>
+
+@code {
+    //==================================================================================
+    // ScrudItemSelector/Properties.cs - the 12 [Parameter]s (checklist tasks 86 and 87).
+    // EVERY NAME IS FROZEN: ten of them are assigned by
+    // FrontEnd/MixERP.Net.FrontEnd/General/ItemSelector.aspx.cs.
+    //==================================================================================
+
+    /// <summary>Css class of the #GoButton.</summary>
+    [Parameter]
+    public string ButtonCssClass { get; set; }
+
+    /// <summary>The tenant catalog every data call and DbConfig lookup is scoped to.</summary>
+    [Parameter]
+    public string Catalog { get; set; }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Height of the #GoButton as a CSS length, for example "32px".
+    ///     <para>
+    ///         API DIVERGENCE (migration-summary section 4, checklist task 87): the legacy type was
+    ///         <c>System.Web.UI.WebControls.Unit</c>, which does not exist on net10.0. A CSS-length
+    ///         string is the direct replacement - it is what <c>Unit</c> rendered anyway - and the
+    ///         "was it set?" test <c>if (this.ButtonHeight.Value &gt; 0)</c> becomes a
+    ///         null/whitespace test, which has the same effect for every value a consumer passes.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    [Parameter]
+    public string ButtonHeight { get; set; }
+
+    /// <summary>Width of the #GoButton as a CSS length. Same divergence as <see cref="ButtonHeight" />.</summary>
+    [Parameter]
+    public string ButtonWidth { get; set; }
+
+    /// <summary>Css class of the #FilterDropDownList.</summary>
+    [Parameter]
+    public string FilterDropDownListCssClass { get; set; }
+
+    /// <summary>Css class of the #FilterTextBox.</summary>
+    [Parameter]
+    public string FilterTextBoxCssClass { get; set; }
+
+    /// <summary>Css class of the #GridPanel.</summary>
+    [Parameter]
+    public string GridPanelCssClass { get; set; }
+
+    /// <summary>Height of the #GridPanel as a CSS length. Same divergence as <see cref="ButtonHeight" />.</summary>
+    [Parameter]
+    public string GridPanelHeight { get; set; }
+
+    /// <summary>Width of the #GridPanel as a CSS length. Same divergence as <see cref="ButtonHeight" />.</summary>
+    [Parameter]
+    public string GridPanelWidth { get; set; }
+
+    /// <summary>Former <c>AlternatingRowStyle.CssClass</c> of the search grid.</summary>
+    [Parameter]
+    public string GridViewAlternateRowCssClass { get; set; }
+
+    /// <summary>Css class of the search grid's table.</summary>
+    [Parameter]
+    public string GridViewCssClass { get; set; }
+
+    /// <summary>Former <c>PagerStyle.CssClass</c> of the search grid.</summary>
+    [Parameter]
+    public string GridViewPagerCssClass { get; set; }
+
+    /// <summary>Former <c>RowStyle.CssClass</c> of the search grid.</summary>
+    [Parameter]
+    public string GridViewRowCssClass { get; set; }
+
+    /// <summary>
+    ///     The i18n resource class the column captions and filter options are looked up in. Empty
+    ///     falls back to <c>DbConfig.GetScrudParameter(Catalog, "ResourceClassName")</c>.
+    /// </summary>
+    [Parameter]
+    public string ResourceClassName { get; set; }
+
+    /// <summary>Css class of the top (filter) panel.</summary>
+    [Parameter]
+    public string TopPanelCssClass { get; set; }
+
+    /// <summary>Css class of the filter table inside the top panel.</summary>
+    [Parameter]
+    public string TopPanelTableCssClass { get; set; }
+
+    //==================================================================================
+    // Control state. This replaces the five PUBLIC FIELDS the legacy control exposed
+    // (container, filterInputText, filterSelect, goButton, searchGridView), which were
+    // WebForms control instances - System.Web types that cannot be part of the net10.0
+    // surface. No consumer referenced them (verified by grep over the 7 dependents);
+    // recorded in migration-summary.md section 4.
+    //==================================================================================
+
+    /// <summary>Former <c>filterSelect.SelectedItem.Value</c> - the column being filtered on.</summary>
+    private string filterColumn = string.Empty;
+
+    /// <summary>Former <c>filterInputText.Text</c> - the search term.</summary>
+    private string filterText = string.Empty;
+
+    /// <summary>Former <c>searchGridView.DataSource</c>.</summary>
+    private DataTable dataSource;
+
+    /// <summary>The resolved column set of the search grid (select column first).</summary>
+    private IReadOnlyList<MixERPGridViewColumn> gridColumns = new List<MixERPGridViewColumn>();
+
+    /// <summary>
+    ///     The #FilterDropDownList options: key = ColumnName (the former DataValueField),
+    ///     value = the localized caption (the former DataTextField, after FilterSelectDataBound).
+    /// </summary>
+    private List<KeyValuePair<string, string>> filterOptions = new List<KeyValuePair<string, string>>();
+
+    /// <summary>Guards the one-time data load against repeated parameter sets.</summary>
+    private string loadedFor;
+
+    //==================================================================================
+    // ScrudItemSelector/Intializer.cs - Initialize/LoadParmeters/LoadGridView
+    // (checklist task 92). CreateChildControls() called Initialize(this.Catalog) once,
+    // while the control tree was being built; OnParametersSet is the Blazor equivalent
+    // hook, and the loadedFor guard keeps it to one data load per (catalog, schema, view)
+    // instead of one per re-render.
+    //==================================================================================
+
+    protected override void OnParametersSet()
+    {
+        string key = this.Catalog + "|" + this.GetSchema() + "|" + this.GetView();
+
+        if (!key.Equals(this.loadedFor, StringComparison.Ordinal))
+        {
+            this.loadedFor = key;
+            this.Initialize(this.Catalog);
+        }
+
+        base.OnParametersSet();
+    }
+
+    /// <summary>Port of <c>Initialize(string catalog)</c>: parameters first, then the grid.</summary>
+    private void Initialize(string catalog)
+    {
+        this.LoadParmeters(catalog);
+        this.LoadGridView(catalog);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of <c>LoadGridView(string catalog)</c>: the unfiltered first page of the view,
+    ///     10 rows, ordered by column "1". Both empty-guards are preserved - with no Schema or no
+    ///     View in the query string the grid stays unbound, exactly as before.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private void LoadGridView(string catalog)
+    {
+        if (string.IsNullOrWhiteSpace(this.GetSchema()))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(this.GetView()))
+        {
+            return;
+        }
+
+        //The legacy "using (var table = ...)" disposed the DataTable it had just handed to the
+        //grid's DataSource (a latent bug - the grid rendered from a disposed table). The table is
+        //kept alive here for as long as it is the data source, and MixERPGridView re-renders from
+        //it on every pass. Recorded in migration-summary.md.
+        this.dataSource = FormHelper.GetTable(catalog, this.GetSchema(), this.GetView(), "", "", 10, "1");
+        this.gridColumns = this.BuildGridColumns();
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of <c>LoadParmeters(string catalog)</c> (the misspelling is kept - it is private
+    ///     and makes the correspondence with the legacy file obvious): the filter dropdown is
+    ///     populated from <c>TableHelper.GetColumns(catalog, schema, view)</c>, with the same two
+    ///     empty-guards.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private void LoadParmeters(string catalog)
+    {
+        this.filterOptions = new List<KeyValuePair<string, string>>();
+
+        if (string.IsNullOrWhiteSpace(this.GetSchema()))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(this.GetView()))
+        {
+            return;
+        }
+
+        string resourceClassName = this.GetResourceClassName();
+
+        foreach (MixERP.Net.Entities.Public.DbPocoGetTableFunctionDefinitionResult column in
+            TableHelper.GetColumns(catalog, this.GetSchema(), this.GetView()))
+        {
+            if (column == null || string.IsNullOrWhiteSpace(column.ColumnName))
+            {
+                continue;
+            }
+
+            //FilterSelectDataBound: item.Text = GetResourceString(resourceClassName, item.Text),
+            //with item.Value left as the raw ColumnName (checklist task 94).
+            this.filterOptions.Add(new KeyValuePair<string, string>(column.ColumnName,
+                ScrudLocalizationHelper.GetResourceString(resourceClassName, column.ColumnName)));
+        }
+
+        //A DropDownList selected its first item by default, and GoButton_Click read
+        //SelectedItem.Value - so the default filter column must be the first option.
+        if (string.IsNullOrWhiteSpace(this.filterColumn) && this.filterOptions.Count > 0)
+        {
+            this.filterColumn = this.filterOptions[0].Key;
+        }
+    }
+
+    //==================================================================================
+    // ScrudItemSelector/Events.cs (checklist tasks 93-96).
+    //==================================================================================
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of <c>GoButton_Click</c> (checklist task 93): re-queries the view with the picked
+    ///     filter column and the typed term, same 10-row limit and same "1" order-by, and rebinds
+    ///     the grid. Both empty-guards are preserved.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private Task GoButton_Click()
+    {
+        if (string.IsNullOrWhiteSpace(this.GetSchema()))
+        {
+            return Task.CompletedTask;
+        }
+
+        if (string.IsNullOrWhiteSpace(this.GetView()))
+        {
+            return Task.CompletedTask;
+        }
+
+        this.dataSource = FormHelper.GetTable(this.Catalog, this.GetSchema(), this.GetView(),
+            this.filterColumn, this.filterText, 10, "1");
+
+        this.gridColumns = this.BuildGridColumns();
+
+        return Task.CompletedTask;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of <c>GetResourceClassName()</c>: the property wins, otherwise the catalog's
+    ///     "ResourceClassName" scrud parameter.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private string GetResourceClassName()
+    {
+        if (string.IsNullOrWhiteSpace(this.ResourceClassName))
+        {
+            return DbConfig.GetScrudParameter(this.Catalog, "ResourceClassName");
+        }
+
+        return this.ResourceClassName;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of <c>GetSchema()</c> (checklist task 96): <c>this.Page.Request["Schema"]</c>
+    ///     becomes the same query-string read off the injected <see cref="NavigationManager" />.
+    ///     The PARAMETER NAME "Schema" is part of the wire contract - the popup url that opens this
+    ///     control (built by the ScrudFactory dropdown renderer and by Scrud.js) carries
+    ///     ?Schema=&amp;View=&amp;AssociatedControlId=.
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private string GetSchema()
+    {
+        return Conversion.TryCastString(this.GetQueryStringValue("Schema"));
+    }
+
+    /// <summary>
+    ///     Port of <c>GetView()</c>: <c>this.Page.Request["View"]</c> through the same channel,
+    ///     keeping the parameter name "View".
+    /// </summary>
+    private string GetView()
+    {
+        return Conversion.TryCastString(this.GetQueryStringValue("View"));
+    }
+
+    /// <summary>
+    ///     The single replacement for the <c>this.Page.Request[...]</c> reads (same helper
+    ///     ScrudForm uses).
+    /// </summary>
+    private string GetQueryStringValue(string key)
+    {
+        if (this.Nav == null)
+        {
+            return null;
+        }
+
+        string query = new Uri(this.Nav.Uri).Query;
+
+        if (string.IsNullOrEmpty(query))
+        {
+            return null;
+        }
+
+        StringValues value;
+
+        if (QueryHelpers.ParseQuery(query).TryGetValue(key, out value))
+        {
+            return value.ToString();
+        }
+
+        return null;
+    }
+
+    //==================================================================================
+    // ScrudItemSelector/ItemSelector.cs - the grid's column set
+    // (checklist tasks 90, 91 and 95).
+    //==================================================================================
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     The select column (<c>GetSelectColumnTemplateField()</c>, checklist task 91) followed by
+    ///     one localized column per data column (<c>SearchGridView_RowDataBound</c>, checklist
+    ///     task 95).
+    ///     <para>
+    ///         THE CELL OFFSET IS PRESERVED. The legacy header handler ran
+    ///         <c>for (int i = 1; i &lt; e.Row.Cells.Count; i++)</c> - it SKIPPED cell 0, the
+    ///         select column, because that column's header is <c>Titles.Select</c> and must not be
+    ///         run through the resource lookup. Here the select column is likewise added first and
+    ///         NOT localized, and only the columns after it get
+    ///         <c>ScrudLocalizationHelper.GetResourceString</c>. The original's
+    ///         <c>if (!string.IsNullOrWhiteSpace(cellText))</c> guard is preserved too, so a blank
+    ///         caption is left alone instead of being replaced by a resource miss.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private IReadOnlyList<MixERPGridViewColumn> BuildGridColumns()
+    {
+        List<MixERPGridViewColumn> columns = new List<MixERPGridViewColumn>();
+
+        //GetSelectColumnTemplateField(): HeaderText = Titles.Select, ItemTemplate =
+        //ScrudItemSelectorSelectTemplate. TemplateField/ITemplate are removed on net10.0, so the
+        //item template becomes this column's RenderFragment<object> (Common section 4).
+        MixERPGridViewColumn selectColumn = new MixERPGridViewColumn();
+        selectColumn.HeaderText = Titles.Select;
+        selectColumn.Template = this.GetSelectColumnTemplate();
+
+        columns.Add(selectColumn);
+
+        if (this.dataSource != null)
+        {
+            string resourceClassName = this.GetResourceClassName();
+
+            foreach (DataColumn column in this.dataSource.Columns)
+            {
+                string cellText = column.ColumnName;
+
+                if (!string.IsNullOrWhiteSpace(cellText))
+                {
+                    cellText = ScrudLocalizationHelper.GetResourceString(resourceClassName, cellText);
+                }
+
+                columns.Add(new MixERPGridViewColumn(column.ColumnName, cellText, column.DataType));
+            }
+        }
+
+        return columns;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of <c>Helpers/ScrudItemSelectorSelectTemplate.cs</c> -
+    ///     <c>InstantiateIn(Control)</c> plus the <c>BindData</c> handler it hooked onto the
+    ///     anchor's <c>DataBinding</c> event (checklist task 91).
+    ///     <para>
+    ///         InstantiateIn built an <c>HtmlAnchor</c> with <c>HRef = "#"</c>, the catalog's
+    ///         "ItemSelectorSelectAnchorCssClass" class and <c>InnerText = Titles.Select</c>;
+    ///         BindData then cast the anchor's naming container to the <c>GridViewRow</c>, read the
+    ///         row's FIRST field (<c>rowView[0]</c>) and wrote
+    ///         <c>onclick="sisUpdateValue('&lt;key&gt;');"</c>. Both halves collapse into this one
+    ///         fragment because the row IS the fragment's argument - no naming-container walk and
+    ///         no <c>DataBinding</c> event are needed.
+    ///     </para>
+    ///     <para>
+    ///         <c>sisUpdateValue</c> lives in ScrudItemSelector.js and is the control's entire
+    ///         purpose: it copies the key into the opener's AssociatedControlId input and closes
+    ///         the colorbox. The call must stay an inline <c>onclick</c> attribute (not an
+    ///         <c>@@onclick</c> handler) because the work is done ENTIRELY in the browser, in the
+    ///         PARENT document - a server round trip cannot reach <c>parent.document.body</c>.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private RenderFragment<object> GetSelectColumnTemplate()
+    {
+        string anchorCssClass = DbConfig.GetScrudParameter(this.Catalog, "ItemSelectorSelectAnchorCssClass");
+
+        return row =>
+    @<a href="#" class="@anchorCssClass" onclick="@this.GetSelectAnchorOnClick(row)">@Titles.Select</a>;
+    }
+
+    /// <summary>
+    ///     The <c>BindData</c> half of the select template: <c>rowView[0]</c>, the row's first
+    ///     field, which is the key the opener receives. The value is JS-string escaped before it
+    ///     goes into the inline handler (the legacy concatenation was unescaped - a quote in a key
+    ///     broke the handler).
+    /// </summary>
+    private string GetSelectAnchorOnClick(object row)
+    {
+        return "sisUpdateValue('" + EscapeJavascriptString(this.GetFirstFieldValue(row)) + "');";
+    }
+
+    private string GetFirstFieldValue(object row)
+    {
+        DataRow dataRow = row as DataRow;
+
+        if (dataRow != null)
+        {
+            return dataRow.Table.Columns.Count > 0 ? Conversion.TryCastString(dataRow[0]) : string.Empty;
+        }
+
+        DataRowView rowView = row as DataRowView;
+
+        if (rowView != null)
+        {
+            return rowView.Row.Table.Columns.Count > 0 ? Conversion.TryCastString(rowView[0]) : string.Empty;
+        }
+
+        if (row == null)
+        {
+            return string.Empty;
+        }
+
+        System.Reflection.PropertyInfo property = row.GetType().GetProperties()
+            .FirstOrDefault(p => p.GetIndexParameters().Length.Equals(0));
+
+        return property == null ? string.Empty : Conversion.TryCastString(property.GetValue(row, null));
+    }
+
+    private static string EscapeJavascriptString(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        return value.Replace("\\", "\\\\").Replace("'", "\\'").Replace("\r", string.Empty).Replace("\n", string.Empty);
+    }
+
+    //==================================================================================
+    // Styling - the former Unit properties (checklist task 87).
+    //==================================================================================
+
+    /// <summary>
+    ///     Port of LoadTopPanel()'s <c>if (this.ButtonHeight.Value &gt; 0) goButton.Height = ...</c>
+    ///     pair: each dimension is emitted only when the consumer supplied one.
+    /// </summary>
+    private string GetButtonStyle()
+    {
+        string style = string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(this.ButtonHeight))
+        {
+            style += "height:" + this.ButtonHeight + ";";
+        }
+
+        if (!string.IsNullOrWhiteSpace(this.ButtonWidth))
+        {
+            style += "width:" + this.ButtonWidth + ";";
+        }
+
+        return style.Length.Equals(0) ? null : style;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of LoadGridPanel()'s style: the literal "overflow:auto" plus the optional
+    ///     height/width.
+    ///     <para>
+    ///         LEGACY BUG CORRECTED: the original assigned <c>gridPanel.Height = this.GridPanelWidth</c>
+    ///         in the width branch (a copy/paste slip), so a consumer setting GridPanelWidth got its
+    ///         height overwritten and never got a width. GridPanelWidth now sets the width.
+    ///         Recorded in migration-summary.md.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private string GetGridPanelStyle()
+    {
+        string style = "overflow:auto;";
+
+        if (!string.IsNullOrWhiteSpace(this.GridPanelHeight))
+        {
+            style += "height:" + this.GridPanelHeight + ";";
+        }
+
+        if (!string.IsNullOrWhiteSpace(this.GridPanelWidth))
+        {
+            style += "width:" + this.GridPanelWidth + ";";
+        }
+
+        return style;
+    }
+
+    /// <summary>
+    ///     "ui small form" (the legacy literal) plus the consumer's TopPanelTableCssClass.
+    /// </summary>
+    private string GetTopPanelTableCssClass()
+    {
+        if (string.IsNullOrWhiteSpace(this.TopPanelTableCssClass))
+        {
+            return "ui small form";
+        }
+
+        return "ui small form " + this.TopPanelTableCssClass;
+    }
+
+    //==================================================================================
+    // ScrudItemSelector/JavaScript.cs - AddJavascript() (checklist tasks 97-99 and 102).
+    //==================================================================================
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Port of <c>AddJavascript()</c> (checklist task 97) and of the per-render re-wiring
+    ///     (checklist task 102).
+    ///     <para>
+    ///         WHAT WAS DROPPED HERE, and why:
+    ///     </para>
+    ///     <para>
+    ///         1. <c>[assembly: WebResource("MixERP.Net.WebControls.ScrudFactory.ScrudItemSelector.js",
+    ///         "application/x-javascript", PerformSubstitution = true)]</c> (checklist task 98).
+    ///         <c>System.Web.UI.WebResourceAttribute</c> does not exist on net10.0 and the only way
+    ///         to keep the declaration would be to re-create a System.Web shim, which is forbidden.
+    ///         It is deleted, not shimmed: the script is still an <c>&lt;EmbeddedResource&gt;</c>
+    ///         under the SAME manifest name and is served by the host's
+    ///         <c>JSUtility.WebResourceRoutePrefix</c> route, which is the modern replacement for
+    ///         the WebResource.axd handler the attribute registered with.
+    ///         <c>PerformSubstitution = true</c> made the legacy pipeline rewrite
+    ///         <c>&lt;%= WebResource("...") %&gt;</c> tokens inside the script body;
+    ///         ScrudItemSelector.js contains NO such token (verified by grep for "&lt;%"), so the
+    ///         substitution pass had nothing to do and nothing needs resolving by hand.
+    ///     </para>
+    ///     <para>
+    ///         2. <c>[AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]</c>
+    ///         (checklist task 99). Code Access Security is removed on modern .NET; the attribute
+    ///         demanded a minimum HOST TRUST level and carried no application-level authorization
+    ///         meaning, so dropping it changes no access decision. The control's actual authorization
+    ///         remains where it always was: the consumer-supplied Catalog scoping.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    private void AddJavascript()
+    {
+        JSUtility.AddJSReference(this.JSRuntime, "MixERP.Net.WebControls.ScrudFactory.ScrudItemSelector.js",
+            "ScrudItemSelector", typeof(ScrudItemSelector));
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     Registers ScrudItemSelector.js once, then (re)wires it after EVERY render (checklist
+    ///     task 102).
+    ///     <para>
+    ///         CreateChildControls() called AddJavascript() while building the control tree;
+    ///         <c>OnAfterRenderAsync(firstRender: true)</c> is the equivalent guarantee that the
+    ///         elements the script touches already exist. The script's own body ran once per page
+    ///         load and installed <c>document.onkeydown</c> (Esc closes the selector); nothing
+    ///         re-ran it after a partial postback. A Blazor re-render replaces DOM, so
+    ///         <c>initScrudItemSelector()</c> - the idempotent entry point added to the script for
+    ///         this purpose, mirroring Scrud.js's <c>initScrud()</c> - is invoked after every pass.
+    ///     </para>
+    ///     <para>
+    ///         The <see cref="JSException" /> guard is required on the first render:
+    ///         <c>PageUtility.RegisterJavascript</c> is fire-and-forget (its signature is void and
+    ///         frozen), so the function may not be defined yet. Missing it once is harmless - the
+    ///         script installs its own handlers when it loads.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            this.AddJavascript();
+        }
+
+        try
+        {
+            await this.JSRuntime.InvokeVoidAsync("initScrudItemSelector").ConfigureAwait(false);
+        }
+        catch (JSException)
+        {
+            //Not loaded yet (first render) - the script wires itself when it arrives.
+        }
+        catch (InvalidOperationException)
+        {
+            //Prerendering: no interop channel yet. The next (interactive) render does the wiring.
+        }
+
+        await base.OnAfterRenderAsync(firstRender).ConfigureAwait(false);
+    }
+
+    //==================================================================================
+    // DELIBERATE DROPS from ScrudItemSelector/Control.cs (checklist tasks 100 and 101),
+    // recorded here and in migration-summary.md:
+    //
+    //  * [ToolboxData("<{0}:ScrudItemSelector runat=server></{0}:ScrudItemSelector>")] - a Visual
+    //    Studio DESIGNER hint for the WebForms toolbox. It has no runtime behaviour and no modern
+    //    equivalent (task 100).
+    //
+    //  * Dispose() / Dispose(bool) - they released the five WebForms child controls (Panel,
+    //    DropDownList, TextBox, Button, MixERPGridView) and unhooked their event handlers. None of
+    //    those objects exists any more: the markup above owns the DOM and Blazor owns the
+    //    component's lifetime, so there is nothing to release. An EMPTY Dispose() is NOT left
+    //    behind (task 101). CONSEQUENCE, recorded in migration-summary.md section E / task 108:
+    //    the type no longer implements IDisposable, which breaks
+    //    FrontEnd/.../General/ItemSelector.aspx.cs:33's "using (ScrudItemSelector selector = new
+    //    ScrudItemSelector())" - that call site becomes <ScrudItemSelector ... /> markup.
+    //
+    //  * RecreateChildControls() / Render(HtmlTextWriter) - the WebForms render pipeline itself.
+    //    Blazor's renderer calls this component's render tree; there is no writer to push to.
+    //
+    //  * "sealed" - the legacy type was sealed. The class a .razor file compiles to is not sealed;
+    //    no subclass exists (verified by grep over the 7 dependents), so nothing depended on it.
+    //==================================================================================
+}

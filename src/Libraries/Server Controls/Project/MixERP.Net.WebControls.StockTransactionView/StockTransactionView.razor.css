@@ -1,0 +1,38 @@
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+
+/*
+    The Actions column's former HeaderStyle.Width = 90 (a removed WebForms
+    Unit-typed style property). GridViewColumnHelper gives that header cell the
+    css class "actions-header" (GridViewColumnHelper.ActionColumnHeaderCssClass);
+    this is the matching 90px rule.
+
+    ::deep is required because the header cell is rendered by the child
+    MixERPGridView component, not by this component's own markup.
+
+    HOST OBLIGATION: scoped css reaches the browser through the RCL's css bundle,
+    so the host page must reference
+    <link href="MixERP.Net.FrontEnd.styles.css" rel="stylesheet" /> (the host's own
+    bundle, which includes every referenced RCL). Without it the column simply
+    loses its fixed width - no other behaviour changes.
+*/
+
+::deep .actions-header {
+    width: 90px;
+}

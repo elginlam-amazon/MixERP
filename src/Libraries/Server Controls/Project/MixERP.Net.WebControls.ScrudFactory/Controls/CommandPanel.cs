@@ -17,244 +17,293 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Rendering;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Primitives;
 using MixERP.Net.i18n.Resources;
 using System;
-using System.Web;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls
 {
-    internal sealed class CommandPanel : IDisposable
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// <summary>
+    ///     The scrud grid's command toolbar — select / show-compact / show-all / add / edit / delete /
+    ///     print.
+    ///     <para>
+    ///         This was never a WebForms <c>Control</c>: it was a plain class that assembled an
+    ///         <c>HtmlGenericControl("div")</c> tree of <c>HtmlButton</c>s (the visible affordances,
+    ///         which only run client script) plus two real <c>Button</c>s kept in
+    ///         <c>class="hidden"</c> whose postback carried the edit/delete command to the server.
+    ///         <c>HtmlGenericControl</c>, <c>HtmlButton</c> and <c>Button</c> are removed on net10.0,
+    ///         so <see cref="GetCommandPanel" /> now returns a <see cref="RenderFragment" /> — the
+    ///         same resolution the already-migrated <c>ScrudPager</c> used. Every button, its order,
+    ///         its css classes, its title (the keyboard-shortcut hint), its <c>onclick</c> script and
+    ///         — critically — the two load-bearing ids are unchanged.
+    ///     </para>
+    ///     <para>
+    ///         DOM CONTRACT. <c>Scrud.js</c> HARDCODES <c>#EditButtontop</c> and
+    ///         <c>#DeleteButtontop</c>, and each visible button clicks its hidden sibling by
+    ///         <c>#EditButton{suffix}</c> / <c>#DeleteButton{suffix}</c>. Renaming either id compiles
+    ///         green and silently kills editing and deleting.
+    ///     </para>
+    /// </summary>
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    internal sealed class CommandPanel
     {
-        private HtmlGenericControl commandPanel;
-        public event EventHandler DeleteButtonClick;
+        /// <summary>
+        ///     Former <c>event EventHandler DeleteButtonClick</c>. <c>ScrudForm</c> subscribed both
+        ///     panels to its <c>DeleteButton_Click</c>; an <see cref="EventCallback" /> is the Blazor
+        ///     equivalent and additionally re-renders the owning component afterwards.
+        /// </summary>
+        public EventCallback DeleteButtonClick { get; set; }
 
-        public event EventHandler EditButtonClick;
+        /// <summary>Former <c>event EventHandler EditButtonClick</c>.</summary>
+        public EventCallback EditButtonClick { get; set; }
 
         public string AddButtonIconCssClass { get; set; }
         public string AllButtonIconCssClass { get; set; }
         public string ButtonCssClass { get; set; }
         public string CompactButtonIconCssClass { get; set; }
         public string CssClass { get; set; }
-        public Button DeleteButton { get; private set; }
         public string DeleteButtonIconCssClass { get; set; }
-        public Button EditButton { get; private set; }
         public string EditButtonIconCssClass { get; set; }
         public string PrintButtonIconCssClass { get; set; }
         public string SelectButtonIconCssClass { get; set; }
 
-        public HtmlGenericControl GetCommandPanel(string controlSuffix)
-        {
-            this.commandPanel = new HtmlGenericControl("div");
-            this.commandPanel.Attributes.Add("role", "toolbar");
-            this.commandPanel.Attributes.Add("class", this.CssClass);
-            this.AddSelectButton(this.commandPanel);
-            this.AddShowCompactButton(this.commandPanel);
-            this.AddShowAllButton(this.commandPanel);
-            this.AddAddButton(this.commandPanel);
-            this.AddEditButtonHidden(this.commandPanel, controlSuffix);
-            this.AddEditButtonVisible(this.commandPanel, controlSuffix);
-            this.AddDeleteButtonHidden(this.commandPanel, controlSuffix);
-            this.AddDeleteButtonVisible(this.commandPanel, controlSuffix);
-            this.AddPrintButton(this.commandPanel);
-            return this.commandPanel;
-        }
+        /// <summary>
+        ///     Replaces the former <c>public Button DeleteButton { get; private set; }</c> /
+        ///     <c>EditButton</c> pair as far as any surviving reader is concerned: the only consumer
+        ///     of those two properties was <c>ScrudForm.AddScriptManager()</c>, which registered them
+        ///     as async-postback controls — and that whole mechanism is dropped (see the ScrudForm
+        ///     summary's deliberate-drop table). The buttons themselves are still rendered, with
+        ///     their ids.
+        /// </summary>
+        public string ControlSuffix { get; private set; }
 
-        private void AddAddButton(HtmlGenericControl p)
+        /// <summary>
+        ///     <c>ScrudForm.DenyAdd</c>/<c>DenyEdit</c>/<c>DenyDelete</c>. The original rendered all
+        ///     three affordances unconditionally and enforced the policy only inside the event
+        ///     handlers; the affordance is now suppressed as well (checklist tasks 112-114), while the
+        ///     HIDDEN buttons still render so the load-bearing ids never disappear from the DOM.
+        /// </summary>
+        public bool DenyAdd { get; set; }
+
+        public bool DenyEdit { get; set; }
+        public bool DenyDelete { get; set; }
+
+        /// <summary>
+        ///     Supplies the request's query string in place of
+        ///     <c>HttpContext.Current.CurrentHandler</c>. <c>ScrudForm</c> assigns its own injected
+        ///     <c>NavigationManager</c>; this type is not a component, so it cannot inject one.
+        /// </summary>
+        public NavigationManager Navigation { get; set; }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>GetCommandPanel(string controlSuffix)</c>: the toolbar <c>div</c> and its
+        ///     nine buttons, in the original order — select, show-compact, show-all, add, hidden
+        ///     edit, visible edit, hidden delete, visible delete, print.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        public RenderFragment GetCommandPanel(string controlSuffix)
         {
-            using (HtmlButton addButton = this.GetInputButton("CTRL + SHIFT + A", "return(scrudAddNew());", Titles.AddNew, this.ButtonCssClass, this.AddButtonIconCssClass))
+            this.ControlSuffix = controlSuffix;
+
+            return builder =>
             {
-                p.Controls.Add(addButton);
-            }
+                int sequence = 0;
+
+                builder.OpenElement(sequence++, "div");
+                builder.AddAttribute(sequence++, "role", "toolbar");
+                builder.AddAttribute(sequence++, "class", this.CssClass);
+
+                this.AddSelectButton(builder, ref sequence);
+                this.AddShowCompactButton(builder, ref sequence);
+                this.AddShowAllButton(builder, ref sequence);
+                this.AddAddButton(builder, ref sequence);
+                this.AddEditButtonHidden(builder, ref sequence, controlSuffix);
+                this.AddEditButtonVisible(builder, ref sequence, controlSuffix);
+                this.AddDeleteButtonHidden(builder, ref sequence, controlSuffix);
+                this.AddDeleteButtonVisible(builder, ref sequence, controlSuffix);
+                this.AddPrintButton(builder, ref sequence);
+
+                builder.CloseElement();
+            };
         }
 
-        private void AddDeleteButtonHidden(HtmlGenericControl p, string controlSuffix)
+        /// <summary>Port of <c>AddAddButton</c> — <c>Titles.AddNew</c>, <c>scrudAddNew()</c>.</summary>
+        private void AddAddButton(RenderTreeBuilder builder, ref int sequence)
         {
-            this.DeleteButton = this.GetButton("CTRL + SHIFT + D", "return(scrudConfirmAction());", Titles.DeleteSelected);
-            this.DeleteButton.ID = "DeleteButton" + controlSuffix;
-            this.DeleteButton.CssClass = "hidden";
-            this.DeleteButton.CausesValidation = false;
-            this.DeleteButton.Click += this.OnDeleteButtonClick;
-            p.Controls.Add(this.DeleteButton);
-        }
-
-        private void AddDeleteButtonVisible(HtmlGenericControl p, string controlSuffix)
-        {
-            using (HtmlButton deleteButton = this.GetInputButton("CTRL + SHIFT + D", "$('#DeleteButton" + controlSuffix + "').click();return false;", Titles.DeleteSelected, this.ButtonCssClass, this.DeleteButtonIconCssClass))
-            {
-                p.Controls.Add(deleteButton);
-            }
-        }
-
-        private void AddEditButtonHidden(HtmlGenericControl p, string controlSuffix)
-        {
-            this.EditButton = this.GetButton("CTRL + SHIFT + E", "return(scrudConfirmAction());", Titles.EditSelected);
-            this.EditButton.Attributes.Add("role", "edit");
-            this.EditButton.ID = "EditButton" + controlSuffix;
-            this.EditButton.CssClass = "hidden";
-            this.EditButton.Click += this.OnEditButtonClick;
-            p.Controls.Add(this.EditButton);
-        }
-
-        private void AddEditButtonVisible(HtmlGenericControl p, string controlSuffix)
-        {
-            using (HtmlButton editButton = this.GetInputButton("CTRL + SHIFT + E", "$('#EditButton" + controlSuffix + "').click();return false;", Titles.EditSelected, this.ButtonCssClass, this.EditButtonIconCssClass))
-            {
-                p.Controls.Add(editButton);
-            }
-        }
-
-        private void AddPrintButton(HtmlGenericControl p)
-        {
-            using (HtmlButton printButton = this.GetInputButton("CTRL + SHIFT + P", "scrudPrintGridView();", Titles.Print, this.ButtonCssClass, this.PrintButtonIconCssClass))
-            {
-                p.Controls.Add(printButton);
-            }
-        }
-
-        private void AddSelectButton(HtmlGenericControl p)
-        {
-            if (IsModal())
-            {
-                using (HtmlButton addSelectButton = this.GetInputButton("RETURN", "scrudSelectAndClose();", Titles.Select, this.ButtonCssClass, this.SelectButtonIconCssClass))
-                {
-                    p.Controls.Add(addSelectButton);
-                }
-            }
-        }
-
-        private void AddShowAllButton(HtmlGenericControl p)
-        {
-            using (HtmlButton showAllButton = this.GetInputButton("CTRL + SHIFT + S", "scrudShowAll();", Titles.ShowAll, this.ButtonCssClass, this.AllButtonIconCssClass))
-            {
-                p.Controls.Add(showAllButton);
-            }
-        }
-
-        private void AddShowCompactButton(HtmlGenericControl p)
-        {
-            using (HtmlButton showCompactButton = this.GetInputButton("CTRL + SHIFT + C", "scrudShowCompact();", Titles.ShowCompact, this.ButtonCssClass, this.CompactButtonIconCssClass))
-            {
-                p.Controls.Add(showCompactButton);
-            }
-        }
-
-        private Button GetButton(string toolTip, string onClientClick, string text)
-        {
-            using (Button button = new Button())
-            {
-                button.CssClass = this.ButtonCssClass;
-                button.ToolTip = toolTip;
-                button.OnClientClick = onClientClick;
-                button.Text = text;
-                return button;
-            }
-        }
-
-        private HtmlButton GetInputButton(string title, string onclick, string value, string cssClass, string iconCssClass)
-        {
-            using (HtmlButton inputButton = new HtmlButton())
-            {
-                inputButton.Attributes.Add("class", cssClass);
-                inputButton.Attributes.Add("type", "button");
-                inputButton.Attributes.Add("title", title);
-                inputButton.Attributes.Add("onclick", onclick);
-
-                if (!string.IsNullOrWhiteSpace(iconCssClass))
-                {
-                    inputButton.InnerHtml = @"<i class='" + iconCssClass + "'></i> " + value;
-                }
-                else
-                {
-                    inputButton.InnerHtml = value;
-                }
-
-                return inputButton;
-            }
-        }
-
-        private static bool IsModal()
-        {
-            Page page = HttpContext.Current.CurrentHandler as Page;
-
-            if (page != null)
-            {
-                string modal = page.Request.QueryString["modal"];
-                if (modal != null)
-                {
-                    if (modal.Equals("1"))
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        private void OnDeleteButtonClick(object sender, EventArgs e)
-        {
-            if (this.DeleteButtonClick != null)
-            {
-                this.DeleteButtonClick(this, e);
-            }
-        }
-
-        private void OnEditButtonClick(object sender, EventArgs e)
-        {
-            if (this.EditButtonClick != null)
-            {
-                this.EditButtonClick(this, e);
-            }
-        }
-
-        #region IDisposable
-
-        private bool disposed;
-
-        public void Dispose()
-        {
-            if (!this.disposed)
-            {
-                this.Dispose(true);
-            }
-        }
-
-        private void Dispose(bool disposing)
-        {
-            if (!disposing)
+            if (this.DenyAdd)
             {
                 return;
             }
 
-            if (this.commandPanel != null)
-            {
-                this.commandPanel.Dispose();
-                this.commandPanel = null;
-            }
-
-            if (this.EditButton != null)
-            {
-                this.EditButton.Click -= this.OnEditButtonClick;
-                this.EditButtonClick = null;
-                this.EditButton.Dispose();
-                this.EditButton = null;
-            }
-
-            if (this.DeleteButton != null)
-            {
-                this.DeleteButton.Click -= this.OnDeleteButtonClick;
-                this.DeleteButtonClick = null;
-                this.DeleteButton.Dispose();
-                this.DeleteButton = null;
-            }
-
-
-            this.disposed = true;
+            this.GetInputButton(builder, ref sequence, "CTRL + SHIFT + A", "return(scrudAddNew());", Titles.AddNew, this.ButtonCssClass, this.AddButtonIconCssClass);
         }
 
-        #endregion
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>AddDeleteButtonHidden</c>: the real command button, kept
+        ///     <c>class="hidden"</c>, that the visible button and <c>Scrud.js</c> both click by id.
+        ///     Its former <c>Click</c> postback is now the <see cref="DeleteButtonClick" /> callback.
+        ///     <para>
+        ///         DIVERGENCE (recorded): the original put the confirmation
+        ///         (<c>return(scrudConfirmAction());</c>) on the HIDDEN button's <c>OnClientClick</c>,
+        ///         where returning false cancelled the postback. A Blazor <c>@onclick</c> listener is
+        ///         not cancellable by an inline handler, so the confirmation moved onto the VISIBLE
+        ///         button, which now only clicks its hidden sibling once the user confirms. The
+        ///         user-visible behaviour (confirm, then delete) is identical, and
+        ///         <c>Scrud.js</c>'s own <c>#DeleteButtontop</c> click still deletes — as it did
+        ///         before, since it ran its own confirm first.
+        ///     </para>
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private void AddDeleteButtonHidden(RenderTreeBuilder builder, ref int sequence, string controlSuffix)
+        {
+            builder.OpenElement(sequence++, "button");
+            builder.AddAttribute(sequence++, "type", "button");
+            builder.AddAttribute(sequence++, "id", "DeleteButton" + controlSuffix);
+            builder.AddAttribute(sequence++, "class", "hidden");
+            builder.AddAttribute(sequence++, "title", "CTRL + SHIFT + D");
+            builder.AddAttribute(sequence++, "onclick", this.DeleteButtonClick);
+            builder.AddContent(sequence++, Titles.DeleteSelected);
+            builder.CloseElement();
+        }
+
+        /// <summary>Port of <c>AddDeleteButtonVisible</c> — clicks the hidden button by id.</summary>
+        private void AddDeleteButtonVisible(RenderTreeBuilder builder, ref int sequence, string controlSuffix)
+        {
+            if (this.DenyDelete)
+            {
+                return;
+            }
+
+            string onclick = "if(scrudConfirmAction()){$('#DeleteButton" + controlSuffix + "').click();}return false;";
+
+            this.GetInputButton(builder, ref sequence, "CTRL + SHIFT + D", onclick, Titles.DeleteSelected, this.ButtonCssClass, this.DeleteButtonIconCssClass);
+        }
+
+        /// <summary>
+        ///     Port of <c>AddEditButtonHidden</c>, including its <c>role="edit"</c> attribute
+        ///     (<c>Scrud.js</c> selects on it).
+        /// </summary>
+        private void AddEditButtonHidden(RenderTreeBuilder builder, ref int sequence, string controlSuffix)
+        {
+            builder.OpenElement(sequence++, "button");
+            builder.AddAttribute(sequence++, "type", "button");
+            builder.AddAttribute(sequence++, "role", "edit");
+            builder.AddAttribute(sequence++, "id", "EditButton" + controlSuffix);
+            builder.AddAttribute(sequence++, "class", "hidden");
+            builder.AddAttribute(sequence++, "title", "CTRL + SHIFT + E");
+            builder.AddAttribute(sequence++, "onclick", this.EditButtonClick);
+            builder.AddContent(sequence++, Titles.EditSelected);
+            builder.CloseElement();
+        }
+
+        /// <summary>Port of <c>AddEditButtonVisible</c> — clicks the hidden button by id.</summary>
+        private void AddEditButtonVisible(RenderTreeBuilder builder, ref int sequence, string controlSuffix)
+        {
+            if (this.DenyEdit)
+            {
+                return;
+            }
+
+            string onclick = "if(scrudConfirmAction()){$('#EditButton" + controlSuffix + "').click();}return false;";
+
+            this.GetInputButton(builder, ref sequence, "CTRL + SHIFT + E", onclick, Titles.EditSelected, this.ButtonCssClass, this.EditButtonIconCssClass);
+        }
+
+        /// <summary>Port of <c>AddPrintButton</c> — <c>Titles.Print</c>, <c>scrudPrintGridView()</c>.</summary>
+        private void AddPrintButton(RenderTreeBuilder builder, ref int sequence)
+        {
+            this.GetInputButton(builder, ref sequence, "CTRL + SHIFT + P", "scrudPrintGridView();", Titles.Print, this.ButtonCssClass, this.PrintButtonIconCssClass);
+        }
+
+        /// <summary>Port of <c>AddSelectButton</c> — modal-only, <c>Titles.Select</c>.</summary>
+        private void AddSelectButton(RenderTreeBuilder builder, ref int sequence)
+        {
+            if (this.IsModal())
+            {
+                this.GetInputButton(builder, ref sequence, "RETURN", "scrudSelectAndClose();", Titles.Select, this.ButtonCssClass, this.SelectButtonIconCssClass);
+            }
+        }
+
+        /// <summary>Port of <c>AddShowAllButton</c> — <c>Titles.ShowAll</c>, <c>scrudShowAll()</c>.</summary>
+        private void AddShowAllButton(RenderTreeBuilder builder, ref int sequence)
+        {
+            this.GetInputButton(builder, ref sequence, "CTRL + SHIFT + S", "scrudShowAll();", Titles.ShowAll, this.ButtonCssClass, this.AllButtonIconCssClass);
+        }
+
+        /// <summary>Port of <c>AddShowCompactButton</c> — <c>Titles.ShowCompact</c>.</summary>
+        private void AddShowCompactButton(RenderTreeBuilder builder, ref int sequence)
+        {
+            this.GetInputButton(builder, ref sequence, "CTRL + SHIFT + C", "scrudShowCompact();", Titles.ShowCompact, this.ButtonCssClass, this.CompactButtonIconCssClass);
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>GetInputButton(title, onclick, value, cssClass, iconCssClass)</c>: an
+        ///     <c>HtmlButton</c> whose <c>InnerHtml</c> was an optional <c>&lt;i&gt;</c> icon followed
+        ///     by the label. The icon markup is emitted as its own element rather than through a
+        ///     markup string, which renders the identical DOM.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private void GetInputButton(RenderTreeBuilder builder, ref int sequence, string title, string onclick, string value, string cssClass, string iconCssClass)
+        {
+            builder.OpenElement(sequence++, "button");
+            builder.AddAttribute(sequence++, "class", cssClass);
+            builder.AddAttribute(sequence++, "type", "button");
+            builder.AddAttribute(sequence++, "title", title);
+            builder.AddAttribute(sequence++, "onclick", onclick);
+
+            if (!string.IsNullOrWhiteSpace(iconCssClass))
+            {
+                builder.OpenElement(sequence++, "i");
+                builder.AddAttribute(sequence++, "class", iconCssClass);
+                builder.CloseElement();
+
+                builder.AddContent(sequence++, " " + value);
+            }
+            else
+            {
+                builder.AddContent(sequence++, value);
+            }
+
+            builder.CloseElement();
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        /// <summary>
+        ///     Port of <c>IsModal()</c>. <c>HttpContext.Current.CurrentHandler as Page</c> +
+        ///     <c>page.Request.QueryString["modal"]</c> becomes a query-string read off the
+        ///     <see cref="Navigation" /> the owning component injects. The truthiness semantics are
+        ///     unchanged: ONLY the literal "1" is modal.
+        /// </summary>
+        ////////////////////////////////////////////////////////////////////////////////////////////////////
+        private bool IsModal()
+        {
+            if (this.Navigation == null)
+            {
+                return false;
+            }
+
+            string query = new Uri(this.Navigation.Uri).Query;
+
+            if (string.IsNullOrEmpty(query))
+            {
+                return false;
+            }
+
+            StringValues modal;
+
+            if (QueryHelpers.ParseQuery(query).TryGetValue("modal", out modal))
+            {
+                return modal.ToString().Equals("1");
+            }
+
+            return false;
+        }
     }
 }

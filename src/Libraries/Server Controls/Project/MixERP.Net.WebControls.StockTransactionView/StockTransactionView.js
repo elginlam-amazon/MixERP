@@ -20,6 +20,32 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 /*jshint -W098*/
 /*global createFlaggedRows, getSelectedCheckBoxItemIds, Resources, popUnder, shortcut, toogleSelection*/
 
+/*
+    BLAZOR RE-WIRING NOTE (see migration-summary.md section 3.6a).
+
+    Under WebForms every request was a full page load: this script ran with the whole grid
+    already in the DOM, and the top-level $('#ProductViewGridView tr').click(...) binding
+    plus the $(document).ready(updateFlagColor) call therefore always found the data rows.
+
+    Under Blazor none of that holds. JSUtility.AddJSReference injects the script element
+    once per circuit (keyed), it can be appended BEFORE the component markup reaches the
+    browser, and - critically - the grid's <tr> set is REPLACED by Blazor on every
+    re-render (the Show button, a flag update, any LoadGridView()). A binding made once at
+    load time attaches to rows that either do not exist yet or are later thrown away, so
+    row-click selection and the flag row colouring render but do nothing.
+
+    The row-dependent wiring therefore lives in window.initStockTransactionView(), which
+    StockTransactionView.razor calls from OnAfterRenderAsync on EVERY render, not just the
+    first. Element lookups are re-done on each call (never cached across calls) and the
+    binding uses .off().on() with a namespaced event, so repeat calls REBIND rather than
+    stack duplicate handlers - the function is idempotent. The handlers' behaviour is
+    unchanged from the original.
+
+    The static-markup wiring (#PrintButton, the ALT+O / CTRL+ENTER shortcuts) stays at
+    load time: those elements are present from the component's first render and are never
+    replaced.
+*/
+
 var printButton = $("#PrintButton");
 
 printButton.click(function () {
@@ -35,14 +61,37 @@ printButton.click(function () {
     printGridView(templatePath, headerPath, title, targetControlId, date, user, office, windowName, offsetFirst, offsetLast);
 });
 
-$(document).ready(function () {
-    updateFlagColor();
-});
-
 var updateFlagColor = function () {
     //Get an instance of the form grid.
     var grid = $("#ProductViewGridView");
     createFlaggedRows(grid);
+};
+
+//Idempotent re-wiring of everything that depends on the grid's data rows. Called by
+//StockTransactionView.razor from OnAfterRenderAsync after every render, and once at load
+//time below (so the control behaves exactly as it did under WebForms when the markup is
+//already present when the script arrives).
+window.initStockTransactionView = function () {
+    var grid = $("#ProductViewGridView");
+
+    //The component is not in the DOM yet (the script was injected before the markup
+    //reached the browser). The next render's call will wire it up.
+    if (!grid.length) {
+        return;
+    }
+
+    //Port of the original top-level $('#ProductViewGridView tr').click(...) binding.
+    //Namespaced .off().on() so a repeat call rebinds the new rows instead of stacking
+    //handlers on them.
+    grid.find("tr").off("click.stocktransactionview").on("click.stocktransactionview", function () {
+        var checkBox = $(this).find('td input:checkbox');
+        toogleSelection(checkBox);
+    });
+
+    //Port of the original $(document).ready(updateFlagColor). This reads the trailing
+    //FlagBackgroundColor / FlagForegroundColor columns off the rendered rows, so it has to
+    //re-run whenever the rows change or the flag colours never appear.
+    updateFlagColor();
 };
 
 var getSelectedItems = function () {
@@ -66,12 +115,22 @@ var getSelectedItems = function () {
     }
 };
 
-$('#ProductViewGridView tr').click(function () {
-    var checkBox = $(this).find('td input:checkbox');
-    toogleSelection(checkBox);
-});
+//Blazor interop reader. getSelectedItems() publishes the selection with
+//$("#SelectedValuesHidden").val(...), and jQuery's .val() raises NO input/change event,
+//so a Blazor @bind on that element would never fire and the server would never see the
+//selection. The server therefore reads the element's value directly through this function
+//after invoking getSelectedItems(). Keep the element id in sync with the markup.
+var readSelectedValuesHidden = function () {
+    return $("#SelectedValuesHidden").val();
+};
 
 $(document).ready(function () {
+    //Self-initialisation, matching the original's $(document).ready(updateFlagColor) and
+    //top-level row binding. Repeat renders are wired by StockTransactionView.razor calling
+    //initStockTransactionView(); the namespaced .off().on() above makes both paths safe
+    //together.
+    window.initStockTransactionView();
+
     shortcut.add("ALT+O", function () {
         $('#OfficeTextBox').foucs();
     });
