@@ -1,3 +1,4 @@
+using Markdig;
 using MixERP.Net.Common;
 using System;
 using System.Collections.Generic;
@@ -40,13 +41,24 @@ namespace MixERP.Net.Updater.Api
             return release;
         }
 
+        /// <remarks>
+        ///     MarkdownDeep.NET only ever shipped .NET Framework 3.5 assemblies, so it cannot be
+        ///     restored for net10.0. Markdig is the maintained replacement. MarkdownDeep's
+        ///     <c>ExtraMode</c> (Markdown Extra: tables, fenced code, definition lists, footnotes)
+        ///     maps onto Markdig's advanced extensions, and <c>SafeMode = false</c> — raw HTML passed
+        ///     through untouched — is Markdig's default behavior.
+        /// </remarks>
         private static string ParseMarkdown(string markdown)
         {
-            var md = new MarkdownDeep.Markdown();
-            md.ExtraMode = true;
-            md.SafeMode = false;
+            if (string.IsNullOrEmpty(markdown))
+            {
+                return markdown;
+            }
 
-            return md.Transform(markdown);
+            return Markdig.Markdown.ToHtml(markdown, MarkdownPipeline);
         }
+
+        private static readonly Markdig.MarkdownPipeline MarkdownPipeline =
+            new Markdig.MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
     }
 }

@@ -18,13 +18,18 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
-using System.Runtime.Serialization;
-using System.Security.Permissions;
 using System.Web;
 using Serilog;
 
 namespace MixERP.Net.Framework
 {
+    /// <remarks>
+    ///     The formatter based serialization members (the
+    ///     <c>(SerializationInfo, StreamingContext)</c> constructor and the <c>GetObjectData</c>
+    ///     override, which also carried a Code Access Security demand) were removed: BinaryFormatter
+    ///     no longer exists on modern .NET, so that scaffolding is obsolete and inert
+    ///     (SYSLIB0051, SYSLIB0003, CS0672). See knowledge base doc 28.
+    /// </remarks>
     [Serializable]
     public class MixERPException : Exception
     {
@@ -50,22 +55,19 @@ namespace MixERP.Net.Framework
             this.dbConstraintName = dbConstraintName;
         }
 
-        public MixERPException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
-
         public string DBConstraintName
         {
             get { return this.dbConstraintName; }
         }
 
-        [SecurityPermission(SecurityAction.Demand, SerializationFormatter = true)]
-        public override void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            base.GetObjectData(info, context);
-        }
-
+        /// <remarks>
+        ///     The Web Forms implementation called <c>Server.TransferRequest</c>, which is not
+        ///     supported on ASP.NET Core (SYSWEB0001): there is no way to re execute the pipeline
+        ///     against another path in place. A client redirect reaches the same error page, and the
+        ///     exception object still travels through the session, so the page renders the same
+        ///     details. The visible difference is that the browser url now changes and the original
+        ///     form post is not preserved.
+        /// </remarks>
         public static void Handle(MixERPException ex)
         {
             if (ex == null)
@@ -73,12 +75,19 @@ namespace MixERP.Net.Framework
                 return;
             }
 
-            if (HttpContext.Current.Session != null)
+            HttpContext context = HttpContext.Current;
+
+            if (context == null)
             {
-                HttpContext.Current.Session["ex"] = ex;
+                return;
+            }
+
+            if (context.Session != null)
+            {
+                context.Session["ex"] = ex;
                 Log.Information("Exception object was added to session.");
 
-                HttpContext.Current.Server.TransferRequest("~/Site/RuntimeError.aspx", true);
+                context.Response.Redirect("~/Site/RuntimeError.aspx", false);
             }
         }
 

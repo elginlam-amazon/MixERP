@@ -19,22 +19,25 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.i18n;
 using Serilog;
+using SkiaSharp;
 using System;
-using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Web;
-using System.Web.UI;
-using System.Web.UI.WebControls;
-using Image = System.Drawing.Image;
+using System.Web.Hosting;
 
 namespace MixERP.Net.Common
 {
-    public static class Conversion
+    public static partial class Conversion
     {
-        public static byte[] ConvertImageToByteArray(Image imageToConvert, ImageFormat formatOfImage)
+        // System.Drawing is Windows-only on modern .NET, so the image primitives below are backed by
+        // SkiaSharp. "Quality" is the Skia encoder quality (0 - 100); 100 keeps the lossless behavior
+        // the System.Drawing encoders used by default. See knowledge base doc 21.
+        private const int EncoderQuality = 100;
+
+        [CLSCompliant(false)]
+        public static byte[] ConvertImageToByteArray(SKBitmap imageToConvert, SKEncodedImageFormat formatOfImage)
         {
             if (imageToConvert == null)
             {
@@ -43,7 +46,7 @@ namespace MixERP.Net.Common
 
             using (MemoryStream ms = new MemoryStream())
             {
-                imageToConvert.Save(ms, formatOfImage);
+                imageToConvert.Encode(ms, formatOfImage, EncoderQuality);
                 return ms.ToArray();
             }
         }
@@ -74,10 +77,11 @@ namespace MixERP.Net.Common
                 return null;
             }
 
-            using (SHA512CryptoServiceProvider provider = new SHA512CryptoServiceProvider())
-            {
-                return BitConverter.ToString(provider.ComputeHash(Encoding.UTF8.GetBytes(password + salt))).Replace("-", "").ToLower(CultureInfo.InvariantCulture);
-            }
+            //The derived SHA512CryptoServiceProvider type is obsolete (SYSLIB0021). The one shot
+            //static SHA512.HashData produces the very same digest, so stored password hashes
+            //remain valid.
+            byte[] hash = SHA512.HashData(Encoding.UTF8.GetBytes(password + salt));
+            return BitConverter.ToString(hash).Replace("-", "").ToLower(CultureInfo.InvariantCulture);
         }
 
         public static bool IsEmptyDate(DateTime date)
@@ -102,7 +106,9 @@ namespace MixERP.Net.Common
             {
                 return null;
             }
-            string physicalApplicationPath = HttpContext.Current.Request.PhysicalApplicationPath;
+            // HttpRequest.PhysicalApplicationPath is an IIS concept and is not part of the
+            // System.Web adapters. HostingEnvironment.ApplicationPhysicalPath is the equivalent.
+            string physicalApplicationPath = HostingEnvironment.ApplicationPhysicalPath;
 
             if (string.IsNullOrWhiteSpace(physicalApplicationPath))
             {
@@ -114,14 +120,7 @@ namespace MixERP.Net.Common
 
         public static string ResolveUrl(string url)
         {
-            Page page = HttpContext.Current.Handler as Page;
-
-            if (page == null)
-            {
-                return url;
-            }
-
-            return (page).ResolveUrl(url);
+            return PageUtility.ResolveUrl(url);
         }
 
         public static bool TryCastBoolean(object value)
@@ -152,7 +151,8 @@ namespace MixERP.Net.Common
             return retVal;
         }
 
-        public static byte[] TryCastByteArray(Image image)
+        [CLSCompliant(false)]
+        public static byte[] TryCastByteArray(SKBitmap image)
         {
             if (image == null)
             {
@@ -161,7 +161,7 @@ namespace MixERP.Net.Common
 
             using (var ms = new MemoryStream())
             {
-                image.Save(ms, ImageFormat.Jpeg);
+                image.Encode(ms, SKEncodedImageFormat.Jpeg, EncoderQuality);
                 return ms.ToArray();
             }
         }
@@ -386,22 +386,6 @@ namespace MixERP.Net.Common
             }
 
             return string.Empty;
-        }
-
-        public static Unit TryCastUnit(object value)
-        {
-            if (value == null)
-            {
-                return new Unit();
-            }
-
-            if (value is Unit)
-            {
-                return (Unit) value;
-            }
-
-
-            return Unit.Parse(value.ToString(), CultureInfo.DefaultThreadCurrentCulture);
         }
 
         public static DateTime? TryCastNullableDate(object value)

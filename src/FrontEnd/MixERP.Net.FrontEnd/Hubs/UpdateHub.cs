@@ -20,7 +20,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNet.SignalR;
+using Microsoft.AspNetCore.SignalR;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Extensions;
@@ -34,14 +34,19 @@ using Serilog;
 
 namespace MixERP.Net.FrontEnd.Hubs
 {
+    /// <remarks>
+    ///     Migrated from ASP.NET SignalR 2. ASP.NET Core SignalR dropped the dynamic client proxy,
+    ///     so client methods are invoked by name with <c>SendAsync</c>, and hub methods are
+    ///     asynchronous. See knowledge base doc 32.
+    /// </remarks>
     [CLSCompliant(false)]
     public class UpdateHub : Hub
     {
-        public void InstallUpdates()
+        public async Task InstallUpdates()
         {
-            if (!this.IsValidRequest())
+            if (!await this.IsValidRequest())
             {
-                this.Notify("Cannot Update", Warnings.AccessIsDenied);
+                await this.Notify("Cannot Update", Warnings.AccessIsDenied);
                 return;
             }
 
@@ -62,7 +67,7 @@ namespace MixERP.Net.FrontEnd.Hubs
             }
             catch
             {
-                this.Notify("Cannot Update", "Cannot start the update because no release was found.");
+                await this.Notify("Cannot Update", "Cannot start the update because no release was found.");
                 return;
             }
 
@@ -78,28 +83,29 @@ namespace MixERP.Net.FrontEnd.Hubs
 
             if (string.IsNullOrWhiteSpace(downloadUrl))
             {
-                this.Notify("Cannot Update", "Cannot start the update because no download was found on the release.");
+                await this.Notify("Cannot Update",
+                    "Cannot start the update because no download was found on the release.");
                 return;
             }
 
-            this.InstallUpdate(downloadUrl, toBackup);
+            await this.InstallUpdate(downloadUrl, toBackup);
         }
 
-        private bool IsValidRequest()
+        private async Task<bool> IsValidRequest()
         {
-            System.Threading.Thread.Sleep(2000);
+            await Task.Delay(2000);
 
             if (this.Context == null)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                await this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied);
                 return false;
             }
 
-            long globalLoginId = Conversion.TryCastLong(this.Context.User.Identity.Name);
+            long globalLoginId = Conversion.TryCastLong(this.Context.User?.Identity?.Name);
 
             if (globalLoginId <= 0)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                await this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied);
                 return false;
             }
 
@@ -116,13 +122,13 @@ namespace MixERP.Net.FrontEnd.Hubs
             return true;
         }
 
-        private void InstallUpdate(string downloadUrl, string[] toBackup)
+        private async Task InstallUpdate(string downloadUrl, string[] toBackup)
         {
             UpdateInstaller installer = new UpdateInstaller(downloadUrl, toBackup);
-            installer.Progress += installer_Progress;
+            installer.Progress += this.installer_Progress;
 
 
-            this.Notify("Update Started", "The update process has started.");
+            await this.Notify("Update Started", "The update process has started.");
             try
             {
                 installer.Update();
@@ -130,19 +136,25 @@ namespace MixERP.Net.FrontEnd.Hubs
             catch (Exception ex)
             {
                 Log.Error("Exception occurred. {Exception}.", ex);
-                this.Notify(Titles.UnknownError, ex.Message);
+                await this.Notify(Titles.UnknownError, ex.Message);
             }
         }
 
-        private void Notify(string description, string message)
+        private Task Notify(string description, string message)
         {
-            this.Clients.All.updateInstallationNotification(DateTime.UtcNow, description, message);
+            return this.Clients.All.SendAsync("updateInstallationNotification", DateTime.UtcNow, description, message);
         }
 
+        /// <remarks>
+        ///     <see cref="UpdateInstaller.UpdateProgressHandler" /> is a void returning delegate, so this
+        ///     handler cannot become asynchronous. Blocking here is safe: ASP.NET Core has no
+        ///     synchronization context, so there is no deadlock risk the way there was under
+        ///     System.Web.
+        /// </remarks>
         private void installer_Progress(ProgressInfo progressInfo)
         {
-            this.Clients.All.updateInstallationNotification(progressInfo.Timestamp, progressInfo.Description,
-                progressInfo.Message);
+            this.Clients.All.SendAsync("updateInstallationNotification", progressInfo.Timestamp,
+                progressInfo.Description, progressInfo.Message).GetAwaiter().GetResult();
         }
     }
 }

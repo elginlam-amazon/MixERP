@@ -18,7 +18,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System.IO;
-using Microsoft.VisualBasic.FileIO;
 
 namespace MixERP.Net.Common.Helpers
 {
@@ -43,7 +42,17 @@ namespace MixERP.Net.Common.Helpers
 
         public static void CopyDirectory(string source, string destination)
         {
-            FileSystem.CopyDirectory(source, destination, true);
+            Directory.CreateDirectory(destination);
+
+            foreach (string file in Directory.GetFiles(source))
+            {
+                File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), true);
+            }
+
+            foreach (string subDirectory in Directory.GetDirectories(source))
+            {
+                CopyDirectory(subDirectory, Path.Combine(destination, Path.GetFileName(subDirectory)));
+            }
         }
     }
 }

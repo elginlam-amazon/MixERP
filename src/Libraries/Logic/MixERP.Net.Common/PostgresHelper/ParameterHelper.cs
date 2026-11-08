@@ -18,6 +18,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using Npgsql;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
@@ -26,6 +27,7 @@ namespace MixERP.Net.Common.PostgresHelper
 {
     public static class ParameterHelper
     {
+        [CLSCompliant(false)]
         public static IEnumerable<NpgsqlParameter> AddBigintArrayParameter(Collection<long> items, string parameterPrefix)
         {
             Collection<NpgsqlParameter> collection = new Collection<NpgsqlParameter>();
