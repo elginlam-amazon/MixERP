@@ -118,7 +118,9 @@ namespace MixERP.Net.Core.Modules.Finance.Data
 
                 if (e.Notice != null && e.Notice.Severity.ToUpperInvariant().Equals("INFO"))
                 {
-                    MixERPPGEventArgs args = new MixERPPGEventArgs(e.Notice.Message, e.Notice.Detail, 0);
+                    // PostgresNotice, which replaced NpgsqlError, exposes the notice text as
+                    // MessageText.
+                    MixERPPGEventArgs args = new MixERPPGEventArgs(e.Notice.MessageText, e.Notice.Detail, 0);
 
                     notificationReceived(this, args);
                 }

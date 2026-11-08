@@ -1,6 +1,6 @@
-﻿using System.Configuration;
 using System.Web.Hosting;
 using MixERP.Net.Common.Helpers;
+using MixERP.Net.Framework;
 
 namespace MixERP.Net.Updater
 {
@@ -41,7 +41,7 @@ namespace MixERP.Net.Updater
 
         public static bool IsDevelopmentMode()
         {
-            return ConfigurationManager.AppSettings["IsIDE"].ToUpperInvariant().StartsWith("T");
+            return AppSettings.Get("IsIDE", string.Empty).ToUpperInvariant().StartsWith("T");
         }
 
         private static string GetConfigValue(string key)

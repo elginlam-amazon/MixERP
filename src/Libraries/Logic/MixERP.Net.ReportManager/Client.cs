@@ -1,7 +1,6 @@
 ﻿using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
@@ -50,11 +49,16 @@ namespace MixERP.Net.ReportManager
             return null;
         }
 
+        /// <remarks>
+        ///     WebClient is obsolete (SYSLIB0014). HttpClient has no synchronous string download, so
+        ///     the asynchronous call is awaited inline; this member is called from synchronous code
+        ///     and ASP.NET Core has no synchronization context to deadlock against.
+        /// </remarks>
         internal string GetContent()
         {
-            using (WebClient client = new WebClient())
+            using (HttpClient client = new HttpClient())
             {
-                string content = client.DownloadString(this.Url);
+                string content = client.GetStringAsync(this.Url).GetAwaiter().GetResult();
                 Console.WriteLine("{0}", content);
                 return content;
             }
