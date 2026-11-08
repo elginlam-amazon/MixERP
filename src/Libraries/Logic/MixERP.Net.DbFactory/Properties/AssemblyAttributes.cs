@@ -1,6 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-
-<!--
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,14 +15,14 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
--->
-<configuration>
-  <runtime>
-    <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
-      <dependentAssembly>
-        <assemblyIdentity name="Serilog" publicKeyToken="24c2f752a8e58a10" culture="neutral" />
-        <bindingRedirect oldVersion="0.0.0.0-1.4.0.0" newVersion="1.4.0.0" />
-      </dependentAssembly>
-    </assemblyBinding>
-  </runtime>
-</configuration>
+***********************************************************************************/
+
+using System;
+using System.Runtime.InteropServices;
+
+// These two assembly-level attributes have no equivalent MSBuild property, so they are
+// retained here after Properties/AssemblyInfo.cs was removed during the SDK-style
+// conversion. CLSCompliant(true) in particular must survive: it is what gives meaning to
+// the [CLSCompliant(false)] attributes on the Npgsql-typed members of DbOperation.
+[assembly: CLSCompliant(true)]
+[assembly: Guid("c872e88f-c476-43e4-8e4f-8973341945fb")]

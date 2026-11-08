@@ -1,7 +1,7 @@
 ﻿using MixERP.Net.Common.Helpers;
-using System.Drawing;
-using System.Threading;
-using TheArtOfDev.HtmlRenderer.WinForms;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Png;
 
 namespace MixERP.Net.HtmlParser.ImageSerializer
 {
@@ -9,18 +9,21 @@ namespace MixERP.Net.HtmlParser.ImageSerializer
     {
         internal override void CreateImage(string imagePath)
         {
-            Thread thread = new Thread(delegate()
+            string path = imagePath + ImageHelper.GetFileExtension(this.ImageFormat);
+
+            //Was TheArtOfDev.HtmlRenderer.WinForms.HtmlRender.RenderToImage(this.Html) on an STA
+            //thread; headless Chromium renders the same HTML string cross-platform. The STA
+            //apartment and Thread.Join are gone, but the call still completes synchronously so
+            //ImageSaved is raised before Serialize() returns.
+            byte[] rendered = HtmlRenderingEngine.RenderHtml(this.Html, HtmlRenderingEngine.ViewportWidth, 1);
+
+            using (Image image = Image.Load(rendered))
             {
-                string path = imagePath + ImageHelper.GetFileExtension(this.ImageFormat);
+                IImageEncoder encoder = ImageHelper.GetEncoder(this.ImageFormat) ?? new PngEncoder();
+                image.Save(path, encoder);
+            }
 
-                Image image = HtmlRender.RenderToImage(this.Html);
-
-                image.Save(path, ImageHelper.GetEncoder(this.ImageFormat), null);
-                OnImageSaved(new ImageSavedEventArgs(path));
-            });
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
+            this.OnImageSaved(new ImageSavedEventArgs(path));
 
             base.CreateImage(imagePath);
         }

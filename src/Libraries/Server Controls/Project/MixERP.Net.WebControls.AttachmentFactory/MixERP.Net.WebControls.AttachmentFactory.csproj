@@ -72,7 +72,7 @@
       <Project>{61ab8b69-2097-4595-97b7-4a930a70163d}</Project>
       <Name>MixERP.Net.ApplicationState</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\..\Logic\MixERP.net.Common\MixERP.Net.Common.csproj">
+    <ProjectReference Include="..\..\..\Logic\MixERP.Net.Common\MixERP.Net.Common.csproj">
       <Project>{D5A09C22-8F48-4FB2-A14D-C62C8C8FCEC0}</Project>
       <Name>MixERP.Net.Common</Name>
     </ProjectReference>

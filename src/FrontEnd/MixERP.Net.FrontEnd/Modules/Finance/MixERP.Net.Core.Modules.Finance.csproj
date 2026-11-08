@@ -456,7 +456,7 @@
       <Project>{1C84E528-87ED-4B69-BFC3-81D675CB153E}</Project>
       <Name>MixERP.Net.WebControls.StockTransactionFactory</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\..\..\Libraries\Logic\MixERP.net.Common\MixERP.Net.Common.csproj">
+    <ProjectReference Include="..\..\..\..\Libraries\Logic\MixERP.Net.Common\MixERP.Net.Common.csproj">
       <Project>{D5A09C22-8F48-4FB2-A14D-C62C8C8FCEC0}</Project>
       <Name>MixERP.Net.Common</Name>
     </ProjectReference>

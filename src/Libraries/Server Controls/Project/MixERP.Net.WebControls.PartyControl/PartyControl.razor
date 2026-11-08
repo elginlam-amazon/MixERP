@@ -1,0 +1,208 @@
+@*
+/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+*@
+
+@*
+    Blazor replacement for the former WebForms CompositeControl
+    "MixERP.Net.WebControls.PartyControl.PartyControl".
+
+    The markup below is the one-for-one port of the control's render tree:
+      PartyControl.CreateChildControls() -> this template
+        GetHeader()                      -> the "ui form" block
+        GetTabs()                        -> the "ui tabular top attached menu" block
+        AddTabBody()                     -> the four tab segments
+        AddHiddenField() x3              -> the three hidden inputs
+        AddScript()                      -> OnAfterRenderAsync (below)
+
+    DOM CONTRACT: PartyControl.js selects every element by LITERAL id
+    (#PartyCodeTextBox, #PartyDropDownList, #GoButton, every *Span, #AddressDiv,
+    #ShippingAddressesDiv, #TotalDueAmountHidden, #OfficeDueAmountHidden) and by the
+    data-tab attributes. Ids, css classes and data-tab values must stay byte-identical
+    to the original render output or the control renders but silently does nothing.
+*@
+
+@namespace MixERP.Net.WebControls.PartyControl
+@using MixERP.Net.i18n.Resources
+@using MixERP.Net.Common.Helpers
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
+
+<div>
+    @* ---------- GetHeader() ---------- *@
+    <div class="ui form">
+        <div class="inline fields">
+            <div class="small field">
+                <label for='PartyCodeTextBox'>@Titles.SelectCustomer</label>
+                <input type="text" id="PartyCodeTextBox" name="PartyCodeTextBox" />
+            </div>
+            <div class="medium field">
+                <select id="PartyDropDownList" name="PartyDropDownList"></select>
+            </div>
+            <button type="button" id="GoButton" name="GoButton" class="ui small teal button">@Titles.Go</button>
+        </div>
+    </div>
+
+    @* ---------- GetTabs() ---------- *@
+    <div class="ui tabular top attached menu">
+        <a class="active item" data-tab="home"><i class='home icon'></i>@Titles.Home</a>
+        <a class="item" data-tab="party-summary"><i class='user icon'></i>@Titles.PartySummary</a>
+        <a class="item" data-tab="transaction-summary"><i class='book icon'></i>@Titles.TransactionSummary</a>
+        <a class="item" data-tab="contact-info"><i class='globe icon'></i>@Titles.AddressAndContactInfo</a>
+    </div>
+
+    @* ---------- AddTabBody(): home tab (intentionally empty — filled by PartyControl.js) ---------- *@
+    <div id="home" class="ui active tab bottom stacked attached segment" data-tab="home"></div>
+
+    @* ---------- AddTabBody(): GetPartySummaryTab() ---------- *@
+    <div id="party-summary" class="ui tab bottom stacked attached green segment" data-tab="party-summary">
+        <table class="ui table segment">
+            <tr>
+                <td style="width:300px"><strong>@Titles.PartyType</strong></td>
+                <td><span id="PartyTypeSpan"></span></td>
+            </tr>
+            <tr>
+                <td style="width:300px"><strong>@Titles.EmailAddress</strong></td>
+                <td><span id="EmailAddressSpan"></span></td>
+            </tr>
+            <tr>
+                <td style="width:300px"><strong>@Titles.PANNumber</strong></td>
+                <td><span id="PANNumberSpan"></span></td>
+            </tr>
+            <tr>
+                <td style="width:300px"><strong>@Titles.SSTNumber</strong></td>
+                <td><span id="SSTNumberSpan"></span></td>
+            </tr>
+            <tr>
+                <td style="width:300px"><strong>@Titles.CSTNumber</strong></td>
+                <td><span id="CSTNumberSpan"></span></td>
+            </tr>
+            <tr>
+                <td style="width:300px"><strong>@Titles.CreditAllowed</strong></td>
+                <td><span id="CreditAllowedSpan"></span></td>
+            </tr>
+            <tr>
+                <td style="width:300px"><strong>@Titles.MaximumCreditPeriod</strong></td>
+                <td><span id="MaxCreditPeriodSpan"></span></td>
+            </tr>
+            <tr>
+                <td style="width:300px"><strong>@Titles.MaximumCreditAmount</strong></td>
+                <td><span id="MaxCreditAmountSpan"></span></td>
+            </tr>
+            <tr>
+                <td style="width:300px"><strong>@Titles.GLHead</strong></td>
+                <td><span id="GLHeadSpan"></span></td>
+            </tr>
+            <tr>
+                <td style="width:300px"><strong>@Titles.DefaultCurrency</strong></td>
+                <td><span id="DefaultCurrencySpan"></span></td>
+            </tr>
+        </table>
+    </div>
+
+    @* ---------- AddTabBody(): GetTransactionSummaryTab() ---------- *@
+    <div id="transaction-summary" class="ui tab bottom stacked attached red segment" data-tab="transaction-summary">
+        <table class="ui table segment">
+            <tr>
+                <td style="width:300px"><strong>@Titles.TotalDueAmount</strong></td>
+                <td><span id="TotalDueAmountSpan"></span></td>
+            </tr>
+            <tr>
+                <td style="width:300px"><strong>@Titles.TotalDueAmountCurrentOffice</strong></td>
+                <td><span id="OfficeDueAmountSpan"></span></td>
+            </tr>
+            <tr>
+                <td style="width:300px"><strong>@Titles.LastPaymentDate</strong></td>
+                <td><span id="LastPaymentDateSpan"></span></td>
+            </tr>
+            <tr>
+                <td style="width:300px"><strong>@Titles.TransactionValue</strong></td>
+                <td><span id="TransactionValueSpan"></span></td>
+            </tr>
+        </table>
+    </div>
+
+    @* ---------- AddTabBody(): GetAddressInfoTab() ---------- *@
+    <div id="addresses-and-contact-info" class="ui tab bottom stacked attached teal segment" data-tab="contact-info">
+        <h3 class="ui header">  <i class='globe icon'></i>@Titles.AddressAndContactInfo</h3>
+        <table class="ui table segment">
+            <tr>
+                <td style="width:300px"><strong>@Titles.DefaultAddress</strong></td>
+                <td><div id="AddressDiv"></div></td>
+            </tr>
+            <tr>
+                <td style="width:300px"><strong>@Titles.ShippingAddresses</strong></td>
+                <td><div id="ShippingAddressesDiv"></div></td>
+            </tr>
+        </table>
+    </div>
+
+    @* ---------- AddHiddenField() x3 ---------- *@
+    @* AccruedInterestHidden has no reader in PartyControl.js today but is part of the
+       original DOM contract (consumers post it back); removing it would drop behavior. *@
+    <input type="hidden" id="TotalDueAmountHidden" name="TotalDueAmountHidden" value="" />
+    <input type="hidden" id="OfficeDueAmountHidden" name="OfficeDueAmountHidden" value="" />
+    <input type="hidden" id="AccruedInterestHidden" name="AccruedInterestHidden" value="" />
+</div>
+
+@code {
+    /// <summary>
+    ///     Port of PartyControl.AddScript(). The original ran once per control
+    ///     instantiation during CreateChildControls; JS interop is only legal after the
+    ///     first render in Blazor, so it moves to OnAfterRenderAsync(firstRender).
+    ///     <para>
+    ///         AddJSReference injects the &lt;script&gt; element once per key
+    ///         ("PartyControl") for the whole circuit, which is why the script cannot be
+    ///         relied on to re-run its element lookups: under WebForms a full page load
+    ///         re-executed it against a fresh DOM every time the control rendered. The
+    ///         explicit initPartyControl() call below restores that behaviour for the
+    ///         second and later instantiations of this component (SPA navigation away and
+    ///         back). It is idempotent - PartyControl.js flags the #PartyDropDownList node
+    ///         it has already wired - so the self-initialisation that runs when the script
+    ///         is first injected and this call cannot double-bind handlers or double-bind
+    ///         the party list.
+    ///     </para>
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            JSUtility.AddJSReference(this.JSRuntime,
+                "MixERP.Net.WebControls.PartyControl.PartyControl.js",
+                "PartyControl",
+                typeof(PartyControl));
+
+            try
+            {
+                await this.JSRuntime.InvokeVoidAsync("initPartyControl");
+            }
+            catch (JSException)
+            {
+                //Expected on the very first instantiation only: AddJSReference is a void,
+                //fire-and-forget API, so the script element may not have finished loading
+                //when this call is made and "initPartyControl" is not defined yet. That
+                //case needs no retry - the script wires itself up as soon as it loads (see
+                //the self-initialisation block at the bottom of PartyControl.js). Every
+                //later instantiation finds the function defined and takes the call above.
+            }
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+}

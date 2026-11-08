@@ -1012,7 +1012,7 @@
       <Project>{07ddce95-a18f-4a35-b892-ce09ead2aa65}</Project>
       <Name>MixERP.Net.WebControls.ScrudFactory</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\Libraries\Logic\MixERP.net.Common\MixERP.Net.Common.csproj">
+    <ProjectReference Include="..\..\Libraries\Logic\MixERP.Net.Common\MixERP.Net.Common.csproj">
       <Project>{d5a09c22-8f48-4fb2-a14d-c62c8c8fcec0}</Project>
       <Name>MixERP.Net.Common</Name>
     </ProjectReference>

@@ -52,12 +52,15 @@ namespace MixERP.Net.DbFactory
             {
                 Host = host,
                 Database = database,
-                UserName = username,
+                Username = username,
                 Password = password,
                 Port = port,
-                SyncNotification = true,
                 Pooling = true,
-                SSL = true,
+
+                // Npgsql removed the standalone "SSL" boolean; SslMode carries the same
+                // intent (negotiate TLS, fall back to plaintext). "SyncNotification" was
+                // also removed - server notices are delivered through the connection's
+                // Notice event instead (see DbOperation.ListenNonQuery).
                 SslMode = SslMode.Prefer,
                 MinPoolSize = 10,
                 MaxPoolSize = 100,

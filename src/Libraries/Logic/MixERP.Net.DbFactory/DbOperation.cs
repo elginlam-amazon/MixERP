@@ -33,12 +33,21 @@ namespace MixERP.Net.DbFactory
 {
     public class DbNotificationArgs : EventArgs
     {
-        public NpgsqlError Notice { get; set; }
+        /// <summary>
+        ///     The server notice that raised this notification. Npgsql removed the legacy
+        ///     NpgsqlError type; PostgresNotice is its replacement. Note that the notice text
+        ///     is exposed as <see cref="PostgresNotice.MessageText" />, not "Message".
+        /// </summary>
+        public PostgresNotice Notice { get; set; }
+
         public string Message { get; set; }
     }
 
     public class DbOperation
     {
+        // Deliberately a field, not a property or an event: callers such as
+        // Finance.Data/EODOperation subscribe with "operation.Listen += this.Listen;" and
+        // this library reads it into a local before invoking it.
         public EventHandler<DbNotificationArgs> Listen;
 
         [CLSCompliant(false)]
@@ -63,9 +72,9 @@ namespace MixERP.Net.DbFactory
 
                 return false;
             }
-            catch (NpgsqlException ex)
+            catch (PostgresException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (IsPostgresPlpgsqlError(ex))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -86,11 +95,21 @@ namespace MixERP.Net.DbFactory
             return ExecuteNonQuery(catalog, new NpgsqlCommand(sql));
         }
 
-        private static string GetDBErrorResource(NpgsqlException ex)
+        /// <summary>
+        ///     Npgsql no longer exposes the error code as NpgsqlException.Code; the SQLSTATE now
+        ///     lives on PostgresException.SqlState. The "P" class covers PL/pgSQL raised errors,
+        ///     which MixERP maps onto its own localized error resources.
+        /// </summary>
+        private static bool IsPostgresPlpgsqlError(PostgresException ex)
         {
-            string message = DbErrors.Get(ex.Code);
+            return ex.SqlState != null && ex.SqlState.StartsWith("P", StringComparison.Ordinal);
+        }
 
-            if (message == ex.Code)
+        private static string GetDBErrorResource(PostgresException ex)
+        {
+            string message = DbErrors.Get(ex.SqlState);
+
+            if (message == ex.SqlState)
             {
                 return ex.Message;
             }
@@ -107,23 +126,20 @@ namespace MixERP.Net.DbFactory
                 {
                     if (ValidateCommand(command))
                     {
-                        using (NpgsqlConnection connection = new NpgsqlConnection(DbConnection.GetConnectionString(catalog)))
-                        {
-                            command.Connection = connection;
-
-                            using (NpgsqlDataAdapter adapter = new NpgsqlDataAdapter(command))
-                            {
-                                return adapter;
-                            }
-                        }
+                        // The adapter (and the connection its command is bound to) is returned to
+                        // the caller, so neither may be disposed here. The connection is left
+                        // closed on purpose: NpgsqlDataAdapter.Fill opens it and closes it again,
+                        // which returns it to the pool.
+                        command.Connection = new NpgsqlConnection(DbConnection.GetConnectionString(catalog));
+                        return new NpgsqlDataAdapter(command);
                     }
                 }
 
                 return null;
             }
-            catch (NpgsqlException ex)
+            catch (PostgresException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (IsPostgresPlpgsqlError(ex))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -142,20 +158,33 @@ namespace MixERP.Net.DbFactory
                 {
                     if (ValidateCommand(command))
                     {
-                        using (NpgsqlConnection connection = new NpgsqlConnection(DbConnection.GetConnectionString(catalog)))
+                        // The reader outlives this method, so the connection must not be disposed
+                        // on the success path. CommandBehavior.CloseConnection hands connection
+                        // ownership to the reader: closing/disposing the reader releases the
+                        // connection. That transfer only happens once a reader is actually
+                        // returned, so a throwing Open/ExecuteReader must dispose the connection
+                        // itself or it would be orphaned open and never returned to the pool.
+                        NpgsqlConnection connection = new NpgsqlConnection(DbConnection.GetConnectionString(catalog));
+
+                        try
                         {
                             command.Connection = connection;
-                            command.Connection.Open();
-                            return command.ExecuteReader();
+                            connection.Open();
+                            return command.ExecuteReader(CommandBehavior.CloseConnection);
+                        }
+                        catch
+                        {
+                            connection.Dispose();
+                            throw;
                         }
                     }
                 }
 
                 return null;
             }
-            catch (NpgsqlException ex)
+            catch (PostgresException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (IsPostgresPlpgsqlError(ex))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -172,22 +201,38 @@ namespace MixERP.Net.DbFactory
             {
                 if (ValidateCommand(command))
                 {
-                    using (NpgsqlDataAdapter adapter = GetDataAdapter(catalog, command))
+                    NpgsqlDataAdapter adapter = GetDataAdapter(catalog, command);
+
+                    if (adapter == null)
                     {
-                        using (DataSet set = new DataSet())
+                        return null;
+                    }
+
+                    try
+                    {
+                        // The DataSet is returned, so it must not be disposed here.
+                        DataSet set = new DataSet();
+                        adapter.Fill(set);
+                        set.Locale = CultureInfo.CurrentUICulture;
+                        return set;
+                    }
+                    finally
+                    {
+                        NpgsqlConnection connection = adapter.SelectCommand?.Connection;
+                        adapter.Dispose();
+
+                        if (connection != null)
                         {
-                            adapter.Fill(set);
-                            set.Locale = CultureInfo.CurrentUICulture;
-                            return set;
+                            connection.Dispose();
                         }
                     }
                 }
 
                 return null;
             }
-            catch (NpgsqlException ex)
+            catch (PostgresException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (IsPostgresPlpgsqlError(ex))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -212,12 +257,13 @@ namespace MixERP.Net.DbFactory
 
                             using (NpgsqlDataAdapter adapter = new NpgsqlDataAdapter(command))
                             {
-                                using (DataTable dataTable = new DataTable())
-                                {
-                                    dataTable.Locale = Thread.CurrentThread.CurrentCulture;
-                                    adapter.Fill(dataTable);
-                                    return dataTable;
-                                }
+                                // Fill completes before this method returns, so disposing the
+                                // connection and the adapter here is correct. The DataTable
+                                // itself is returned and therefore must NOT be disposed.
+                                DataTable dataTable = new DataTable();
+                                dataTable.Locale = Thread.CurrentThread.CurrentCulture;
+                                adapter.Fill(dataTable);
+                                return dataTable;
                             }
                         }
                     }
@@ -225,9 +271,9 @@ namespace MixERP.Net.DbFactory
 
                 return null;
             }
-            catch (NpgsqlException ex)
+            catch (PostgresException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (IsPostgresPlpgsqlError(ex))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -248,10 +294,8 @@ namespace MixERP.Net.DbFactory
         {
             if (ValidateCommand(command))
             {
-                using (DataView view = new DataView(GetDataTable(catalog, command)))
-                {
-                    return view;
-                }
+                // The DataView is returned to the caller and must not be disposed here.
+                return new DataView(GetDataTable(catalog, command));
             }
 
             return null;
@@ -277,9 +321,9 @@ namespace MixERP.Net.DbFactory
 
                 return null;
             }
-            catch (NpgsqlException ex)
+            catch (PostgresException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (IsPostgresPlpgsqlError(ex))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -302,6 +346,8 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
+                // NpgsqlException (the base type) is correct here: this path reports
+                // connection-level failures, not server error responses.
                 Log.Warning("Server is not available: {Exception}.", ex);
             }
 
@@ -325,50 +371,68 @@ namespace MixERP.Net.DbFactory
                                         new NpgsqlConnection(DbConnection.GetConnectionString(catalog)))
                                 {
                                     command.Connection = connection;
-                                    connection.Notice += Connection_Notice;
+
+                                    // Subscribe BEFORE opening so no notice is missed.
+                                    connection.Notice += this.Connection_Notice;
                                     connection.Open();
                                     command.ExecuteNonQuery();
                                 }
                             }
-                            catch (NpgsqlException ex)
+                            catch (PostgresException ex)
                             {
                                 string errorMessage = ex.Message;
 
-                                if (ex.Code.StartsWith("P"))
+                                if (IsPostgresPlpgsqlError(ex))
                                 {
                                     errorMessage = GetDBErrorResource(ex);
                                 }
 
-                                EventHandler<DbNotificationArgs> listen = this.Listen;
-
-                                if (listen != null)
-                                {
-                                    DbNotificationArgs args = new DbNotificationArgs
-                                    {
-                                        Message = errorMessage
-                                    };
-
-                                    listen(this, args);
-                                }
+                                this.RaiseError(errorMessage);
+                            }
+                            catch (NpgsqlException ex)
+                            {
+                                this.RaiseError(ex.Message);
                             }
                         };
 
+                        // Holds the background thread open long enough to drain the trailing
+                        // notices the server emits after the command completes.
                         queryStart += () => { Thread.Sleep(15000); };
 
-                        Thread query = new Thread(queryStart) {IsBackground = true};
+                        Thread query = new Thread(queryStart) { IsBackground = true };
                         query.Start();
                     }
                 }
             }
-            catch (NpgsqlException ex)
+            catch (PostgresException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (IsPostgresPlpgsqlError(ex))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
                 }
 
                 throw;
+            }
+        }
+
+        /// <summary>
+        ///     Surfaces a failure through the Listen feed with no Notice attached. Subscribers
+        ///     (for example EODOperation) distinguish an error from a progress notice by exactly
+        ///     that: a null Notice with a non-blank Message.
+        /// </summary>
+        private void RaiseError(string errorMessage)
+        {
+            EventHandler<DbNotificationArgs> listen = this.Listen;
+
+            if (listen != null)
+            {
+                DbNotificationArgs args = new DbNotificationArgs
+                {
+                    Message = errorMessage
+                };
+
+                listen(this, args);
             }
         }
 
@@ -424,7 +488,10 @@ namespace MixERP.Net.DbFactory
                 DbNotificationArgs args = new DbNotificationArgs
                 {
                     Notice = e.Notice,
-                    Message = e.Notice.Message
+
+                    // PostgresNotice exposes the notice text as MessageText; the legacy
+                    // NpgsqlError.Message member no longer exists.
+                    Message = e.Notice.MessageText
                 };
 
                 listen(this, args);

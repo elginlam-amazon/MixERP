@@ -93,7 +93,7 @@
       <Project>{81F04B78-6194-4F86-A795-5F186C602EEE}</Project>
       <Name>MixERP.Net.WebControls.ReportEngine</Name>
     </ProjectReference>
-    <ProjectReference Include="..\MixERP.net.Common\MixERP.Net.Common.csproj">
+    <ProjectReference Include="..\MixERP.Net.Common\MixERP.Net.Common.csproj">
       <Project>{D5A09C22-8F48-4FB2-A14D-C62C8C8FCEC0}</Project>
       <Name>MixERP.Net.Common</Name>
     </ProjectReference>
