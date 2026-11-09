@@ -20,7 +20,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNet.SignalR;
+using Microsoft.AspNetCore.SignalR;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Extensions;
@@ -48,7 +48,7 @@ namespace MixERP.Net.FrontEnd.Hubs
             string downloadUrl = string.Empty;
             string[] toBackup =
             {
-                DbConfig.GetAttachmentParameter(AppUsers.GetCurrentUserDB(), "AttachmentsDirectory"),
+                DbConfig.GetAttachmentParameter(AppUsers.GetCurrent(Conversion.TryCastLong(this.Context.User?.Identity?.Name)).Catalog, "AttachmentsDirectory"),
                 ConfigurationHelper.GetDbServerParameter("DatabaseBackupDirectory")
             };
 
@@ -91,15 +91,15 @@ namespace MixERP.Net.FrontEnd.Hubs
 
             if (this.Context == null)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied);
                 return false;
             }
 
-            long globalLoginId = Conversion.TryCastLong(this.Context.User.Identity.Name);
+            long globalLoginId = Conversion.TryCastLong(this.Context.User?.Identity?.Name);
 
             if (globalLoginId <= 0)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied);
                 return false;
             }
 
@@ -136,12 +136,12 @@ namespace MixERP.Net.FrontEnd.Hubs
 
         private void Notify(string description, string message)
         {
-            this.Clients.All.updateInstallationNotification(DateTime.UtcNow, description, message);
+            this.Clients.All.SendAsync("updateInstallationNotification", DateTime.UtcNow, description, message);
         }
 
         private void installer_Progress(ProgressInfo progressInfo)
         {
-            this.Clients.All.updateInstallationNotification(progressInfo.Timestamp, progressInfo.Description,
+            this.Clients.All.SendAsync("updateInstallationNotification", progressInfo.Timestamp, progressInfo.Description,
                 progressInfo.Message);
         }
     }

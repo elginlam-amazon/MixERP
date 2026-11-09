@@ -18,7 +18,7 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             script += JSUtility.GetVar("unitServiceUrl", this.UnitServiceUrl);
             script += JSUtility.GetVar("itemPopupUrl", this.ItemPopupUrl);
             script += JSUtility.GetVar("itemIdQuerySericeUrl", this.ItemIdQuerySericeUrl);
-            script += JSUtility.GetVar("validateSides", this.ValidateSides.ToString().ToLower(CultureInfo.InvariantCulture));
+            script += JSUtility.GetVar("validateSides", this.ValidateSides.ToString().ToLower(CultureInfo.InvariantCulture), false);
 
             PageUtility.RegisterJavascript("StockAdjustmentFormViewInlineScript", script, this.Page, true);
         }
