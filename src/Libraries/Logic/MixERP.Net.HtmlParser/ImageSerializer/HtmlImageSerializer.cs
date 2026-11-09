@@ -1,8 +1,8 @@
-﻿using MixERP.Net.Framework;
+using MixERP.Net.Framework;
 using MixERP.Net.i18n.Resources;
 using System;
 using System.Drawing.Imaging;
-using System.Web.Hosting;
+using System.IO;
 
 namespace MixERP.Net.HtmlParser.ImageSerializer
 {
@@ -20,7 +20,9 @@ namespace MixERP.Net.HtmlParser.ImageSerializer
                 throw new MixERPException(Messages.TempDirectoryNullError);
             }
 
-            string imagePath = HostingEnvironment.MapPath(this.TempDirectory + Guid.NewGuid());
+            string imagePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                this.TempDirectory.TrimStart('/').Replace('/', Path.DirectorySeparatorChar),
+                Guid.NewGuid().ToString());
 
             if (string.IsNullOrWhiteSpace(imagePath))
             {

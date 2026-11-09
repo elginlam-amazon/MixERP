@@ -1,8 +1,8 @@
-﻿using MixERP.Net.Common.Helpers;
+using MixERP.Net.Common.Helpers;
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
-    public partial class TransactionView
+    public partial class TransactionView : WebControlBase
     {
         private void AddJavascript()
         {

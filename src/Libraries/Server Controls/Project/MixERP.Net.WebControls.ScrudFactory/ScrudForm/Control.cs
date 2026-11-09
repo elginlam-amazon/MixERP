@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,18 +19,15 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common;
 using System.Reflection;
-using System.Web.UI;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
-    [ToolboxData("<{0}:ScrudForm runat=server></{0}:ScrudForm>")]
-    public partial class ScrudForm
+        public partial class ScrudForm : WebControlBase
     {
         private string imageColumn = string.Empty;
-        private Panel scrudContainer;
+        private dynamic scrudContainer;
 
-        protected override void CreateChildControls()
+        protected void CreateChildControls()
         {
             this.Validate();
 
@@ -51,12 +48,12 @@ namespace MixERP.Net.WebControls.ScrudFactory
             this.Controls.Add(this.scrudContainer);
         }
 
-        protected override void RecreateChildControls()
+        protected void RecreateChildControls()
         {
             this.EnsureChildControls();
         }
 
-        protected override void Render(HtmlTextWriter w)
+        protected void Render(dynamic w)
         {
             this.scrudContainer.RenderControl(w);
         }

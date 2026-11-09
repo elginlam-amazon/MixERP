@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,15 +17,14 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private void CreateFooterRow(Table grid)
+        private void CreateFooterRow(dynamic grid)
         {
-            using (TableRow row = new TableRow())
+            using (dynamic row = new TableRow())
             {
                 row.TableSection = TableRowSection.TableBody;
                 row.CssClass = "ui footer-row form";

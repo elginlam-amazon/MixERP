@@ -1,10 +1,10 @@
-﻿namespace MixERP.Net.WebControls.Flag
+namespace MixERP.Net.WebControls.Flag
 {
-    public partial class FlagControl
+    public partial class FlagControl : WebControlBase
     {
         private bool disposed;
 
-        public override void Dispose()
+        public void Dispose()
         {
             if (!this.disposed)
             {

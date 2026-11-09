@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -21,14 +21,13 @@ using MixERP.Net.Common;
 using MixERP.Net.i18n;
 using MixERP.Net.i18n.Resources;
 using System.Globalization;
-using System.Web.UI.WebControls;
 using MixERP.Net.TransactionGovernor.Verification;
 
 namespace MixERP.Net.WebControls.TransactionChecklist
 {
-    public partial class TransactionChecklistForm
+    public partial class TransactionChecklistForm : WebControlBase
     {
-        private void ShowVerificationStatus(string tranId, Label label)
+        private void ShowVerificationStatus(string tranId, dynamic label)
         {
             if (this.HideVerificationMessage)
             {

@@ -88,7 +88,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.OTS
         }
 
 
-        private void Dispose(bool disposing)
+        protected override void Dispose(bool disposing)
         {
             if (!disposing)
             {

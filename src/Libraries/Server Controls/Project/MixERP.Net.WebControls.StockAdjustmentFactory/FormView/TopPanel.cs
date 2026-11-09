@@ -1,18 +1,17 @@
-﻿using MixERP.Net.Entities;
+using MixERP.Net.Entities;
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.Common;
 using MixERP.Net.WebControls.StockAdjustmentFactory.Helpers;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockAdjustmentFactory
 {
-    public partial class FormView
+    public partial class FormView : WebControlBase
     {
-        private void AddDateTextBox(HtmlGenericControl fields)
+        private void AddDateTextBox(dynamic fields)
         {
-            using (HtmlGenericControl field = FormHelper.GetField())
+            using (dynamic field = FormHelper.GetField())
             {
-                using (HtmlGenericControl label = new HtmlGenericControl())
+                using (dynamic label = new HtmlGenericControl())
                 {
                     label.TagName = "label";
                     label.Attributes.Add("for", "ValueDateTextBox");
@@ -32,11 +31,11 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             }
         }
 
-        private void AddReferenceNumberTextBox(HtmlGenericControl fields)
+        private void AddReferenceNumberTextBox(dynamic fields)
         {
-            using (HtmlGenericControl field = FormHelper.GetField())
+            using (dynamic field = FormHelper.GetField())
             {
-                using (HtmlGenericControl label = new HtmlGenericControl())
+                using (dynamic label = new HtmlGenericControl())
                 {
                     label.TagName = "label";
                     label.Attributes.Add("for", "ReferenceNumberInputText");
@@ -57,12 +56,12 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
 
         private void CreateTopPanel()
         {
-            using (HtmlGenericControl form = new HtmlGenericControl())
+            using (dynamic form = new HtmlGenericControl())
             {
                 form.TagName = "div";
                 form.Attributes.Add("class", "ui form");
 
-                using (HtmlGenericControl fields = FormHelper.GetFields())
+                using (dynamic fields = FormHelper.GetFields())
                 {
                     this.AddDateTextBox(fields);
                     this.AddReferenceNumberTextBox(fields);

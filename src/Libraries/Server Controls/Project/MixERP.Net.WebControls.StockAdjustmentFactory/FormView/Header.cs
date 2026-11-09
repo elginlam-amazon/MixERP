@@ -1,12 +1,11 @@
-﻿using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockAdjustmentFactory
 {
-    public partial class FormView
+    public partial class FormView : WebControlBase
     {
         private void CreateHeader()
         {
-            using (HtmlGenericControl header = new HtmlGenericControl())
+            using (dynamic header = new HtmlGenericControl())
             {
                 header.TagName = "h2";
                 header.InnerText = this.Text;
@@ -16,7 +15,7 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
 
         private void AddRuler()
         {
-            using (HtmlGenericControl divider = new HtmlGenericControl("div"))
+            using (dynamic divider = new HtmlGenericControl("div"))
             {
                 divider.Attributes.Add("class", "ui divider");
                 this.container.Controls.Add(divider);

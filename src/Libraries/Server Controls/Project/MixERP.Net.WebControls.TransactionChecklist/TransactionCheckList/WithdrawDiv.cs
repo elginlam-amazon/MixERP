@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,20 +18,17 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.i18n.Resources;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.TransactionChecklist
 {
-    public partial class TransactionChecklistForm
+    public partial class TransactionChecklistForm : WebControlBase
     {
-        private Button okButton;
-        private TextBox reasonTextBox;
+        private dynamic okButton;
+        private dynamic reasonTextBox;
 
-        private void AddCancelButton(HtmlGenericControl p)
+        private void AddCancelButton(dynamic p)
         {
-            using (HtmlInputButton button = new HtmlInputButton())
+            using (dynamic button = new HtmlInputButton())
             {
                 button.ID = "CancelButton";
                 button.CausesValidation = false;
@@ -42,19 +39,19 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddOkButton(HtmlGenericControl p)
+        private void AddOkButton(dynamic p)
         {
             this.okButton = new Button();
             this.okButton.ID = "OKButton";
             this.okButton.CausesValidation = true;
             this.okButton.Text = Titles.OK;
             this.okButton.Attributes.Add("class", "ui red small submit button");
-            this.okButton.Click += this.OkButton_Click;
+            // this.okButton.Click += this.OkButton_Click; // stub: dynamic event not supported
 
             p.Controls.Add(this.okButton);
         }
 
-        private void AddReasonTextBox(HtmlGenericControl p)
+        private void AddReasonTextBox(dynamic p)
         {
             this.reasonTextBox = new TextBox();
             this.reasonTextBox.ID = "ReasonTextBox";
@@ -64,7 +61,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
 
             p.Controls.Add(this.reasonTextBox);
 
-            using (RequiredFieldValidator reasonTextBoxRequired = new RequiredFieldValidator())
+            using (dynamic reasonTextBoxRequired = new RequiredFieldValidator())
             {
                 reasonTextBoxRequired.ID = "ReasonTextBoxRequired";
                 reasonTextBoxRequired.ControlToValidate = this.reasonTextBox.ID;
@@ -76,9 +73,9 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddSpacer(HtmlGenericControl div)
+        private void AddSpacer(dynamic div)
         {
-            using (HtmlGenericControl spacer = new HtmlGenericControl("span"))
+            using (dynamic spacer = new HtmlGenericControl("span"))
             {
                 spacer.Attributes.Add("class", "spacer");
                 spacer.InnerHtml = "&nbsp;";
@@ -86,11 +83,11 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddWidthdrawDiv(HtmlGenericControl p)
+        private void AddWidthdrawDiv(dynamic p)
         {
             if (this.DisplayWithdrawButton)
             {
-                using (HtmlGenericControl withdrawDiv = new HtmlGenericControl())
+                using (dynamic withdrawDiv = new HtmlGenericControl())
                 {
                     withdrawDiv.TagName = "div";
                     withdrawDiv.ID = "WithdrawDiv";
@@ -104,9 +101,9 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddWithdrawFooter(HtmlGenericControl div)
+        private void AddWithdrawFooter(dynamic div)
         {
-            using (HtmlGenericControl footer = new HtmlGenericControl("div"))
+            using (dynamic footer = new HtmlGenericControl("div"))
             {
                 footer.Attributes.Add("class", "ui bottom attached red info message");
                 footer.InnerHtml = @"<i class='icon help'></i>" + Questions.AreYouSure;
@@ -114,14 +111,14 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddWithdrawHeader(HtmlGenericControl div)
+        private void AddWithdrawHeader(dynamic div)
         {
-            using (HtmlGenericControl headerContainer = new HtmlGenericControl("div"))
+            using (dynamic headerContainer = new HtmlGenericControl("div"))
             {
                 headerContainer.Attributes.Add("class", "ui attached red message");
                 headerContainer.Attributes.Add("style", "display:block;");
 
-                using (HtmlGenericControl header = new HtmlGenericControl("div"))
+                using (dynamic header = new HtmlGenericControl("div"))
                 {
                     header.Attributes.Add("class", "header");
                     header.InnerText = Questions.WithdrawalReason;
@@ -132,19 +129,19 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddWithdrawPanelBody(HtmlGenericControl div)
+        private void AddWithdrawPanelBody(dynamic div)
         {
-            using (HtmlGenericControl form = new HtmlGenericControl("div"))
+            using (dynamic form = new HtmlGenericControl("div"))
             {
                 form.Attributes.Add("class", "ui form attached fluid segment");
 
-                using (HtmlGenericControl paragraph = new HtmlGenericControl("p"))
+                using (dynamic paragraph = new HtmlGenericControl("p"))
                 {
                     paragraph.InnerText = Labels.TransactionWithdrawalInformation;
                     form.Controls.Add(paragraph);
                 }
 
-                using (HtmlGenericControl field = new HtmlGenericControl("div"))
+                using (dynamic field = new HtmlGenericControl("div"))
                 {
                     field.Attributes.Add("class", "field");
                     this.AddReasonTextBox(field);

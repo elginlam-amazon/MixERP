@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,13 +17,12 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ReportEngine
 {
-    public partial class Report
+    public partial class Report : WebControlBase
     {
-        private void AddHiddenControls(Panel p)
+        private void AddHiddenControls(dynamic p)
         {
             this.reportHidden = new HiddenField();
             this.reportHidden.ID = "ReportHidden";

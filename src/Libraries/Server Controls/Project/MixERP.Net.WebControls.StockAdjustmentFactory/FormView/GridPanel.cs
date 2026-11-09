@@ -1,19 +1,17 @@
-﻿using MixERP.Net.i18n.Resources;
+using MixERP.Net.i18n.Resources;
 using System.Globalization;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockAdjustmentFactory
 {
-    public partial class FormView
+    public partial class FormView : WebControlBase
     {
         private void CreateGridPanel()
         {
-            using (HtmlGenericControl gridPanel = new HtmlGenericControl("div"))
+            using (dynamic gridPanel = new HtmlGenericControl("div"))
             {
                 gridPanel.Attributes.Add("style", "width: 100%;overflow:auto;");
 
-                using (Table table = new Table())
+                using (dynamic table = new Table())
                 {
                     table.ID = "TransferGridView";
                     table.Attributes.Add("class", "ui table segment");
@@ -49,7 +47,7 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
                 }
                 else
                 {
-                    using (HtmlGenericControl label = new HtmlGenericControl())
+                    using (dynamic label = new HtmlGenericControl())
                     {
                         label.TagName = "label";
                         label.Attributes.Add("for", AssociatedControlId);
@@ -63,7 +61,7 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             }
         }
 
-        private TableHeaderRow GetHeaderRow()
+        private dynamic GetHeaderRow()
         {
             using (TableHeaderRow row = new TableHeaderRow())
             {

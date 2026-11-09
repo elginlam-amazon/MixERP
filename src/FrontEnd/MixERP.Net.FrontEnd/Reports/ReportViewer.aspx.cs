@@ -16,6 +16,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
+#pragma warning disable CS0436
 
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common.Helpers;

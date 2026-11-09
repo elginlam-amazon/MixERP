@@ -37,7 +37,9 @@ namespace MixERP.Net.FrontEnd.Base
     public class MixERPWebpage : MixERPWebPageBase
     {
         private string currentPage;
+#pragma warning disable CS0649
         private Menu[] menus;
+#pragma warning restore CS0649
 
         /// <summary>
         ///     The pages, having no actual entry on database menu table, can have an OverridePath
@@ -170,7 +172,7 @@ namespace MixERP.Net.FrontEnd.Base
 
             if (!policyExists)
             {
-                Server.Transfer("~/Site/AccessIsDenied.aspx");
+                Response.Redirect("~/Site/AccessIsDenied.aspx");
             }
 
             return policyExists;

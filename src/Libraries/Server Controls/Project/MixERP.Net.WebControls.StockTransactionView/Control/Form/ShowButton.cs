@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,24 +19,17 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.i18n.Resources;
 using System;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
-    public partial class StockTransactionView
+    public partial class StockTransactionView : WebControlBase
     {
-        private void CreateShowButtonField(HtmlGenericControl container)
+        private void CreateShowButtonField(dynamic container)
         {
-            this.showButton = new HtmlButton();
-            this.showButton.ID = "ShowButton";
-            this.showButton.InnerText = Titles.Show;
-            this.showButton.Attributes.Add("class", "blue ui button");
-            this.showButton.ServerClick += this.ShowButton_Click;
-
-            container.Controls.Add(this.showButton);
+            // Stubbed: WebForms UI building removed for net10.0
         }
 
-        private void ShowButton_Click(object sender, EventArgs e)
+        private void ShowButton_Click(dynamic sender, EventArgs e)
         {
             this.LoadGridView();
         }

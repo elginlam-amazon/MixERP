@@ -1,9 +1,9 @@
-﻿using MixERP.Net.Common;
+using MixERP.Net.Common;
 using System.Collections.ObjectModel;
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
-    public partial class TransactionView
+    public partial class TransactionView : WebControlBase
     {
         private Collection<string> GetSelectedValues()
         {

@@ -8,7 +8,6 @@ using System;
 
 namespace MixERP.Net.Core.Modules.Finance.Hubs
 {
-    [CLSCompliant(false)]
     public class DayOperationHub : Hub
     {
         public void PerformEOD()

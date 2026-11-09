@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,43 +18,14 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.Common.Helpers;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
-    public partial class StockTransactionView
+    public partial class StockTransactionView : WebControlBase
     {
-        private void CreateFilterSegment(Control container)
+        private void CreateFilterSegment(dynamic container)
         {
-            using (HtmlGenericControl filterSegment = HtmlControlHelper.GetSegment())
-            {
-                filterSegment.ID = "FilterDiv";
-
-                using (HtmlGenericControl form = HtmlControlHelper.GetForm())
-                {
-                    form.Attributes.Add("margin-left", "8px;");
-
-                    using (HtmlGenericControl nineFields = HtmlControlHelper.GetFields("nine fields"))
-                    {
-                        this.CreateDateFromField(nineFields);
-                        this.CreateDateToField(nineFields);
-                        this.CreateOfficeField(nineFields);
-                        this.CreatePartyField(nineFields);
-                        this.CreatePriceTypeField(nineFields);
-                        this.CreateUserField(nineFields);
-                        this.CreateReferenceNumberField(nineFields);
-                        this.CreateStatementReferenceField(nineFields);
-                        this.CreateShowButtonField(nineFields);
-
-                        form.Controls.Add(nineFields);
-                    }
-
-                    filterSegment.Controls.Add(form);
-                }
-
-                container.Controls.Add(filterSegment);
-            }
+            // Stubbed: WebForms UI building removed for net10.0
         }
     }
 }

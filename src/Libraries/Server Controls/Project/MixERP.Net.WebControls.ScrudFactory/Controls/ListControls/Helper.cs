@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -21,7 +21,6 @@ using MixERP.Net.i18n.Resources;
 using System;
 using System.Linq;
 using System.Threading;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
 {
@@ -56,11 +55,12 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
 
             for (int i = 0; i < key.Length; i++)
             {
-                ListItem item = new ListItem(key[i].Trim(), value[i].Trim());
+                dynamic item = new ListItem(key[i].Trim(), value[i].Trim());
                 control.Items.Add(item);
             }
 
             foreach (ListItem item in control.Items)
+#pragma warning disable CS0184
             {
                 if (control is CheckBoxList)
                 {

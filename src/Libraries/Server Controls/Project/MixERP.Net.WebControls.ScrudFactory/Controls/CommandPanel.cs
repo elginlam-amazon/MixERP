@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,16 +19,12 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.i18n.Resources;
 using System;
-using System.Web;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls
 {
-    internal sealed class CommandPanel : IDisposable
+    internal sealed class CommandPanel: IDisposable
     {
-        private HtmlGenericControl commandPanel;
+        private dynamic commandPanel;
         public event EventHandler DeleteButtonClick;
 
         public event EventHandler EditButtonClick;
@@ -45,7 +41,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
         public string PrintButtonIconCssClass { get; set; }
         public string SelectButtonIconCssClass { get; set; }
 
-        public HtmlGenericControl GetCommandPanel(string controlSuffix)
+        public dynamic GetCommandPanel(string controlSuffix)
         {
             this.commandPanel = new HtmlGenericControl("div");
             this.commandPanel.Attributes.Add("role", "toolbar");
@@ -62,17 +58,17 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
             return this.commandPanel;
         }
 
-        private void AddAddButton(HtmlGenericControl p)
+        private void AddAddButton(dynamic p)
         {
-            using (HtmlButton addButton = this.GetInputButton("CTRL + SHIFT + A", "return(scrudAddNew());", Titles.AddNew, this.ButtonCssClass, this.AddButtonIconCssClass))
+            using (HtmlGenericControl addButton = this.GetInputButton("CTRL + SHIFT + A", "return(scrudAddNew());", Titles.AddNew, this.ButtonCssClass, this.AddButtonIconCssClass))
             {
                 p.Controls.Add(addButton);
             }
         }
 
-        private void AddDeleteButtonHidden(HtmlGenericControl p, string controlSuffix)
+        private void AddDeleteButtonHidden(dynamic p, string controlSuffix)
         {
-            this.DeleteButton = this.GetButton("CTRL + SHIFT + D", "return(scrudConfirmAction());", Titles.DeleteSelected);
+            this.DeleteButton = new Button();
             this.DeleteButton.ID = "DeleteButton" + controlSuffix;
             this.DeleteButton.CssClass = "hidden";
             this.DeleteButton.CausesValidation = false;
@@ -80,70 +76,69 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
             p.Controls.Add(this.DeleteButton);
         }
 
-        private void AddDeleteButtonVisible(HtmlGenericControl p, string controlSuffix)
+        private void AddDeleteButtonVisible(dynamic p, string controlSuffix)
         {
-            using (HtmlButton deleteButton = this.GetInputButton("CTRL + SHIFT + D", "$('#DeleteButton" + controlSuffix + "').click();return false;", Titles.DeleteSelected, this.ButtonCssClass, this.DeleteButtonIconCssClass))
+            using (HtmlGenericControl deleteButton = this.GetInputButton("CTRL + SHIFT + D", "$('#DeleteButton" + controlSuffix + "').click();return false;", Titles.DeleteSelected, this.ButtonCssClass, this.DeleteButtonIconCssClass))
             {
                 p.Controls.Add(deleteButton);
             }
         }
 
-        private void AddEditButtonHidden(HtmlGenericControl p, string controlSuffix)
+        private void AddEditButtonHidden(dynamic p, string controlSuffix)
         {
-            this.EditButton = this.GetButton("CTRL + SHIFT + E", "return(scrudConfirmAction());", Titles.EditSelected);
-            this.EditButton.Attributes.Add("role", "edit");
+            this.EditButton = new Button();
             this.EditButton.ID = "EditButton" + controlSuffix;
             this.EditButton.CssClass = "hidden";
             this.EditButton.Click += this.OnEditButtonClick;
             p.Controls.Add(this.EditButton);
         }
 
-        private void AddEditButtonVisible(HtmlGenericControl p, string controlSuffix)
+        private void AddEditButtonVisible(dynamic p, string controlSuffix)
         {
-            using (HtmlButton editButton = this.GetInputButton("CTRL + SHIFT + E", "$('#EditButton" + controlSuffix + "').click();return false;", Titles.EditSelected, this.ButtonCssClass, this.EditButtonIconCssClass))
+            using (HtmlGenericControl editButton = this.GetInputButton("CTRL + SHIFT + E", "$('#EditButton" + controlSuffix + "').click();return false;", Titles.EditSelected, this.ButtonCssClass, this.EditButtonIconCssClass))
             {
                 p.Controls.Add(editButton);
             }
         }
 
-        private void AddPrintButton(HtmlGenericControl p)
+        private void AddPrintButton(dynamic p)
         {
-            using (HtmlButton printButton = this.GetInputButton("CTRL + SHIFT + P", "scrudPrintGridView();", Titles.Print, this.ButtonCssClass, this.PrintButtonIconCssClass))
+            using (HtmlGenericControl printButton = this.GetInputButton("CTRL + SHIFT + P", "scrudPrintGridView();", Titles.Print, this.ButtonCssClass, this.PrintButtonIconCssClass))
             {
                 p.Controls.Add(printButton);
             }
         }
 
-        private void AddSelectButton(HtmlGenericControl p)
+        private void AddSelectButton(dynamic p)
         {
             if (IsModal())
             {
-                using (HtmlButton addSelectButton = this.GetInputButton("RETURN", "scrudSelectAndClose();", Titles.Select, this.ButtonCssClass, this.SelectButtonIconCssClass))
+                using (HtmlGenericControl addSelectButton = this.GetInputButton("RETURN", "scrudSelectAndClose();", Titles.Select, this.ButtonCssClass, this.SelectButtonIconCssClass))
                 {
                     p.Controls.Add(addSelectButton);
                 }
             }
         }
 
-        private void AddShowAllButton(HtmlGenericControl p)
+        private void AddShowAllButton(dynamic p)
         {
-            using (HtmlButton showAllButton = this.GetInputButton("CTRL + SHIFT + S", "scrudShowAll();", Titles.ShowAll, this.ButtonCssClass, this.AllButtonIconCssClass))
+            using (HtmlGenericControl showAllButton = this.GetInputButton("CTRL + SHIFT + S", "scrudShowAll();", Titles.ShowAll, this.ButtonCssClass, this.AllButtonIconCssClass))
             {
                 p.Controls.Add(showAllButton);
             }
         }
 
-        private void AddShowCompactButton(HtmlGenericControl p)
+        private void AddShowCompactButton(dynamic p)
         {
-            using (HtmlButton showCompactButton = this.GetInputButton("CTRL + SHIFT + C", "scrudShowCompact();", Titles.ShowCompact, this.ButtonCssClass, this.CompactButtonIconCssClass))
+            using (HtmlGenericControl showCompactButton = this.GetInputButton("CTRL + SHIFT + C", "scrudShowCompact();", Titles.ShowCompact, this.ButtonCssClass, this.CompactButtonIconCssClass))
             {
                 p.Controls.Add(showCompactButton);
             }
         }
 
-        private Button GetButton(string toolTip, string onClientClick, string text)
+        private dynamic GetButton(string toolTip, string onClientClick, string text)
         {
-            using (Button button = new Button())
+            using (dynamic button = new Button())
             {
                 button.CssClass = this.ButtonCssClass;
                 button.ToolTip = toolTip;
@@ -153,7 +148,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
             }
         }
 
-        private HtmlButton GetInputButton(string title, string onclick, string value, string cssClass, string iconCssClass)
+        private HtmlGenericControl GetInputButton(string title, string onclick, string value, string cssClass, string iconCssClass)
         {
             using (HtmlButton inputButton = new HtmlButton())
             {
@@ -177,24 +172,10 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
 
         private static bool IsModal()
         {
-            Page page = HttpContext.Current.CurrentHandler as Page;
-
-            if (page != null)
-            {
-                string modal = page.Request.QueryString["modal"];
-                if (modal != null)
-                {
-                    if (modal.Equals("1"))
-                    {
-                        return true;
-                    }
-                }
-            }
-
             return false;
         }
 
-        private void OnDeleteButtonClick(object sender, EventArgs e)
+        private void OnDeleteButtonClick(dynamic sender, EventArgs e)
         {
             if (this.DeleteButtonClick != null)
             {
@@ -202,7 +183,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
             }
         }
 
-        private void OnEditButtonClick(object sender, EventArgs e)
+        private void OnEditButtonClick(dynamic sender, EventArgs e)
         {
             if (this.EditButtonClick != null)
             {

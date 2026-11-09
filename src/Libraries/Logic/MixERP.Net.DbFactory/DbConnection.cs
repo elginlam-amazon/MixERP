@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -52,12 +52,10 @@ namespace MixERP.Net.DbFactory
             {
                 Host = host,
                 Database = database,
-                UserName = username,
+                Username = username,
                 Password = password,
                 Port = port,
-                SyncNotification = true,
                 Pooling = true,
-                SSL = true,
                 SslMode = SslMode.Prefer,
                 MinPoolSize = 10,
                 MaxPoolSize = 100,

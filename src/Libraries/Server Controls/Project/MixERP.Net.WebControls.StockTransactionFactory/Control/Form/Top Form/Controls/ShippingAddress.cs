@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,20 +19,19 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n.Resources;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private static void AddShippingAddressCompositeField(HtmlGenericControl container)
+        private static void AddShippingAddressCompositeField(dynamic container)
         {
-            using (HtmlGenericControl shippingAddressInfoDiv = HtmlControlHelper.GetField())
+            using (dynamic shippingAddressInfoDiv = HtmlControlHelper.GetField())
             {
                 shippingAddressInfoDiv.ID = "ShippingAddressInfoDiv";
                 shippingAddressInfoDiv.Attributes.Add("style", "width:500px;");
 
-                using (HtmlGenericControl fields = HtmlControlHelper.GetFields("two fields"))
+                using (dynamic fields = HtmlControlHelper.GetFields("two fields"))
                 {
                     AddShippingCompanyField(fields);
                     AddShippingAddressField(fields);
@@ -45,11 +44,11 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             }
         }
 
-        private static void AddShippingAddressField(HtmlGenericControl container)
+        private static void AddShippingAddressField(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
-                using (HtmlGenericControl label = HtmlControlHelper.GetLabel(Titles.ShippingAddress, "ShippingAddressSelect"))
+                using (dynamic label = HtmlControlHelper.GetLabel(Titles.ShippingAddress, "ShippingAddressSelect"))
                 {
                     field.Controls.Add(label);
                 }
@@ -63,11 +62,11 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             }
         }
 
-        private static void AddShippingCompanyField(HtmlGenericControl container)
+        private static void AddShippingCompanyField(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
-                using (HtmlGenericControl label = HtmlControlHelper.GetLabel(Titles.ShippingCompany, "ShippingCompanySelect"))
+                using (dynamic label = HtmlControlHelper.GetLabel(Titles.ShippingCompany, "ShippingCompanySelect"))
                 {
                     field.Controls.Add(label);
                 }

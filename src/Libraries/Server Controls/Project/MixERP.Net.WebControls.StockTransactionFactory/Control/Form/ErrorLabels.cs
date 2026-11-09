@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,16 +17,14 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private static void CreateErrorLabel(Control container)
+        private static void CreateErrorLabel(dynamic container)
         {
-            using (HtmlGenericControl errorLabel = new HtmlGenericControl("span"))
+            using (dynamic errorLabel = new HtmlGenericControl("span"))
             {
                 errorLabel.ID = "ErrorLabel";
                 errorLabel.Attributes.Add("class", "big error");
@@ -35,9 +33,9 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             }
         }
 
-        private static void CreateErrorLabelBottom(Control container)
+        private static void CreateErrorLabelBottom(dynamic container)
         {
-            using (HtmlGenericControl errorLabel = new HtmlGenericControl("span"))
+            using (dynamic errorLabel = new HtmlGenericControl("span"))
             {
                 errorLabel.ID = "ErrorLabelBottom";
                 errorLabel.Attributes.Add("class", "big error");

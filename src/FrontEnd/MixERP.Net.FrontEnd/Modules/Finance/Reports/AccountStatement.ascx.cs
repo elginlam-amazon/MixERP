@@ -35,6 +35,8 @@ using System.Globalization;
 using System.Web.UI;
 using System.Web.UI.HtmlControls;
 using System.Web.UI.WebControls;
+using HtmlGenericControl = System.Web.UI.HtmlControls.HtmlGenericControl;
+using ITemplate = System.Web.UI.ITemplate;
 
 namespace MixERP.Net.Core.Modules.Finance.Reports
 {
@@ -225,7 +227,7 @@ namespace MixERP.Net.Core.Modules.Finance.Reports
             }
         }
 
-        private void Dispose(bool disposing)
+        protected override void Dispose(bool disposing)
         {
             if (!disposing)
             {

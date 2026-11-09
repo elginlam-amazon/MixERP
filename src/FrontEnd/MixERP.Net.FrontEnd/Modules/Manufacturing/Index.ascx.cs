@@ -17,14 +17,13 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using MixERP.Net.FrontEnd.Base;
 using System;
 
 namespace MixERP.Net.Core.Modules.Manufacturing
 {
-    public partial class Index : MixERPUserControl
+    public partial class Index
     {
-        public override void OnControlLoad(object sender, EventArgs e)
+        public void OnControlLoad(object sender, EventArgs e)
         {
         }
     }

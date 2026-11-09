@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,13 +19,10 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.WebControls.ReportEngine.Helpers;
 using System.IO;
-using System.Web.UI;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ReportEngine
 {
-    [ToolboxData("<{0}:ReportHeader runat=server></{0}:ReportHeader>")]
-    public partial class ReportHeader : CompositeControl
+        public partial class ReportHeader : WebControlBase
     {
         private string html;
 
@@ -34,12 +31,12 @@ namespace MixERP.Net.WebControls.ReportEngine
             return this.html;
         }
 
-        protected override void RecreateChildControls()
+        protected void RecreateChildControls()
         {
             this.EnsureChildControls();
         }
 
-        protected override void Render(HtmlTextWriter w)
+        protected void Render(dynamic w)
         {
             if (!this.IsValid())
             {
@@ -52,7 +49,6 @@ namespace MixERP.Net.WebControls.ReportEngine
             w.AddAttribute(HtmlTextWriterAttribute.Id, "reportheader");
             w.Write(this.html);
             w.RenderEndTag();
-            base.Render(w);
         }
 
         private string GetPath()

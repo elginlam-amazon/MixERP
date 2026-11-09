@@ -1,11 +1,10 @@
-﻿using MixERP.Net.WebControls.Flag;
-using System.Web.UI;
+using MixERP.Net.WebControls.Flag;
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
-    public partial class TransactionView
+    public partial class TransactionView : WebControlBase
     {
-        private void AddFlagControl(Control container)
+        private void AddFlagControl(dynamic container)
         {
             using (FlagControl flag = new FlagControl())
             {

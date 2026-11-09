@@ -45,6 +45,7 @@ namespace MixERP.Net.Updater.Installation.Tasks
         }
 
         private Task DownloadTask(string downloadFrom, string destination)
+#pragma warning disable SYSLIB0014
         {
             using (WebClient client = new WebClient())
             {

@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -21,21 +21,11 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
-using System.Web.UI;
 
 namespace MixERP.Net.Common.Helpers
 {
     public static class JSUtility
     {
-        public static void AddJSReference(Page page, string resourceName, string key, Type type)
-        {
-            if (page != null)
-            {
-                string script = "<script type='text/javascript' src='" + page.Request.Url.GetLeftPart(UriPartial.Authority) + page.ClientScript.GetWebResourceUrl(type, resourceName) + "'></script>";
-                PageUtility.RegisterJavascript(key, script, page, false);
-            }
-        }
-
         public static string GetEmbeddedScript(string embeddedScriptName, Assembly assembly)
         {
             if (assembly == null)
@@ -60,6 +50,8 @@ namespace MixERP.Net.Common.Helpers
                 return reader.ReadToEnd();
             }
         }
+
+        public static void AddJSReference(dynamic page, string resourceName, string key, Type type) { }
 
         public static string GetVar(string name, object value, bool isString = true)
         {

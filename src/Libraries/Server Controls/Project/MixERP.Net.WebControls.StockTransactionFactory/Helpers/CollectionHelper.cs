@@ -1,27 +1,8 @@
-﻿/********************************************************************************
-Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
-
-This file is part of MixERP.
-
-MixERP is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-MixERP is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
-***********************************************************************************/
-
 using MixERP.Net.Common;
 using MixERP.Net.Entities.Core;
 using MixERP.Net.Entities.Models.Transactions;
 using System.Collections.ObjectModel;
-using System.Web.Script.Serialization;
+using System.Text.Json;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory.Helpers
 {
@@ -30,22 +11,24 @@ namespace MixERP.Net.WebControls.StockTransactionFactory.Helpers
         public static Collection<Attachment> GetAttachmentCollection(string json)
         {
             Collection<Attachment> details = new Collection<Attachment>();
-            var jss = new JavaScriptSerializer();
+            if (string.IsNullOrWhiteSpace(json)) return details;
 
-            dynamic result = jss.Deserialize<dynamic>(json);
-
-            if (result != null)
+            try
             {
-                foreach (dynamic item in result)
+                var result = JsonSerializer.Deserialize<JsonElement>(json);
+                if (result.ValueKind == JsonValueKind.Array)
                 {
-                    Attachment detail = new Attachment();
-                    detail.Comment = item["Comment"];
-                    detail.FilePath = item["FilePath"];
-                    detail.OriginalFileName = item["OriginalFileName"];
-
-                    details.Add(detail);
+                    foreach (var item in result.EnumerateArray())
+                    {
+                        Attachment detail = new Attachment();
+                        if (item.TryGetProperty("Comment", out var c)) detail.Comment = c.GetString();
+                        if (item.TryGetProperty("FilePath", out var fp)) detail.FilePath = fp.GetString();
+                        if (item.TryGetProperty("OriginalFileName", out var ofn)) detail.OriginalFileName = ofn.GetString();
+                        details.Add(detail);
+                    }
                 }
             }
+            catch { }
 
             return details;
         }
@@ -53,27 +36,41 @@ namespace MixERP.Net.WebControls.StockTransactionFactory.Helpers
         public static Collection<StockDetail> GetStockMasterDetailCollection(string json, int storeId)
         {
             Collection<StockDetail> details = new Collection<StockDetail>();
-            var jss = new JavaScriptSerializer();
+            if (string.IsNullOrWhiteSpace(json)) return details;
 
-            dynamic result = jss.Deserialize<dynamic>(json);
-
-            foreach (dynamic item in result)
+            try
             {
-                StockDetail detail = new StockDetail();
-                detail.ItemCode = item[0];
-                detail.Quantity = Conversion.TryCastInteger(item[2]);
-                detail.UnitName = item[3];
-                detail.Price = Conversion.TryCastDecimal(item[4]);
-                detail.Discount = Conversion.TryCastDecimal(item[6]);
-                detail.ShippingCharge = Conversion.TryCastDecimal(item[7]);
-                detail.TaxForm = item[9];
-                detail.Tax = Conversion.TryCastDecimal(item[10]);
-                detail.StoreId = storeId;
-
-                details.Add(detail);
+                var result = JsonSerializer.Deserialize<JsonElement>(json);
+                if (result.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in result.EnumerateArray())
+                    {
+                        if (item.ValueKind != JsonValueKind.Array) continue;
+                        var arr = item.EnumerateArray().ToArray();
+                        StockDetail detail = new StockDetail();
+                        if (arr.Length > 0) detail.ItemCode = arr[0].GetString();
+                        if (arr.Length > 2) detail.Quantity = Conversion.TryCastInteger(arr[2].ToString());
+                        if (arr.Length > 3) detail.UnitName = arr[3].GetString();
+                        if (arr.Length > 4) detail.Price = Conversion.TryCastDecimal(arr[4].ToString());
+                        if (arr.Length > 6) detail.Discount = Conversion.TryCastDecimal(arr[6].ToString());
+                        if (arr.Length > 7) detail.ShippingCharge = Conversion.TryCastDecimal(arr[7].ToString());
+                        if (arr.Length > 9) detail.TaxForm = arr[9].GetString();
+                        if (arr.Length > 10) detail.Tax = Conversion.TryCastDecimal(arr[10].ToString());
+                        detail.StoreId = storeId;
+                        details.Add(detail);
+                    }
+                }
             }
+            catch { }
 
             return details;
+        }
+
+        private static JsonElement[] ToArray(this JsonElement.ArrayEnumerator e)
+        {
+            var list = new System.Collections.Generic.List<JsonElement>();
+            foreach (var item in e) list.Add(item);
+            return list.ToArray();
         }
     }
 }

@@ -52,12 +52,10 @@ namespace MixERP.Net.ReportManager
 
         internal string GetContent()
         {
-            using (WebClient client = new WebClient())
-            {
-                string content = client.DownloadString(this.Url);
-                Console.WriteLine("{0}", content);
-                return content;
-            }
+            using var httpClient = new HttpClient();
+            string content = httpClient.GetStringAsync(this.Url).GetAwaiter().GetResult();
+            Console.WriteLine("{0}", content);
+            return content;
         }
     }
 }

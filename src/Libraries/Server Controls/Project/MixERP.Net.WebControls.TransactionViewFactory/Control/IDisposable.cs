@@ -1,10 +1,10 @@
-﻿namespace MixERP.Net.WebControls.TransactionViewFactory
+namespace MixERP.Net.WebControls.TransactionViewFactory
 {
-    public partial class TransactionView
+    public partial class TransactionView : WebControlBase
     {
         private bool disposed;
 
-        public override void Dispose()
+        public void Dispose()
         {
             if (!this.disposed)
             {

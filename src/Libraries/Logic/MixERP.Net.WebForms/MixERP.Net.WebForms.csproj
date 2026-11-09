@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>Mix Open Foundation.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Serilog" Version="4.4.1-dev-02453" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.14" />
+    <PackageReference Include="Microsoft.AspNetCore.SystemWebAdapters" Version="2.3.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../MixER.Net.StateServer/MixERP.Net.ApplicationState.csproj" />
+    <ProjectReference Include="../MixERP.Net.Common/MixERP.Net.Common.csproj" />
+    <ProjectReference Include="../MixERP.Net.Framework/MixERP.Net.Framework.csproj" />
+    <ProjectReference Include="../../Server Controls/Project/MixERP.Net.WebControls.ScrudFactory/MixERP.Net.WebControls.ScrudFactory.csproj" />
+    <ProjectReference Include="../../Server Controls/Project/MixERP.Net.WebControls.TransactionChecklist/MixERP.Net.WebControls.TransactionChecklist.csproj" />
+    <ProjectReference Include="../../Server Controls/Project/MixERP.Net.WebControls.ReportEngine/MixERP.Net.WebControls.ReportEngine.csproj" />
+  </ItemGroup>
+</Project>

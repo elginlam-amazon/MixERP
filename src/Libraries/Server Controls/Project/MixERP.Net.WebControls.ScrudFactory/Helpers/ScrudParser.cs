@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -24,7 +24,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
 {
     internal class ScrudParser
     {
-        public static object ParseValue(string value, string dataType)
+        public static dynamic ParseValue(string value, string dataType)
         {
             if (ScrudTypes.Strings.Contains(dataType))
             {

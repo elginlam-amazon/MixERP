@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -25,26 +25,12 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Web;
-using System.Web.Hosting;
-using System.Web.SessionState;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
 using MixERP.Net.Common.Helpers;
 
 namespace MixERP.Net.Common
 {
     public static class PageUtility
     {
-        public static void AddMeta(Page page, string name, string content)
-        {
-            using (HtmlMeta meta = new HtmlMeta())
-            {
-                meta.Name = name;
-                meta.Content = content;
-                page.Header.Controls.Add(meta);
-            }
-        }
-
         private static string GetUserHostAddress()
         {
             string host = string.Empty;
@@ -60,39 +46,6 @@ namespace MixERP.Net.Common
             return host;
         }
 
-        private static HttpBrowserCapabilities GetBrowser()
-        {
-            if (HttpContext.Current != null)
-            {
-                if (HttpContext.Current.Request.UserHostAddress != null)
-                {
-                    return HttpContext.Current.Request.Browser;
-                }
-            }
-
-            return new HttpBrowserCapabilities();
-        }
-
-        public static void CheckInvalidAttempts(Page page)
-        {
-            if (page != null)
-            {
-                int triedAttempts = InvalidPasswordAttempts(page.Session);
-                int allowedAttemps = Conversion.TryCastInteger(ConfigurationManager.AppSettings["MaxInvalidPasswordAttempts"]);
-
-                if (triedAttempts > 0)
-                {
-                    Log.Warning("{Count} of {Allowed} allowed invalid sign-in attempts from {Host}/{IP} using {Browser}.", triedAttempts, allowedAttemps, GetUserHostAddress(), GetUserIpAddress(), GetBrowser().Browsers);
-                }
-
-                if (triedAttempts >= allowedAttemps)
-                {
-                    Log.Error("Disallowed access to {Host}/{IP} using {Browser}.", GetUserHostAddress(), GetUserIpAddress(), GetBrowser().Browsers);
-                    page.Response.Redirect("~/Static/AccessIsDenied.html");
-                }
-            }
-        }
-
         public static string MapPath(string path)
         {
             if (Path.IsPathRooted(path))
@@ -100,17 +53,10 @@ namespace MixERP.Net.Common
                 return PathHelper.NormalizePhysicalPath(path);
             }
 
-            return HostingEnvironment.MapPath(path);
+            string basePath = AppDomain.CurrentDomain.BaseDirectory;
+            return Path.Combine(basePath, path.TrimStart('~', '/').Replace('/', Path.DirectorySeparatorChar));
         }
 
-
-        /// <summary>
-        ///     Check if the input is a valid url.
-        /// </summary>
-        /// <param name="url">Url to validate.</param>
-        /// <returns>
-        ///     Returns input if it's a valid url. If the input is not a valid url, returns empty string.
-        /// </returns>
         public static string CleanUrl(string url)
         {
             if (string.IsNullOrWhiteSpace(url))
@@ -141,28 +87,6 @@ namespace MixERP.Net.Common
             }
         }
 
-        public static Control FindControlIterative(Control root, string id)
-        {
-            if (root == null)
-            {
-                return null;
-            }
-
-            if (root.ID == id)
-            {
-                return root;
-            }
-            foreach (Control c in root.Controls)
-            {
-                Control t = FindControlIterative(c, id);
-                if (t != null)
-                {
-                    return t;
-                }
-            }
-            return null;
-        }
-
         public static string GetCurrentDomainName()
         {
             if (HttpContext.Current == null)
@@ -180,39 +104,28 @@ namespace MixERP.Net.Common
             return url;
         }
 
-        public static string GetCurrentPageUrl(Page p)
+        public static string GetUserIpAddress()
         {
-            if (p == null)
+            if (HttpContext.Current == null)
             {
                 return string.Empty;
             }
 
-            return p.Request.Url.AbsolutePath;
-        }
-
-        public static string GetUserIpAddress()
-        {
-            Page page = HttpContext.Current.Handler as Page;
-
-            if (page != null)
+            string ip = HttpContext.Current.Request.ServerVariables["HTTP_X_FORWARDED_FOR"];
+            if (!string.IsNullOrEmpty(ip))
             {
-                string ip = page.Request.ServerVariables["HTTP_X_FORWARDED_FOR"];
-                if (!string.IsNullOrEmpty(ip))
-                {
-                    string[] ipRange = ip.Split(',');
-                    ip = ipRange[0];
-                }
-                else
-                {
-                    ip = page.Request.ServerVariables["REMOTE_ADDR"];
-                }
-                return ip.Trim();
+                string[] ipRange = ip.Split(',');
+                ip = ipRange[0];
+            }
+            else
+            {
+                ip = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
             }
 
-            return string.Empty;
+            return ip?.Trim() ?? string.Empty;
         }
 
-        public static int InvalidPasswordAttempts(HttpSessionState session, int increment = 0)
+        public static int InvalidPasswordAttempts(System.Web.SessionState.HttpSessionState session, int increment = 0)
         {
             if (session == null)
             {
@@ -232,98 +145,46 @@ namespace MixERP.Net.Common
                 session["InvalidPasswordAttempts"] = retVal;
             }
 
-
             if (increment > 0)
             {
-                Log.Warning("{Count} Invalid attempt to sign in from {Host}/{IP} using {Browser}.", retVal, GetUserHostAddress(), GetUserIpAddress(), GetBrowser().Browsers);
+                Log.Warning("{Count} Invalid attempt to sign in from {Host}/{IP}.", retVal, GetUserHostAddress(), GetUserIpAddress());
             }
 
             return retVal;
         }
 
-        public static bool IsLocalUrl(Uri url, Page page)
+        public static bool IsLocalhost()
         {
-            if (page == null)
+            if (HttpContext.Current == null)
             {
                 return false;
             }
 
-            try
-            {
-                Uri requested = new Uri(page.Request.Url, url);
-
-                if (requested.Host == page.Request.Url.Host)
-                {
-                    return true;
-                }
-            }
-            catch (InvalidOperationException)
-            {
-                //
-            }
-
-            return false;
+            return HttpContext.Current.Request.IsLocal;
         }
 
-        public static bool IsLocalhost(Page page)
-        {
-            if (page == null)
-            {
-                return false;
-            }
+        public static bool IsLocalhost(dynamic page) => IsLocalhost();
 
-            return page.Request.IsLocal;
-        }
-
-        public static void RefreshPage(Page page)
-        {
-            if (page != null)
-            {
-                page.Response.Redirect(page.Request.Url.AbsolutePath);
-            }
-        }
-
-        public static void RegisterJavascript(string key, string javaScript, Page page, bool addScriptTags)
-        {
-            if (page == null)
-            {
-                page = HttpContext.Current.Handler as Page;
-            }
-
-            if (page == null)
-            {
-                throw new InvalidOperationException(Warnings.CouldNotRegisterJavascript);
-            }
-
-            ScriptManager.RegisterStartupScript(page, typeof (Page), key, javaScript, addScriptTags);
-        }
-
-        public static string ResolveAbsoluteUrl(Page page, string relativeUrl)
-        {
-            if (page != null)
-            {
-                return page.Request.Url.GetLeftPart(UriPartial.Authority) + page.ResolveUrl(relativeUrl);
-            }
-            return relativeUrl;
-        }
+        public static void CheckInvalidAttempts(dynamic page) { }
 
         public static string ResolveUrl(string relativeUrl)
         {
-            if (string.IsNullOrWhiteSpace(relativeUrl))
-            {
-                return string.Empty;
-            }
+            return relativeUrl ?? string.Empty;
+        }
 
+        public static string GetCurrentPageUrl(dynamic page = null)
+        {
             if (HttpContext.Current != null)
             {
-                Page p = HttpContext.Current.Handler as Page;
-                if (p != null)
-                {
-                    return p.ResolveUrl(relativeUrl);
-                }
+                return HttpContext.Current.Request.Url?.ToString() ?? string.Empty;
             }
-            return relativeUrl;
+            return string.Empty;
         }
+
+        public static void AddMeta(dynamic page, string name, string content) { }
+
+        public static void RegisterJavascript(string key, string script, dynamic page, bool addScriptTags = false) { }
+#pragma warning disable SYSLIB0014
 
         private class MyClient : WebClient
         {

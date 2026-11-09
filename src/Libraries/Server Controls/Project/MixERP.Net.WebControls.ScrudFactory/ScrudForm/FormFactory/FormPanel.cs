@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -20,43 +20,39 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.i18n.Resources;
 using System.Data;
 using System.Threading;
-using System.Web;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
-    public partial class ScrudForm
+    public partial class ScrudForm : WebControlBase
     {
         private Button cancelButton;
-        private Panel form;
-        private Panel formContainer;
-        private Panel formPanel;
-        private Literal requiredFieldDetailsLiteral;
+        private dynamic form;
+        private dynamic formContainer;
+        private dynamic formPanel;
+        private dynamic requiredFieldDetailsLiteral;
         private Button saveButton;
         private Button useButton;
 
-        private void AddFormContainer(Panel p)
+        private void AddFormContainer(dynamic p)
         {
             this.formContainer = new Panel();
             p.Controls.Add(this.formContainer);
         }
 
-        private void AddFormFooter(Panel p)
+        private void AddFormFooter(dynamic p)
         {
-            using (HtmlTable htmlTable = new HtmlTable())
+            using (HtmlGenericControl htmlTable = new HtmlTable())
             {
-                using (HtmlTableRow row = new HtmlTableRow())
+                using (HtmlGenericControl row = new HtmlTableRow())
                 {
-                    using (HtmlTableCell labelCell = new HtmlTableCell())
+                    using (HtmlGenericControl labelCell = new HtmlTableCell())
                     {
                         labelCell.Attributes.Add("class", "label-cell");
 
                         row.Cells.Add(labelCell);
                     }
 
-                    using (HtmlTableCell controlCell = new HtmlTableCell())
+                    using (HtmlGenericControl controlCell = new HtmlTableCell())
                     {
                         controlCell.Attributes.Add("class", "control-cell");
 
@@ -112,7 +108,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
             }
         }
 
-        private void AddFormHeader(Panel p)
+        private void AddFormHeader(dynamic p)
         {
             this.requiredFieldDetailsLiteral = new Literal();
             this.requiredFieldDetailsLiteral.Text = @"<div class='form-description'>" + Titles.RequiredFieldDetails + @"</div>"; //Todo:parameterize css class
@@ -140,7 +136,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
 
         private void InitializeScrudControl()
         {
-            using (DataTable table = new DataTable())
+            using (dynamic table = new DataTable())
             {
                 table.Locale = Thread.CurrentThread.CurrentCulture;
                 this.LoadForm(this.formContainer, table);
@@ -149,20 +145,6 @@ namespace MixERP.Net.WebControls.ScrudFactory
 
         private bool IsModal()
         {
-            Page page = HttpContext.Current.CurrentHandler as Page;
-
-            if (page != null)
-            {
-                string modal = page.Request.QueryString["modal"];
-                if (modal != null)
-                {
-                    if (modal.Equals("1"))
-                    {
-                        return true;
-                    }
-                }
-            }
-
             return false;
         }
     }

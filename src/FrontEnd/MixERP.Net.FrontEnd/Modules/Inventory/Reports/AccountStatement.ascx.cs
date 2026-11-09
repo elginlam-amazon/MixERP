@@ -24,6 +24,9 @@ using System.Linq;
 using System.Web.UI;
 using System.Web.UI.HtmlControls;
 using System.Web.UI.WebControls;
+using HtmlGenericControl = System.Web.UI.HtmlControls.HtmlGenericControl;
+using ITemplate = System.Web.UI.ITemplate;
+using GridLines = System.Web.UI.WebControls.GridLines;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Extensions;
@@ -222,7 +225,7 @@ namespace MixERP.Net.Core.Modules.Inventory.Reports
             }
         }
 
-        private void Dispose(bool disposing)
+        protected override void Dispose(bool disposing)
         {
             if (!disposing)
             {

@@ -1,8 +1,8 @@
-﻿using System;
+using System;
 
 namespace MixERP.Net.WebControls.Flag
 {
-    public class FlagUpdatedEventArgs : EventArgs
+    public class FlagUpdatedEventArgs: EventArgs
     {
         public FlagUpdatedEventArgs(int flagId)
         {

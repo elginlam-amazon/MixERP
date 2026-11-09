@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -22,23 +22,19 @@ using MixERP.Net.Entities.Models.Transactions;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Web.Script.Serialization;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private void CreateGrid(Control container)
+        private void CreateGrid(dynamic container)
         {
-            using (HtmlGenericControl div = new HtmlGenericControl("div"))
+            using (dynamic div = new HtmlGenericControl("div"))
             {
                 div.Attributes.Add("style", "width:100%;overflow:auto;");
                 div.Attributes.Add("class", "ui form vpad16");
 
-                using (Table productGridView = new Table())
+                using (dynamic productGridView = new Table())
                 {
                     productGridView.ID = "ProductGridView";
                     productGridView.CssClass = "ui table";
@@ -82,8 +78,8 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
                     rowData.Add(colData);
                 }
 
-                JavaScriptSerializer serializer = new JavaScriptSerializer();
-                string data = serializer.Serialize(rowData);
+                var serializer = new System.Text.Json.JsonSerializerOptions { };
+                string data = System.Text.Json.JsonSerializer.Serialize(rowData);
 
                 this.productGridViewDataHidden.Value = data;
             }

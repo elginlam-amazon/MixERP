@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -20,23 +20,21 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.AttachmentFactory;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private static void CreateAttachmentPanel(Control container)
+        private static void CreateAttachmentPanel(dynamic container)
         {
-            using (HtmlGenericControl header = new HtmlGenericControl("h2"))
+            using (dynamic header = new HtmlGenericControl("h2"))
             {
                 header.ID = "attachmentToggler";
                 header.InnerText = Titles.AttachmentsPlus;
                 container.Controls.Add(header);
             }
 
-            using (HtmlGenericControl attachmentContainer = new HtmlGenericControl("div"))
+            using (dynamic attachmentContainer = new HtmlGenericControl("div"))
             {
                 attachmentContainer.ID = "attachment";
                 attachmentContainer.Attributes.Add("class", "ui segment initially hidden");

@@ -1,19 +1,12 @@
-﻿using MixERP.Net.WebControls.Common;
+using MixERP.Net.WebControls.Common;
 using System;
-using System.Security.Permissions;
-using System.Web;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockAdjustmentFactory
 {
-    [ToolboxData("<{0}:FormView runat=server></{0}:FormView>")]
-    [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
-    public partial class FormView : CompositeControl
+            public partial class FormView : WebControlBase
     {
-        private HtmlGenericControl container;
-        private DateTextBox dateTextBox;
+        private dynamic container;
+        private dynamic dateTextBox;
         public string ItemIdQuerySericeUrl { get; set; }
         public string ItemPopupUrl { get; set; }
         public string ItemServiceUrl { get; set; }
@@ -24,7 +17,7 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
         public bool ValidateSides { get; set; }
         public bool HideSides { get; set; }
 
-        protected override void CreateChildControls()
+        protected void CreateChildControls()
         {
             this.container = new HtmlGenericControl();
             this.CreateHeader();
@@ -39,12 +32,12 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             this.Controls.Add(this.container);
         }
 
-        protected override void RecreateChildControls()
+        protected void RecreateChildControls()
         {
             this.EnsureChildControls();
         }
 
-        protected override void Render(HtmlTextWriter w)
+        protected void Render(dynamic w)
         {
             this.container.RenderControl(w);
         }
@@ -53,7 +46,7 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
 
         private bool disposed;
 
-        public override sealed void Dispose()
+        public void Dispose()
         {
             if (!this.disposed)
             {

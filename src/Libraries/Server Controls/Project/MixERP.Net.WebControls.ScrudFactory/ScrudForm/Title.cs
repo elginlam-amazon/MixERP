@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,45 +17,43 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
-    public partial class ScrudForm
+    public partial class ScrudForm : WebControlBase
     {
-        private Label descriptionLabel;
-        private Label titleLabel;
+        private dynamic descriptionLabel;
+        private dynamic titleLabel;
 
-        private static void AddRuler(Panel p)
+        private static void AddRuler(dynamic p)
         {
             if (p == null)
             {
                 return;
             }
 
-            using (HtmlGenericControl ruler = new HtmlGenericControl("div")) //"hr"
+            using (dynamic ruler = new HtmlGenericControl("div")) //"hr"
             {
                 ruler.Attributes.Add("class", "ui divider");
                 p.Controls.Add(ruler);
             }
         }
 
-        private void AddDescription(Panel p)
+        private void AddDescription(dynamic p)
         {
             this.descriptionLabel = new Label();
             this.descriptionLabel.Attributes.Add("style", "display:block;");
             p.Controls.Add(this.descriptionLabel);
         }
 
-        private void AddTitle(Panel p)
+        private void AddTitle(dynamic p)
         {
             if (p == null)
             {
                 return;
             }
 
-            using (HtmlGenericControl titleDiv = new HtmlGenericControl())
+            using (dynamic titleDiv = new HtmlGenericControl())
             {
                 titleDiv.TagName = "div";
                 this.titleLabel = new Label();

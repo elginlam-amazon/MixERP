@@ -1,54 +1,22 @@
-﻿using MixERP.Net.ApplicationState.Cache;
+using MixERP.Net.ApplicationState.Cache;
 using System;
 using System.Collections.ObjectModel;
-using System.Reflection;
-using System.Security.Permissions;
-using System.Web;
-using System.Web.Script.Serialization;
-using System.Web.Script.Services;
-using System.Web.Services;
-using System.Web.Services.Protocols;
 
 namespace MixERP.Net.WebControls.AttachmentFactory.Handlers
 {
-    [WebService(Namespace = "http://tempuri.org/")]
-    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
-    [ScriptService]
-    [PermissionSet(SecurityAction.InheritanceDemand, Unrestricted = true)]
-    public class UploadService : WebService, IHttpHandlerFactory
+    public class UploadService
     {
-        public IHttpHandler GetHandler(HttpContext context, string requestType, string url, string pathTranslated)
-        {
-            WebServiceHandlerFactory factory = new WebServiceHandlerFactory();
-            MethodInfo method = typeof (WebServiceHandlerFactory).GetMethod("CoreGetHandler",
-                BindingFlags.NonPublic | BindingFlags.Instance, null,
-                new Type[] {typeof (Type), typeof (HttpContext), typeof (HttpRequest), typeof (HttpResponse)}, null);
-
-            return (IHttpHandler) method.Invoke(factory, new object[]
-            {
-                this.GetType(),
-                context,
-                context.Request,
-                context.Response
-            });
-        }
-
-        public void ReleaseHandler(IHttpHandler handler)
-        {
-        }
-
-        [WebMethod]
-        [ScriptMethod(ResponseFormat = ResponseFormat.Xml)]
         public bool UndoUpload(string uploadedFilesJson)
         {
             Collection<Entities.Core.Attachment> uploads = GetAttachmentCollection(uploadedFilesJson);
-
-            string attachmentsDirectory =
-                Helpers.ConfigurationHelper.GetAttachmentsDirectory(AppUsers.GetCurrentUserDB());
+            string attachmentsDirectory = Helpers.ConfigurationHelper.GetAttachmentsDirectory(AppUsers.GetCurrentUserDB());
 
             foreach (Entities.Core.Attachment upload in uploads)
             {
-                string path = this.Server.MapPath(attachmentsDirectory + upload.FilePath);
+                string path = System.IO.Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    attachmentsDirectory.TrimStart('/').Replace('/', System.IO.Path.DirectorySeparatorChar),
+                    upload.FilePath ?? string.Empty);
 
                 if (System.IO.File.Exists(path))
                 {
@@ -62,22 +30,26 @@ namespace MixERP.Net.WebControls.AttachmentFactory.Handlers
         public static Collection<Entities.Core.Attachment> GetAttachmentCollection(string json)
         {
             Collection<Entities.Core.Attachment> details = new Collection<Entities.Core.Attachment>();
-            var jss = new JavaScriptSerializer();
 
-            dynamic result = jss.Deserialize<dynamic>(json);
+            if (string.IsNullOrWhiteSpace(json))
+                return details;
 
-            if (result != null)
+            try
             {
-                foreach (dynamic item in result)
+                var parsed = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
+                if (parsed.ValueKind == System.Text.Json.JsonValueKind.Array)
                 {
-                    Entities.Core.Attachment detail = new Entities.Core.Attachment();
-                    detail.Comment = item["Comment"];
-                    detail.FilePath = item["FilePath"];
-                    detail.OriginalFileName = item["OriginalFileName"];
-
-                    details.Add(detail);
+                    foreach (var item in parsed.EnumerateArray())
+                    {
+                        Entities.Core.Attachment detail = new Entities.Core.Attachment();
+                        if (item.TryGetProperty("Comment", out var c)) detail.Comment = c.GetString();
+                        if (item.TryGetProperty("FilePath", out var fp)) detail.FilePath = fp.GetString();
+                        if (item.TryGetProperty("OriginalFileName", out var ofn)) detail.OriginalFileName = ofn.GetString();
+                        details.Add(detail);
+                    }
                 }
             }
+            catch { }
 
             return details;
         }

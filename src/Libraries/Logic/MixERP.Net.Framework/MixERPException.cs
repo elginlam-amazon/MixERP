@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,8 +19,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Runtime.Serialization;
-using System.Security.Permissions;
-using System.Web;
 using Serilog;
 
 namespace MixERP.Net.Framework
@@ -50,6 +48,7 @@ namespace MixERP.Net.Framework
             this.dbConstraintName = dbConstraintName;
         }
 
+        [Obsolete]
         public MixERPException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
@@ -60,12 +59,6 @@ namespace MixERP.Net.Framework
             get { return this.dbConstraintName; }
         }
 
-        [SecurityPermission(SecurityAction.Demand, SerializationFormatter = true)]
-        public override void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            base.GetObjectData(info, context);
-        }
-
         public static void Handle(MixERPException ex)
         {
             if (ex == null)
@@ -73,14 +66,7 @@ namespace MixERP.Net.Framework
                 return;
             }
 
-            if (HttpContext.Current.Session != null)
-            {
-                HttpContext.Current.Session["ex"] = ex;
-                Log.Information("Exception object was added to session.");
-
-                HttpContext.Current.Server.TransferRequest("~/Site/RuntimeError.aspx", true);
-            }
+            Log.Error(ex, "MixERPException handled: {Message}", ex.Message);
         }
-
     }
 }

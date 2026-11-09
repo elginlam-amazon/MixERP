@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -24,13 +24,12 @@ using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.Flag;
 using MixERP.Net.WebControls.StockTransactionViewFactory.Helpers;
 using System.Linq;
-using System.Web.UI;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
-    public partial class StockTransactionView
+    public partial class StockTransactionView : WebControlBase
     {
-        private void AddFlag(Control contianer)
+        private void AddFlag(dynamic contianer)
         {
             using (FlagControl flag = new FlagControl())
             {
@@ -45,7 +44,7 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory
             }
         }
 
-        private void Flag_Updated(object sender, FlagUpdatedEventArgs e)
+        private void Flag_Updated(dynamic sender, FlagUpdatedEventArgs e)
         {
             int flagTypeId = e.FlagId;
 

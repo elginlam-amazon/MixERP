@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,22 +18,14 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.Common.Helpers;
-using System.Security.Permissions;
-using System.Web;
-using System.Web.UI;
-using System.Web.UI.WebControls;
-
-[assembly: WebResource("MixERP.Net.WebControls.PartyControl.PartyControl.js", "application/x-javascript")]
 
 namespace MixERP.Net.WebControls.PartyControl
 {
-    [ToolboxData("<{0}:PartyControl runat=server></{0}:PartyControl>")]
-    [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
-    public sealed partial class PartyControl : CompositeControl
+            public sealed partial class PartyControl : WebControlBase
     {
-        public Panel container;
+        public dynamic container;
 
-        protected override void CreateChildControls()
+        protected void CreateChildControls()
         {
             //this.Validate();
 
@@ -49,12 +41,12 @@ namespace MixERP.Net.WebControls.PartyControl
             this.AddScript();
         }
 
-        protected override void RecreateChildControls()
+        protected void RecreateChildControls()
         {
             this.EnsureChildControls();
         }
 
-        protected override void Render(HtmlTextWriter w)
+        protected void Render(dynamic w)
         {
             this.container.RenderControl(w);
         }
@@ -68,7 +60,7 @@ namespace MixERP.Net.WebControls.PartyControl
 
         private bool disposed;
 
-        public override void Dispose()
+        public void Dispose()
         {
             if (!this.disposed)
             {

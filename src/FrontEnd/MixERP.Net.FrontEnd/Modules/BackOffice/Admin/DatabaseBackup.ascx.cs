@@ -313,7 +313,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Admin
             }
         }
 
-        protected virtual void Dispose(bool disposing)
+        protected override void Dispose(bool disposing)
         {
             if (!disposing)
             {

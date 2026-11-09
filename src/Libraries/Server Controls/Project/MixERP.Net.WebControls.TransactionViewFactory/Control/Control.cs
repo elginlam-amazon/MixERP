@@ -1,20 +1,11 @@
-﻿using System.Security.Permissions;
-using System.Web;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
-
-[assembly: WebResource("MixERP.Net.WebControls.TransactionViewFactory.TransactionViewFactory.js", "application/x-javascript")]
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
-    [ToolboxData("<{0}:TransactionView runat=server></{0}:TransactionView>")]
-    [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
-    public sealed partial class TransactionView : CompositeControl
+            public sealed partial class TransactionView : WebControlBase
     {
-        private HtmlGenericControl panel;
+        private dynamic panel;
 
-        protected override void CreateChildControls()
+        protected void CreateChildControls()
         {
             this.panel = new HtmlGenericControl();
 
@@ -32,12 +23,12 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             this.Controls.Add(this.panel);
         }
 
-        protected override void RecreateChildControls()
+        protected void RecreateChildControls()
         {
             this.EnsureChildControls();
         }
 
-        protected override void Render(HtmlTextWriter w)
+        protected void Render(dynamic w)
         {
             this.panel.RenderControl(w);
         }

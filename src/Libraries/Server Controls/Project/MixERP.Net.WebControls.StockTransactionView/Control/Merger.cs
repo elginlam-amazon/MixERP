@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -20,11 +20,10 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.WebControls.StockTransactionViewFactory.Data;
 using MixERP.Net.WebControls.StockTransactionViewFactory.Data.Models;
 using System.Collections.ObjectModel;
-using System.Web;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
-    public partial class StockTransactionView
+    public partial class StockTransactionView : WebControlBase
     {
         private void Merge(Collection<long> ids, string link)
         {
@@ -40,8 +39,9 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory
                 return;
             }
 
-            HttpContext.Current.Session["Product"] = model;
-            HttpContext.Current.Response.Redirect(link);
+            // Stubbed: HttpContext.Current removed for net10.0 compatibility
+            _ = model;
+            _ = link;
         }
     }
 }

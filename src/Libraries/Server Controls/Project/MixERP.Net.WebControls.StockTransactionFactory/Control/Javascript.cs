@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -20,15 +20,10 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.Entities;
-using System.Security.Permissions;
-using System.Web;
-using System.Web.UI;
-
-[assembly: WebResource("MixERP.Net.WebControls.StockTransactionFactory.Includes.Script.StockTransactionForm.js", "application/x-javascript", PerformSubstitution = true)]
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
         private void RegisterJavascript()
         {
@@ -54,8 +49,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             return "Purchase";
         }
 
-        [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
-        private void AddJavascript()
+                private void AddJavascript()
         {
             JSUtility.AddJSReference(this.Page, "MixERP.Net.WebControls.StockTransactionFactory.Includes.Script.StockTransactionForm.js", "StockTransactionForm", typeof(StockTransactionForm));
         }

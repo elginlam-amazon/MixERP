@@ -1,12 +1,10 @@
-﻿using MixERP.Net.i18n.Resources;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
+using MixERP.Net.i18n.Resources;
 
 namespace MixERP.Net.WebControls.AttachmentFactory
 {
-    public sealed partial class Attachment
+    public sealed partial class Attachment : WebControlBase
     {
-        private void CreateButtons(Control container)
+        private void CreateButtons(WebControlBase container)
         {
             using (HtmlGenericControl buttonContainer = new HtmlGenericControl("div"))
             {
@@ -19,7 +17,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory
             }
         }
 
-        private void CreateUndoButton(HtmlGenericControl container)
+        private void CreateUndoButton(dynamic container)
         {
             using (HtmlInputButton undoButton = new HtmlInputButton())
             {
@@ -31,7 +29,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory
             }
         }
 
-        private void CreateUploadButton(HtmlGenericControl container)
+        private void CreateUploadButton(dynamic container)
         {
             using (HtmlInputButton uploadButton = new HtmlInputButton())
             {
@@ -43,7 +41,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory
             }
         }
 
-        private void CreatSaveButton(HtmlGenericControl container)
+        private void CreatSaveButton(dynamic container)
         {
             using (HtmlInputButton saveButton = new HtmlInputButton())
             {

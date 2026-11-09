@@ -1,31 +1,28 @@
-﻿using MixERP.Net.Common.Helpers;
+using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.Common;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
-    public partial class TransactionView
+    public partial class TransactionView : WebControlBase
     {
-        private HtmlInputText bookInputText;
-        private DateTextBox dateFromDateTextBox;
-        private DateTextBox dateToDateTextBox;
-        private HtmlInputText officeInputText;
-        private HtmlInputText postedByInputText;
-        private HtmlInputText reasonInputText;
-        private HtmlInputText referenceNumberInputText;
+        private dynamic bookInputText;
+        private dynamic dateFromDateTextBox;
+        private dynamic dateToDateTextBox;
+        private dynamic officeInputText;
+        private dynamic postedByInputText;
+        private dynamic reasonInputText;
+        private dynamic referenceNumberInputText;
         private Button showButton;
-        private HtmlInputText statementReferenceInputText;
-        private HtmlInputText statusInputText;
-        private HtmlInputText tranCodeInputText;
-        private HtmlInputText tranIdInputText;
-        private HtmlInputText verifiedByInputText;
+        private dynamic statementReferenceInputText;
+        private dynamic statusInputText;
+        private dynamic tranCodeInputText;
+        private dynamic tranIdInputText;
+        private dynamic verifiedByInputText;
 
-        private void AddBookInputText(HtmlGenericControl container)
+        private void AddBookInputText(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
                 this.bookInputText = new HtmlInputText();
                 this.bookInputText.Attributes.Add("placeholder", Titles.Book);
@@ -35,11 +32,11 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddDateFromDateTextBox(HtmlGenericControl container)
+        private void AddDateFromDateTextBox(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
-                using (HtmlGenericControl iconInput = new HtmlGenericControl("div"))
+                using (dynamic iconInput = new HtmlGenericControl("div"))
                 {
                     iconInput.Attributes.Add("class", "ui icon input");
 
@@ -53,7 +50,7 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
 
                     iconInput.Controls.Add(this.dateFromDateTextBox);
 
-                    using (HtmlGenericControl icon = new HtmlGenericControl("i"))
+                    using (dynamic icon = new HtmlGenericControl("i"))
                     {
                         icon.Attributes.Add("class", "icon calendar pointer");
                         icon.Attributes.Add("onclick", "$('#DateFromDateTextBox').datepicker('show');");
@@ -67,11 +64,11 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddDatetoDateTextBox(HtmlGenericControl container)
+        private void AddDatetoDateTextBox(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
-                using (HtmlGenericControl iconInput = new HtmlGenericControl("div"))
+                using (dynamic iconInput = new HtmlGenericControl("div"))
                 {
                     iconInput.Attributes.Add("class", "ui icon input");
 
@@ -85,7 +82,7 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
 
                     iconInput.Controls.Add(this.dateToDateTextBox);
 
-                    using (HtmlGenericControl icon = new HtmlGenericControl("i"))
+                    using (dynamic icon = new HtmlGenericControl("i"))
                     {
                         icon.Attributes.Add("class", "icon calendar pointer");
                         icon.Attributes.Add("onclick", "$('#DateToDateTextBox').datepicker('show');");
@@ -97,9 +94,9 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddOfficeInputText(HtmlGenericControl container)
+        private void AddOfficeInputText(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
                 this.officeInputText = new HtmlInputText();
                 this.officeInputText.Attributes.Add("placeholder", Titles.Office);
@@ -109,9 +106,9 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddPostedByInputText(HtmlGenericControl container)
+        private void AddPostedByInputText(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
                 this.postedByInputText = new HtmlInputText();
                 this.postedByInputText.Attributes.Add("placeholder", Titles.PostedBy);
@@ -121,9 +118,9 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddReasonInputText(HtmlGenericControl container)
+        private void AddReasonInputText(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
                 this.reasonInputText = new HtmlInputText();
                 this.reasonInputText.Attributes.Add("placeholder", Titles.Reason);
@@ -133,9 +130,9 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddReferenceNumberInputText(HtmlGenericControl container)
+        private void AddReferenceNumberInputText(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
                 this.referenceNumberInputText = new HtmlInputText();
                 this.referenceNumberInputText.Attributes.Add("placeholder", Titles.ReferenceNumber);
@@ -145,7 +142,7 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddShowbutton(HtmlGenericControl container)
+        private void AddShowbutton(dynamic container)
         {
             this.showButton = new Button();
             this.showButton.Text = Titles.Show;
@@ -155,9 +152,9 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             container.Controls.Add(this.showButton);
         }
 
-        private void AddStatementReferenceInputText(HtmlGenericControl container)
+        private void AddStatementReferenceInputText(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
                 this.statementReferenceInputText = new HtmlInputText();
                 this.statementReferenceInputText.Attributes.Add("placeholder", Titles.StatementReference);
@@ -167,9 +164,9 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddStatusInputText(HtmlGenericControl container)
+        private void AddStatusInputText(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
                 this.statusInputText = new HtmlInputText();
                 this.statusInputText.Attributes.Add("placeholder", Titles.Status);
@@ -179,13 +176,13 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddTopPanel(Control container)
+        private void AddTopPanel(dynamic container)
         {
-            using (HtmlGenericControl form = new HtmlGenericControl("div"))
+            using (dynamic form = new HtmlGenericControl("div"))
             {
                 form.Attributes.Add("class", "ui form segment");
 
-                using (HtmlGenericControl fields = new HtmlGenericControl("div"))
+                using (dynamic fields = new HtmlGenericControl("div"))
                 {
                     fields.Attributes.Add("class", "eight fields");
 
@@ -201,7 +198,7 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
                     form.Controls.Add(fields);
                 }
 
-                using (HtmlGenericControl fields = new HtmlGenericControl("div"))
+                using (dynamic fields = new HtmlGenericControl("div"))
                 {
                     fields.Attributes.Add("class", "eight fields");
 
@@ -218,9 +215,9 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddTranCodeInputText(HtmlGenericControl container)
+        private void AddTranCodeInputText(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
                 this.tranCodeInputText = new HtmlInputText();
                 this.tranCodeInputText.Attributes.Add("placeholder", Titles.TranCode);
@@ -230,9 +227,9 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddTranIdInputText(HtmlGenericControl container)
+        private void AddTranIdInputText(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
                 this.tranIdInputText = new HtmlInputText();
                 this.tranIdInputText.Attributes.Add("placeholder", Titles.TranId);
@@ -244,9 +241,9 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddVerifiedByInputText(HtmlGenericControl container)
+        private void AddVerifiedByInputText(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
                 this.verifiedByInputText = new HtmlInputText();
                 this.verifiedByInputText.Attributes.Add("placeholder", Titles.VerifiedBy);

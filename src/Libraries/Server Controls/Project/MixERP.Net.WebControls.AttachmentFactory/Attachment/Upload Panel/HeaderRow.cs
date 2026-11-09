@@ -1,12 +1,10 @@
-﻿using MixERP.Net.i18n.Resources;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using MixERP.Net.i18n.Resources;
 
 namespace MixERP.Net.WebControls.AttachmentFactory
 {
-    public sealed partial class Attachment
+    public sealed partial class Attachment : WebControlBase
     {
-        private void AddHeaderCell(TableHeaderRow row, string width, string text, string cssClass = "")
+        private void AddHeaderCell(dynamic row, string width, string text, string cssClass = "")
         {
             using (TableHeaderCell cell = new TableHeaderCell())
             {
@@ -30,7 +28,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory
             }
         }
 
-        private void CreateHeaderRow(Table table)
+        private void CreateHeaderRow(dynamic table)
         {
             using (TableHeaderRow header = new TableHeaderRow())
             {

@@ -1,11 +1,9 @@
-﻿using System.Web.UI;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.AttachmentFactory
 {
-    public sealed partial class Attachment
+    public sealed partial class Attachment : WebControlBase
     {
-        private void CreateWarningLabel(Control container)
+        private void CreateWarningLabel(WebControlBase container)
         {
             using (HtmlGenericControl p = new HtmlGenericControl("p"))
             {

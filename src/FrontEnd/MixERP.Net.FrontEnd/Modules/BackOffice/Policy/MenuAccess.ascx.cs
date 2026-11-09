@@ -259,7 +259,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Policy
         }
 
 
-        private void Dispose(bool disposing)
+        protected override void Dispose(bool disposing)
         {
             if (!disposing)
             {

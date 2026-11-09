@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,11 +17,10 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.TransactionChecklist
 {
-    public partial class TransactionChecklistForm
+    public partial class TransactionChecklistForm : WebControlBase
     {
         public string AddNewPath { get; set; }
         public string AttachmentBookName { get; set; }
@@ -48,7 +47,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
         public string Text { get; set; }
         public string ViewPath { get; set; }
         public string ViewReportButtonText { get; set; }
-        public new Unit Width { get; set; }
+        public new dynamic Width { get; set; }
         public int UserId { get; set; }
         public bool RestrictedTransactionMode { get; set; }
     }

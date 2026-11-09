@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,15 +19,14 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.ComponentModel;
 using System.Globalization;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.PartyControl
 {
     public static class ControlHelper
     {
-        public static HtmlAnchor GetAnchor(string cssClass, [Localizable(true)]string text, string tabName, string icon)
+        public static dynamic GetAnchor(string cssClass, [Localizable(true)]string text, string tabName, string icon)
         {
-            using (HtmlAnchor a = new HtmlAnchor())
+            using (dynamic a = new HtmlAnchor())
             {
                 if (!string.IsNullOrWhiteSpace(icon))
                 {
@@ -51,7 +50,7 @@ namespace MixERP.Net.WebControls.PartyControl
 
         public static HtmlButton GetButton(string id, string cssClass, [Localizable(true)] string text)
         {
-            using (HtmlButton button = new HtmlButton())
+            using (dynamic button = new HtmlButton())
             {
                 button.Attributes.Add("type", "button");
 
@@ -71,9 +70,9 @@ namespace MixERP.Net.WebControls.PartyControl
             }
         }
 
-        public static HtmlGenericControl GetGenericControl(string tagName, string cssClass)
+        public static dynamic GetGenericControl(string tagName, string cssClass)
         {
-            using (HtmlGenericControl genericControl = new HtmlGenericControl())
+            using (dynamic genericControl = new HtmlGenericControl())
             {
                 if (!string.IsNullOrWhiteSpace(tagName))
                 {
@@ -89,7 +88,7 @@ namespace MixERP.Net.WebControls.PartyControl
             }
         }
 
-        public static HtmlInputText GetInputText(string id, string cssClass)
+        public static dynamic GetInputText(string id, string cssClass)
         {
             using (HtmlInputText input = new HtmlInputText())
             {
@@ -122,20 +121,20 @@ namespace MixERP.Net.WebControls.PartyControl
             return string.Format(CultureInfo.InvariantCulture, @"<label for='{0}'>{1}</label>", targetControlId, text);
         }
 
-        public static HtmlTableRow GetNewRow([Localizable(true)]string text, string id, string tagName)
+        public static dynamic GetNewRow([Localizable(true)]string text, string id, string tagName)
         {
-            using (HtmlTableRow row = new HtmlTableRow())
+            using (dynamic row = new HtmlTableRow())
             {
-                using (HtmlTableCell cell = new HtmlTableCell())
+                using (dynamic cell = new HtmlTableCell())
                 {
                     cell.Style.Add("width", "300px");
                     cell.InnerHtml = @"<strong>" + text + @"</strong>";
                     row.Cells.Add(cell);
                 }
 
-                using (HtmlTableCell cell = new HtmlTableCell())
+                using (dynamic cell = new HtmlTableCell())
                 {
-                    using (HtmlGenericControl element = new HtmlGenericControl())
+                    using (dynamic element = new HtmlGenericControl())
                     {
                         element.ID = id;
                         element.TagName = tagName;
@@ -149,7 +148,7 @@ namespace MixERP.Net.WebControls.PartyControl
             }
         }
 
-        public static HtmlSelect GetSelect(string id, string cssClass)
+        public static dynamic GetSelect(string id, string cssClass)
         {
             using (HtmlSelect select = new HtmlSelect())
             {

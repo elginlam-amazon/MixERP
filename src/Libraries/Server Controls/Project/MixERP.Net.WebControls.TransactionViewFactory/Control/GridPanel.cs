@@ -1,20 +1,17 @@
-﻿using MixERP.Net.Common;
+using MixERP.Net.Common;
 using MixERP.Net.WebControls.Common;
 using MixERP.Net.WebControls.TransactionViewFactory.Helpers;
 using System;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
-    public partial class TransactionView
+    public partial class TransactionView : WebControlBase
     {
         private MixERPGridView transactionGridView;
 
-        private void AddGridPanel(Control container)
+        private void AddGridPanel(dynamic container)
         {
-            using (HtmlGenericControl gridPanel = new HtmlGenericControl("div"))
+            using (dynamic gridPanel = new HtmlGenericControl("div"))
             {
                 gridPanel.Attributes.Add("style", "width:100%;overflow:auto");
 
@@ -24,7 +21,7 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddGridView(HtmlGenericControl container)
+        private void AddGridView(dynamic container)
         {
             this.transactionGridView = new MixERPGridView();
             this.transactionGridView.ID = "TransactionGridView";

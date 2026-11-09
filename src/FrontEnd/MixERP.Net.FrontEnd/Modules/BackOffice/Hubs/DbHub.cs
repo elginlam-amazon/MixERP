@@ -37,7 +37,6 @@ using MixERP.Net.Common.Extensions;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Hubs
 {
-    [CLSCompliant(false)]
     public class DbHub : Hub
     {
         private string backupDirectory;

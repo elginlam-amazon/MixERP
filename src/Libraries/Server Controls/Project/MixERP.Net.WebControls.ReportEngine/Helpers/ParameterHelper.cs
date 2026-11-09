@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -26,7 +26,7 @@ namespace MixERP.Net.WebControls.ReportEngine.Helpers
 {
     public static class ParameterHelper
     {
-        public static Collection<Collection<KeyValuePair<string, object>>> BindParameters(string reportPath, Collection<KeyValuePair<string, object>> parameterCollection)
+        public static Collection<Collection<KeyValuePair<string, dynamic>>> BindParameters(string reportPath, Collection<KeyValuePair<string, dynamic>> parameterCollection)
         {
             if (!File.Exists(reportPath))
             {
@@ -90,7 +90,7 @@ namespace MixERP.Net.WebControls.ReportEngine.Helpers
             return parameterCollection;
         }
 
-        private static object GetParameterValue(string key, IEnumerable<KeyValuePair<string, object>> collection)
+        private static dynamic GetParameterValue(string key, IEnumerable<KeyValuePair<string, dynamic>> collection)
         {
             if (string.IsNullOrWhiteSpace(key))
             {

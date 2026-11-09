@@ -185,7 +185,7 @@ namespace MixERP.Net.Core.Modules.Inventory
             }
         }
 
-        private void Dispose(bool disposing)
+        protected override void Dispose(bool disposing)
         {
             if (!disposing)
             {

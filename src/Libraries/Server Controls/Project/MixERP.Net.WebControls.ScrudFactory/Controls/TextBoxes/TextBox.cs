@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,15 +19,12 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.ScrudFactory.Helpers;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
 {
     internal static class ScrudTextBox
     {
-        internal static void AddTextBox(HtmlTable htmlTable, string resourceClassName, string columnName, string dataType, string defaultValue, bool isNullable, int maxLength, string errorCssClass, bool disabled)
+        internal static void AddTextBox(dynamic htmlTable, string resourceClassName, string columnName, string dataType, string defaultValue, bool isNullable, int maxLength, string errorCssClass, bool disabled)
         {
             if (htmlTable == null)
             {
@@ -46,7 +43,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
                 defaultValue = "fake-password";
             }
 
-            using (TextBox textBox = GetTextBox(columnName + "_textbox", maxLength))
+            using (dynamic textBox = GetTextBox(columnName + "_textbox", maxLength))
             {
                 string label = ScrudLocalizationHelper.GetResourceString(resourceClassName, columnName);
 
@@ -71,7 +68,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
 
                 if (!isNullable)
                 {
-                    using (RequiredFieldValidator required = ScrudFactoryHelper.GetRequiredFieldValidator(textBox, errorCssClass))
+                    using (dynamic required = ScrudFactoryHelper.GetRequiredFieldValidator(textBox, errorCssClass))
                     {
                         ScrudFactoryHelper.AddRow(htmlTable, label + Titles.RequiredFieldIndicator, textBox, required);
                         return;
@@ -82,14 +79,14 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
             }
         }
 
-        internal static TextBox GetTextBox(string id, int maxLength)
+        internal static dynamic GetTextBox(string id, int maxLength)
         {
             if (string.IsNullOrWhiteSpace(id))
             {
                 return null;
             }
 
-            using (TextBox textBox = new TextBox())
+            using (dynamic textBox = new TextBox())
             {
                 textBox.ID = id;
                 textBox.ClientIDMode = ClientIDMode.Static;

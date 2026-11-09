@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -28,12 +28,11 @@ using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
-using System.Web.UI.WebControls;
 using System.Xml;
 
 namespace MixERP.Net.WebControls.ReportEngine
 {
-    public partial class Report
+    public partial class Report : WebControlBase
     {
         public void InitializeReport()
         {
@@ -67,7 +66,7 @@ namespace MixERP.Net.WebControls.ReportEngine
         {
             for (int i = 0; i < this.dataTableCollection.Count - 1; i++)
             {
-                DataTable table = this.dataTableCollection[i];
+                dynamic table = this.dataTableCollection[i];
                 if (table != null)
                 {
                     table.Dispose();
@@ -122,7 +121,7 @@ namespace MixERP.Net.WebControls.ReportEngine
                 {
                     int index = Conversion.TryCastInteger(ds);
 
-                    using (MixERPGridView grid = new MixERPGridView())
+                    using (dynamic grid = new MixERPGridView())
                     {
                         grid.EnableTheming = false;
 
@@ -130,9 +129,8 @@ namespace MixERP.Net.WebControls.ReportEngine
                         grid.CssClass = "report";
                         grid.Width = Unit.Percentage(100);
                         grid.GridLines = GridLines.None;
-                        grid.RowDataBound += this.GridView_RowDataBound;
-
-                        grid.DataBound += this.GridView_DataBound;
+                        // grid.RowDataBound += this.GridView_RowDataBound; // stub: no events on net10 WebForms stub
+                        // grid.DataBound += this.GridView_DataBound;
                         this.gridPlaceHolder.Controls.Add(grid);
 
                         grid.DataSource = this.dataTableCollection[index];
@@ -212,7 +210,7 @@ namespace MixERP.Net.WebControls.ReportEngine
 
                         //Initializing query parameter collection.
                         Collection<KeyValuePair<string, object>> parameters =
-                            new Collection<KeyValuePair<string, object>>();
+                            new Collection<KeyValuePair<string, dynamic>>();
 
                         if (this.parameterCollection != null)
                         {
@@ -224,7 +222,7 @@ namespace MixERP.Net.WebControls.ReportEngine
                         }
 
                         //Get DataTable from SQL Query and parameter collection.
-                        using (DataTable table = TableHelper.GetDataTable(this.Catalog, sql, parameters))
+                        using (dynamic table = TableHelper.GetDataTable(this.Catalog, sql, parameters))
                         {
                             //Add this datatable to the collection for later binding.
                             this.dataTableCollection.Add(table);

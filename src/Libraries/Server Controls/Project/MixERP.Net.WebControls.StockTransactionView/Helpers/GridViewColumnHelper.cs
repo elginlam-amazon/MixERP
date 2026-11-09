@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -21,15 +21,12 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.Entities;
 using MixERP.Net.i18n.Resources;
 using System;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory.Helpers
 {
     public static class GridViewColumnHelper
     {
-        public static void AddColumns(GridView grid, SubTranBook book)
+        public static void AddColumns(dynamic grid, SubTranBook book)
         {
             grid.Columns.Clear();
 
@@ -60,7 +57,7 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory.Helpers
             GridViewHelper.AddDataBoundControl(grid, "FlagForegroundColor", Titles.FlagForegroundColor);
         }
 
-        private static void AddTemplateFields(GridView grid)
+        private static void AddTemplateFields(dynamic grid)
         {
             TemplateField actionTemplateField = new TemplateField();
             actionTemplateField.HeaderStyle.Width = 90;
@@ -75,20 +72,20 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory.Helpers
             grid.Columns.Add(checkBoxTemplateField);
         }
 
-        public class StockTransactionViewActionTemplate : ITemplate, IDisposable
+        public class StockTransactionViewActionTemplate: ITemplate, IDisposable
         {
-            private HtmlAnchor checkListAnchor;
-            private HtmlAnchor goToTopAnchor;
-            private HtmlAnchor printAnchor;
+            private dynamic checkListAnchor;
+            private dynamic goToTopAnchor;
+            private dynamic printAnchor;
 
-            public void InstantiateIn(Control container)
+            public void InstantiateIn(dynamic container)
             {
                 this.checkListAnchor = new HtmlAnchor();
                 this.checkListAnchor.ID = "ChecklistAnchor";
                 this.checkListAnchor.ClientIDMode = ClientIDMode.Predictable;
                 this.checkListAnchor.Title = Labels.GoToChecklistWindow;
 
-                using (HtmlGenericControl icon = new HtmlGenericControl("i"))
+                using (dynamic icon = new HtmlGenericControl("i"))
                 {
                     icon.Attributes.Add("class", "list icon");
                     this.checkListAnchor.Controls.Add(icon);
@@ -99,7 +96,7 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory.Helpers
                 this.printAnchor.ClientIDMode = ClientIDMode.Predictable;
                 this.printAnchor.Title = Titles.Print;
 
-                using (HtmlGenericControl icon = new HtmlGenericControl("i"))
+                using (dynamic icon = new HtmlGenericControl("i"))
                 {
                     icon.Attributes.Add("class", "print icon");
                     this.printAnchor.Controls.Add(icon);
@@ -109,7 +106,7 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory.Helpers
                 this.goToTopAnchor.Title = Labels.GoToTop;
                 this.goToTopAnchor.Attributes.Add("onclick", "window.scroll(0);");
 
-                using (HtmlGenericControl icon = new HtmlGenericControl("i"))
+                using (dynamic icon = new HtmlGenericControl("i"))
                 {
                     icon.Attributes.Add("class", "arrow up icon");
                     this.goToTopAnchor.Controls.Add(icon);
@@ -165,13 +162,13 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory.Helpers
             #endregion
         }
 
-        public class StockTransactionViewSelectTemplate : ITemplate, IDisposable
+        public class StockTransactionViewSelectTemplate: ITemplate, IDisposable
         {
-            private HtmlInputCheckBox checkBox;
+            private dynamic checkBox;
 
-            public void InstantiateIn(Control container)
+            public void InstantiateIn(dynamic container)
             {
-                using (HtmlGenericControl div = new HtmlGenericControl("div"))
+                using (dynamic div = new HtmlGenericControl("div"))
                 {
                     div.Attributes.Add("class", "ui toggle checkbox");
                     this.checkBox = new HtmlInputCheckBox();
@@ -181,7 +178,7 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory.Helpers
                     div.Controls.Add(this.checkBox);
 
                     //Added for compatibility with Semantic UI
-                    using (HtmlGenericControl label = new HtmlGenericControl("label"))
+                    using (dynamic label = new HtmlGenericControl("label"))
                     {
                         div.Controls.Add(label);
                     }

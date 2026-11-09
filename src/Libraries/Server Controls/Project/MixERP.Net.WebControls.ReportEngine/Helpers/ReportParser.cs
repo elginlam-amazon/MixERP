@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using System.Web;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.Framework;
@@ -28,7 +29,6 @@ using System.Data;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Web;
 
 namespace MixERP.Net.WebControls.ReportEngine.Helpers
 {
@@ -84,7 +84,7 @@ namespace MixERP.Net.WebControls.ReportEngine.Helpers
 
                 if (dictionary != null)
                 {
-                    object value = dictionary[key];
+                    dynamic value = dictionary[key];
 
                     if (value != null)
                     {

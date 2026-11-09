@@ -57,7 +57,7 @@ namespace MixERP.Net.FrontEnd.Base
             {
                 if (!AppUsers.GetCurrent().View.AllowTransactionPosting.ToBool())
                 {
-                    this.Server.Transfer("~/Site/Exceptions/RestrictedTransactionMode.aspx");
+                    this.Response.Redirect("~/Site/Exceptions/RestrictedTransactionMode.aspx");
                 }
             }
         }

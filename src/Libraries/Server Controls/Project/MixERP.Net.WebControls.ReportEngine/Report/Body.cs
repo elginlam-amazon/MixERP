@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,13 +19,12 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common.Helpers;
 using System.IO;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ReportEngine
 {
-    public partial class Report
+    public partial class Report : WebControlBase
     {
-        private void AddReportBody(Panel container)
+        private void AddReportBody(dynamic container)
         {
             this.reportBody = new Panel();
             this.reportBody.ID = "report";
