@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -21,29 +21,26 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.WebControls.ScrudFactory.Controls;
 using System;
 using System.Globalization;
-using System.Web.UI;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
-    public partial class ScrudForm
+    public partial class ScrudForm : WebControlBase
     {
-        private CommandPanel bottomCommandPanel;
-        private Label messageLabel;
+        private Controls.CommandPanel bottomCommandPanel;
+        private dynamic messageLabel;
         private HiddenField officeCodeHidden;
-        private CommandPanel topCommandPanel;
-        private UpdatePanel updatePanel;
+        private Controls.CommandPanel topCommandPanel;
+        private dynamic updatePanel;
         private HiddenField userIdHidden;
 
-        protected override void OnPreRender(EventArgs e)
+        protected void OnPreRender(EventArgs e)
         {
             this.AddScriptManager();
-            base.OnPreRender(e);
         }
 
         private void AddScriptManager()
         {
-            ScriptManager scriptManager = ScriptManager.GetCurrent(this.Page);
+            dynamic scriptManager = ScriptManager.GetCurrent(this.Page);
             if (scriptManager != null)
             {
                 scriptManager.RegisterAsyncPostBackControl(this.saveButton);
@@ -55,7 +52,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
             }
         }
 
-        private void AddUpdatePanel(Panel p)
+        private void AddUpdatePanel(dynamic p)
         {
             this.messageLabel = new Label();
 

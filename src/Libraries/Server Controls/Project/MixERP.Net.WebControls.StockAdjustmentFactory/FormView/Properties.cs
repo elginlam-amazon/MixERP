@@ -1,6 +1,6 @@
-﻿namespace MixERP.Net.WebControls.StockAdjustmentFactory
+namespace MixERP.Net.WebControls.StockAdjustmentFactory
 {
-    public partial class FormView
+    public partial class FormView : WebControlBase
     {
         public string Catalog { get; set; }
         public int OfficeId { get; set; }

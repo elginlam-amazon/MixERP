@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -21,17 +21,16 @@ using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.WebControls.Common;
 using System;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
-    public partial class ScrudForm
+    public partial class ScrudForm : WebControlBase
     {
         private MixERPGridView formGridView;
-        private Panel gridPanel;
-        private TextBox lastValueHiddenTextBox;
+        private dynamic gridPanel;
+        private dynamic lastValueHiddenTextBox;
 
-        private void AddGridView(Panel p)
+        private void AddGridView(dynamic p)
         {
             this.formGridView = new MixERPGridView();
             this.formGridView.ID = "FormGridView";
@@ -50,7 +49,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
             p.Controls.Add(this.formGridView);
         }
 
-        private void AddLastValueHiddenField(Panel p)
+        private void AddLastValueHiddenField(dynamic p)
         {
             this.lastValueHiddenTextBox = new TextBox();
             this.lastValueHiddenTextBox.ID = "LastValueHidden";
@@ -86,11 +85,11 @@ namespace MixERP.Net.WebControls.ScrudFactory
             return this.GridPanelStyle;
         }
 
-        private Unit GetGridPanelWidth()
+        private dynamic GetGridPanelWidth()
         {
             if (this.GridPanelWidth.Value.Equals(0))
             {
-                Unit width = Conversion.TryCastUnit(DbConfig.GetScrudParameter(this.Catalog, "GridPanelDefaultWidth"));
+                dynamic width = Conversion.TryCastUnit(DbConfig.GetScrudParameter(this.Catalog, "GridPanelDefaultWidth"));
 
                 return width;
             }

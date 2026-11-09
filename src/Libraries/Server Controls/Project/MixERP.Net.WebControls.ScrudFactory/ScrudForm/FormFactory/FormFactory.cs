@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -26,12 +26,10 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Linq;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
-    public partial class ScrudForm
+    public partial class ScrudForm : WebControlBase
     {
         /// <summary>
         ///     This function iterates through all the dynamically added controls,
@@ -48,11 +46,11 @@ namespace MixERP.Net.WebControls.ScrudFactory
         ///     Returns a list of column and values mapped as
         ///     KeyValuePair of column_name (key) and value.
         /// </returns>
-        private Collection<KeyValuePair<string, object>> GetFormCollection(bool skipSerial)
+        private Collection<KeyValuePair<string, dynamic>> GetFormCollection(bool skipSerial)
         {
             Collection<KeyValuePair<string, object>> list = new Collection<KeyValuePair<string, object>>();
 
-            using (DataTable table = TableHelper.GetTable(this.Catalog, this.TableSchema, this.Table, this.Exclude))
+            using (dynamic table = TableHelper.GetTable(this.Catalog, this.TableSchema, this.Table, this.Exclude))
             {
                 if (table.Rows.Count > 0)
                 {
@@ -77,7 +75,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
                             if (ScrudTypes.TextBoxTypes.Contains(dataType))
                             {
                                 using (
-                                    TextBox textBox = this.formContainer.FindControl(columnName + "_textbox") as TextBox
+                                    dynamic textBox = this.formContainer.FindControl(columnName + "_textbox") as TextBox
                                     )
                                 {
                                     if (textBox != null)
@@ -91,7 +89,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
                             if (ScrudTypes.Bools.Contains(dataType))
                             {
                                 using (
-                                    RadioButtonList radioButtonList =
+                                    dynamic radioButtonList =
                                         this.formContainer.FindControl(columnName + "_radiobuttonlist") as
                                             RadioButtonList)
                                 {
@@ -106,7 +104,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
                             if (dataType.Equals("bytea"))
                             {
                                 using (
-                                    FileUpload fileUpload =
+                                    dynamic fileUpload =
                                         this.formContainer.FindControl(columnName + "_fileupload") as FileUpload)
                                 {
                                     if (fileUpload != null)
@@ -122,10 +120,10 @@ namespace MixERP.Net.WebControls.ScrudFactory
                         {
                             //DropDownList
                             using (
-                                DropDownList dropDownList =
+                                dynamic dropDownList =
                                     this.formContainer.FindControl(columnName + "_dropdownlist") as DropDownList)
                             {
-                                object value = null;
+                                dynamic value = null;
 
                                 if (dropDownList != null && !string.IsNullOrWhiteSpace(dropDownList.Text))
                                 {
@@ -142,13 +140,13 @@ namespace MixERP.Net.WebControls.ScrudFactory
             return list;
         }
 
-        private void LoadForm(Panel container, DataTable values, bool editing = false)
+        private void LoadForm(dynamic container, DataTable values, bool editing = false)
         {
-            using (HtmlTable htmlTable = new HtmlTable())
+            using (HtmlGenericControl htmlTable = new HtmlTable())
             {
                 htmlTable.Attributes.Add("role", "scrud");
 
-                using (DataTable table = TableHelper.GetTable(this.Catalog, this.TableSchema, this.Table, this.Exclude))
+                using (dynamic table = TableHelper.GetTable(this.Catalog, this.TableSchema, this.Table, this.Exclude))
                 {
                     if (table.Rows.Count > 0)
                     {

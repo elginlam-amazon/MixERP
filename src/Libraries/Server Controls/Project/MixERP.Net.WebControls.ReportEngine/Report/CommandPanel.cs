@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,11 +19,10 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n.Resources;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ReportEngine
 {
-    public partial class Report
+    public partial class Report : WebControlBase
     {
         private string GetImageButtonCssClass()
         {
@@ -37,7 +36,7 @@ namespace MixERP.Net.WebControls.ReportEngine
             return cssClass;
         }
 
-        private void AddCommandPanel(Panel p)
+        private void AddCommandPanel(dynamic p)
         {
             this.commandPanel = new Panel();
             this.commandPanel.ID = "ReportParameterPanel";
@@ -53,7 +52,7 @@ namespace MixERP.Net.WebControls.ReportEngine
             p.Controls.Add(this.commandPanel);
         }
 
-        private void AddEmailImageButton(Panel p)
+        private void AddEmailImageButton(dynamic p)
         {
             this.emailImageButton = new ImageButton();
             this.emailImageButton.ID = "SendEmailImageButton";
@@ -64,7 +63,7 @@ namespace MixERP.Net.WebControls.ReportEngine
             p.Controls.Add(this.emailImageButton);
         }
 
-        private void AddPrintImageButton(Panel p)
+        private void AddPrintImageButton(dynamic p)
         {
             this.printImageButton = new ImageButton();
             this.printImageButton.ID = "PrintImageButton";
@@ -76,7 +75,7 @@ namespace MixERP.Net.WebControls.ReportEngine
             p.Controls.Add(this.printImageButton);
         }
 
-        private void AddGoTopImageButton(Panel p)
+        private void AddGoTopImageButton(dynamic p)
         {
             this.goTopImageButton = new ImageButton();
             this.goTopImageButton.ID = "GoTop";
@@ -88,7 +87,7 @@ namespace MixERP.Net.WebControls.ReportEngine
             p.Controls.Add(this.goTopImageButton);
         }
 
-        private void AddGoBottomImageButton(Panel p)
+        private void AddGoBottomImageButton(dynamic p)
         {
             this.goBottomImageButton = new ImageButton();
             this.goBottomImageButton.CssClass = this.GetImageButtonCssClass();
@@ -100,7 +99,7 @@ namespace MixERP.Net.WebControls.ReportEngine
             p.Controls.Add(this.goBottomImageButton);
         }
 
-        private void AddFilterImageButton(Panel p)
+        private void AddFilterImageButton(dynamic p)
         {
             this.filterImageButton = new ImageButton();
             this.filterImageButton.ID = "FilterImageButton";
@@ -112,7 +111,7 @@ namespace MixERP.Net.WebControls.ReportEngine
             p.Controls.Add(this.filterImageButton);
         }
 
-        private void AddCloseImageButton(Panel p)
+        private void AddCloseImageButton(dynamic p)
         {
             this.closeImageButton = new ImageButton();
             this.closeImageButton.CssClass = this.GetImageButtonCssClass();

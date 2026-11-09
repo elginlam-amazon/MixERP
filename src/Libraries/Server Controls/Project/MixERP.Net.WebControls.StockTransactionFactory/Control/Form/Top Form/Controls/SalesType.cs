@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -21,23 +21,21 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n.Resources;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private void AddSalesTypeField(HtmlGenericControl container)
+        private void AddSalesTypeField(dynamic container)
         {
-            using (HtmlGenericControl salesTypeDiv = HtmlControlHelper.GetField())
+            using (dynamic salesTypeDiv = HtmlControlHelper.GetField())
             {
                 salesTypeDiv.ID = "SalesTypeDiv";
                 salesTypeDiv.Attributes.Add("style", "width:200px");
 
-                using (HtmlGenericControl field = HtmlControlHelper.GetField())
+                using (dynamic field = HtmlControlHelper.GetField())
                 {
-                    using (HtmlGenericControl label = HtmlControlHelper.GetLabel(Titles.SalesType, "SalesTypeSelect"))
+                    using (dynamic label = HtmlControlHelper.GetLabel(Titles.SalesType, "SalesTypeSelect"))
                     {
                         field.Controls.Add(label);
                     }

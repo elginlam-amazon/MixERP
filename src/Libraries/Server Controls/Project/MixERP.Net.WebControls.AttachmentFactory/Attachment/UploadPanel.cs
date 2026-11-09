@@ -1,12 +1,9 @@
-﻿using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.AttachmentFactory
 {
-    public sealed partial class Attachment
+    public sealed partial class Attachment : WebControlBase
     {
-        private void CreateUploadPanel(Control container)
+        private void CreateUploadPanel(WebControlBase container)
         {
             using (HtmlGenericControl fileUploads = new HtmlGenericControl("div"))
             {

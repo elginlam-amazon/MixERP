@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,25 +18,23 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.Common.Helpers;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory.Helpers
 {
     internal static class TableHelper
     {
-        internal static HtmlTableCell GetFieldCell()
+        internal static dynamic GetFieldCell()
         {
-            using (HtmlTableCell cell = new HtmlTableCell())
+            using (dynamic cell = new HtmlTableCell())
             {
                 cell.Attributes.Add("class", "ui field");
                 return cell;
             }
         }
 
-        internal static void AddCell(HtmlTableRow row, string text)
+        internal static void AddCell(dynamic row, string text)
         {
-            using (HtmlTableCell cell = new HtmlTableCell())
+            using (dynamic cell = new HtmlTableCell())
             {
                 cell.InnerHtml = text;
 
@@ -44,13 +42,13 @@ namespace MixERP.Net.WebControls.StockTransactionFactory.Helpers
             }
         }
 
-        internal static void CreateHeaderCell(TableRow row, string text, string targetControlId)
+        internal static void CreateHeaderCell(dynamic row, string text, string targetControlId)
         {
             using (TableHeaderCell cell = new TableHeaderCell())
             {
                 if (targetControlId != null)
                 {
-                    using (HtmlGenericControl label = HtmlControlHelper.GetLabel(text, targetControlId))
+                    using (dynamic label = HtmlControlHelper.GetLabel(text, targetControlId))
                     {
                         cell.Controls.Add(label);
                     }

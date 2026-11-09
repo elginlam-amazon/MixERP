@@ -1,8 +1,8 @@
-﻿using System.Globalization;
+using System.Globalization;
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
-    public partial class TransactionView
+    public partial class TransactionView : WebControlBase
     {
         private void SetDefaultValues()
         {

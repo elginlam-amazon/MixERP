@@ -1,15 +1,15 @@
-﻿using MixERP.Net.Common;
+using MixERP.Net.Common;
 using System;
 
 namespace MixERP.Net.WebControls.Flag
 {
-    public partial class FlagControl
+    public partial class FlagControl : WebControlBase
     {
-        public delegate void FlagUpdated(object sender, FlagUpdatedEventArgs e);
+        public delegate void FlagUpdated(dynamic sender, FlagUpdatedEventArgs e);
 
         public event FlagUpdated Updated;
 
-        private void ButtonOnClick(object sender, EventArgs eventArgs)
+        private void ButtonOnClick(dynamic sender, EventArgs eventArgs)
         {
             if (this.Updated != null)
             {

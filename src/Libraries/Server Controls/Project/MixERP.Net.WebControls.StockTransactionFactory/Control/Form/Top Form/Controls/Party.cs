@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,15 +17,14 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private void AddPartyCodeInputTextCell(HtmlTableRow row)
+        private void AddPartyCodeInputTextCell(dynamic row)
         {
-            using (HtmlTableCell cell = Helpers.TableHelper.GetFieldCell())
+            using (dynamic cell = Helpers.TableHelper.GetFieldCell())
             {
                 this.partyCodeInputText = new HtmlInputText();
                 this.partyCodeInputText.ID = "PartyCodeInputText";
@@ -37,9 +36,9 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             }
         }
 
-        private static void AddPartySelectCell(HtmlTableRow row)
+        private static void AddPartySelectCell(dynamic row)
         {
-            using (HtmlTableCell cell = Helpers.TableHelper.GetFieldCell())
+            using (dynamic cell = Helpers.TableHelper.GetFieldCell())
             {
                 using (HtmlSelect partySelect = new HtmlSelect())
                 {

@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,11 +18,10 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System.ComponentModel;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
-    public partial class ScrudForm : CompositeControl
+    public partial class ScrudForm : WebControlBase
     {
         public string AddButtonIconCssClass { get; set; }
         public string AllButtonIconCssClass { get; set; }
@@ -32,7 +31,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
         public string CompactButtonIconCssClass { get; set; }
 
         /// <summary>
-        ///     Use this parameter to override the ScrudFactory's
+        ///     Use this parameter to the ScrudFactory's
         ///     default Add/Edit event implementation by redirecting to a custom url.
         ///     The edit event redirects to the custom url with the KeyColumn parameter
         ///     and the selected value appended as query string data.
@@ -127,7 +126,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
         /// <summary>
         ///     The outer width of grid container.
         /// </summary>
-        public Unit GridPanelWidth { get; set; }
+        public dynamic GridPanelWidth { get; set; }
 
         public string GridViewAlternateRowCssClass { get; set; }
         public string GridViewCssClass { get; set; }
@@ -136,10 +135,10 @@ namespace MixERP.Net.WebControls.ScrudFactory
         /// <summary>
         ///     The full inner width of the grid.
         /// </summary>
-        public Unit GridViewWidth { get; set; }
+        public dynamic GridViewWidth { get; set; }
 
         /// <summary>
-        ///     Use this parameter to override "ItemSelectorPath" key in the configuration file.
+        ///     Use this parameter to "ItemSelectorPath" key in the configuration file.
         ///     ItemSelectorPath is a page which pops up on iframe and provides
         ///     some basic search functionalities for the dropdownlist control.
         /// </summary>
@@ -160,7 +159,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
         public string PagerPageButtonCssClass { get; set; }
 
         /// <summary>
-        ///     Set this to override the default page size of the view, which is 10.
+        ///     Set this to the default page size of the view, which is 10.
         /// </summary>
         public int PageSize { get; set; }
 
@@ -173,7 +172,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
         public string PrintButtonIconCssClass { get; set; }
 
         /// <summary>
-        ///     Use this parameter to override the "ResourceClassName" key in the configuration file.
+        ///     Use this parameter to the "ResourceClassName" key in the configuration file.
         ///     ResourceClassName contains localized resource strings of database table column names.
         /// </summary>
         public string ResourceClassName { get; set; }
@@ -217,7 +216,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
         public string TitleLabelCssClass { get; set; }
 
         /// <summary>
-        ///     If the table has foreign keys, set this to override the data being populated on the
+        ///     If the table has foreign keys, set this to the data being populated on the
         ///     respective DropDownList control. Setting this will allow the Scrud to
         ///     fetch the data from the DisplayViews Expression Tables instead of the original parent table.
         /// </summary>

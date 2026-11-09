@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -22,11 +22,10 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.WebControls.ScrudFactory.Data;
 using System.Data;
 using System.Globalization;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
-    public partial class ScrudForm
+    public partial class ScrudForm : WebControlBase
     {
         private void BindGridView()
         {
@@ -44,14 +43,14 @@ namespace MixERP.Net.WebControls.ScrudFactory
                 offset = (Conversion.TryCastInteger(this.Page.Request["page"]) - 1)*limit;
             }
 
-            using (DataTable table = FormHelper.GetView(this.Catalog, this.ViewSchema, this.View, this.KeyColumn, limit, offset))
+            using (dynamic table = FormHelper.GetView(this.Catalog, this.ViewSchema, this.View, this.KeyColumn, limit, offset))
             {
                 this.formGridView.DataSource = table;
                 this.formGridView.DataBind();
             }
         }
 
-        private Unit GetGridViewWidth()
+        private dynamic GetGridViewWidth()
         {
             if (this.GridViewWidth.Value.Equals(0))
             {

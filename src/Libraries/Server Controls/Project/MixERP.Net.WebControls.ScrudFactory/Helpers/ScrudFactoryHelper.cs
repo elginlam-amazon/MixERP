@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -23,15 +23,12 @@ using MixERP.Net.WebControls.ScrudFactory.Controls.ListControls;
 using MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes;
 using System.Linq;
 using System.Threading;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Helpers
 {
     internal static class ScrudFactoryHelper
     {
-        internal static void AddDropDownList(HtmlTable htmlTable, string label, DropDownList dropDownList, HtmlAnchor itemSelectorAnchor, RequiredFieldValidator required)
+        internal static void AddDropDownList(dynamic htmlTable, string label, dynamic dropDownList, dynamic itemSelectorAnchor, dynamic required)
         {
             if (htmlTable == null)
             {
@@ -43,11 +40,11 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
                 return;
             }
 
-            using (HtmlTableCell labelCell = new HtmlTableCell())
+            using (HtmlGenericControl labelCell = new HtmlTableCell())
             {
-                using (HtmlTableCell controlContainer = new HtmlTableCell())
+                using (HtmlGenericControl controlContainer = new HtmlTableCell())
                 {
-                    using (Literal labelLiteral = new Literal())
+                    using (dynamic labelLiteral = new Literal())
                     {
                         labelLiteral.Text = string.Format(Thread.CurrentThread.CurrentCulture, "<label for='{0}'>{1}</label>", dropDownList.ID, label);
                         labelCell.Attributes.Add("class", "label-cell");
@@ -55,11 +52,11 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
                         labelCell.Controls.Add(labelLiteral);
                         controlContainer.Attributes.Add("class", "control-cell");
 
-                        using (HtmlTable controlTable = new HtmlTable())
+                        using (HtmlGenericControl controlTable = new HtmlTable())
                         {
-                            using (HtmlTableRow row = new HtmlTableRow())
+                            using (HtmlGenericControl row = new HtmlTableRow())
                             {
-                                using (HtmlTableCell controlCell = new HtmlTableCell())
+                                using (HtmlGenericControl controlCell = new HtmlTableCell())
                                 {
                                     controlCell.Controls.Add(dropDownList);
 
@@ -71,7 +68,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
                                     row.Cells.Add(controlCell);
                                 }
 
-                                using (HtmlTableCell itemSelectorCell = new HtmlTableCell())
+                                using (HtmlGenericControl itemSelectorCell = new HtmlTableCell())
                                 {
                                     if (itemSelectorAnchor != null)
                                     {
@@ -89,7 +86,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
 
                                 controlContainer.Controls.Add(controlTable);
 
-                                using (HtmlTableRow newRow = new HtmlTableRow())
+                                using (HtmlGenericControl newRow = new HtmlTableRow())
                                 {
                                     newRow.Cells.Add(labelCell);
                                     newRow.Cells.Add(controlContainer);
@@ -102,7 +99,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
             }
         }
 
-        internal static void AddField(string catalog, HtmlTable htmlTable, string resourceClassName, string itemSelectorPath, string columnName, string defaultValue, bool isSerial, bool isNullable, string dataType, string domain, int maxLength, string parentTableSchema, string parentTable, string parentTableColumn, string displayFields, string displayViews, bool useDisplayFieldAsParent, string selectedValues, string errorCssClass, bool disabled)
+        internal static void AddField(string catalog, dynamic htmlTable, string resourceClassName, string itemSelectorPath, string columnName, string defaultValue, bool isSerial, bool isNullable, string dataType, string domain, int maxLength, string parentTableSchema, string parentTable, string parentTableColumn, string displayFields, string displayViews, bool useDisplayFieldAsParent, string selectedValues, string errorCssClass, bool disabled)
         {
             if (isSerial)
             {
@@ -157,7 +154,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
             }
         }
 
-        internal static void AddRow(HtmlTable htmlTable, string label, params Control[] controls)
+        internal static void AddRow(dynamic htmlTable, string label, params Control[] controls)
         {
             if (htmlTable == null)
             {
@@ -174,11 +171,11 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
                 return;
             }
 
-            using (HtmlTableCell labelCell = new HtmlTableCell())
+            using (HtmlGenericControl labelCell = new HtmlTableCell())
             {
-                using (HtmlTableCell controlCell = new HtmlTableCell())
+                using (HtmlGenericControl controlCell = new HtmlTableCell())
                 {
-                    using (Literal labelLiteral = new Literal())
+                    using (dynamic labelLiteral = new Literal())
                     {
                         labelLiteral.Text = string.Format(Thread.CurrentThread.CurrentCulture, "<label for='{0}'>{1}</label>", controls[0].ID, label);
                         labelCell.Attributes.Add("class", "label-cell");
@@ -192,7 +189,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
                             {
                                 if (control is WebControl)
                                 {
-                                    using (WebControl c = control as WebControl)
+                                    using (dynamic c = control as WebControl)
                                     {
                                         controlCell.Controls.Add(c);
                                     }
@@ -204,7 +201,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
                             }
                         }
 
-                        using (HtmlTableRow newRow = new HtmlTableRow())
+                        using (HtmlGenericControl newRow = new HtmlTableRow())
                         {
                             newRow.Cells.Add(labelCell);
                             newRow.Cells.Add(controlCell);
@@ -215,14 +212,14 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
             }
         }
 
-        internal static RequiredFieldValidator GetRequiredFieldValidator(Control controlToValidate, string cssClass)
+        internal static dynamic GetRequiredFieldValidator(dynamic controlToValidate, string cssClass)
         {
             if (controlToValidate == null)
             {
                 return null;
             }
 
-            using (RequiredFieldValidator validator = new RequiredFieldValidator())
+            using (dynamic validator = new RequiredFieldValidator())
             {
                 validator.ID = controlToValidate.ID + "RequiredValidator";
                 validator.ErrorMessage = @"<br/>" + Titles.RequiredField;

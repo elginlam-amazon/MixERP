@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,15 +17,12 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
-    [ToolboxData("<{0}:StockTransactionView runat=server></{0}:StockTransactionView>")]
-    public sealed partial class StockTransactionView : CompositeControl
+        public sealed partial class StockTransactionView : WebControlBase
     {
-        protected override void CreateChildControls()
+        protected void CreateChildControls()
         {
             this.placeHolder = new PlaceHolder();
 
@@ -42,12 +39,12 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory
             this.Controls.Add(this.placeHolder);
         }
 
-        protected override void RecreateChildControls()
+        protected void RecreateChildControls()
         {
             this.EnsureChildControls();
         }
 
-        protected override void Render(HtmlTextWriter writer)
+        protected void Render(dynamic writer)
         {
             this.EnsureChildControls();
             this.placeHolder.RenderControl(writer);

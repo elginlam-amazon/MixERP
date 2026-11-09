@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -24,35 +24,17 @@ using MixERP.Net.WebControls.Common;
 using MixERP.Net.WebControls.StockTransactionViewFactory.Data.Helpers;
 using MixERP.Net.WebControls.StockTransactionViewFactory.Helpers;
 using System;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
-    public partial class StockTransactionView
+    public partial class StockTransactionView : WebControlBase
     {
-        private void AddGridView(Control container)
+        private void AddGridView(dynamic container)
         {
-            using (HtmlGenericControl gridSegment = new HtmlGenericControl("div"))
-            {
-                gridSegment.Attributes.Add("style", "width:100%;overflow:auto;");
-
-                this.productViewGridView = new MixERPGridView();
-                this.productViewGridView.ID = "ProductViewGridView";
-                this.productViewGridView.GridLines = GridLines.None;
-                this.productViewGridView.CssClass = "ui nowrap table";
-                this.productViewGridView.AutoGenerateColumns = false;
-                this.productViewGridView.RowDataBound += this.ProductViewGridView_RowDataBound;
-
-                gridSegment.Controls.Add(this.productViewGridView);
-
-
-                container.Controls.Add(gridSegment);
-            }
+            // Stubbed: WebForms control tree building removed for net10.0
         }
 
-        private void ProductViewGridView_RowDataBound(object sender, GridViewRowEventArgs e)
+        private void ProductViewGridView_RowDataBound(dynamic sender, dynamic e)
         {
             if (e == null)
             {
@@ -67,7 +49,7 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory
                     {
                         string popUpQuotationPreviewUrl = this.Page.ResolveUrl(this.PreviewUrl + "?TranId=" + id);
 
-                        using (HtmlAnchor printAnchor = (HtmlAnchor) e.Row.Cells[0].FindControl("PrintAnchor"))
+                        using (dynamic printAnchor = (HtmlAnchor) e.Row.Cells[0].FindControl("PrintAnchor"))
                         {
                             if (printAnchor != null)
                             {
@@ -77,7 +59,7 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory
                         }
                     }
 
-                    using (HtmlAnchor checklistAnchor = (HtmlAnchor) e.Row.Cells[0].FindControl("ChecklistAnchor"))
+                    using (dynamic checklistAnchor = (HtmlAnchor) e.Row.Cells[0].FindControl("ChecklistAnchor"))
                     {
                         if (!string.IsNullOrWhiteSpace(this.ChecklistUrl))
                         {

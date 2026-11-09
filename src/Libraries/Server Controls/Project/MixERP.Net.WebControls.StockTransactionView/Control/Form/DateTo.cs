@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -20,27 +20,14 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.Entities;
 using MixERP.Net.WebControls.Common;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
-    public partial class StockTransactionView
+    public partial class StockTransactionView : WebControlBase
     {
-        private void CreateDateToField(HtmlGenericControl container)
+        private void CreateDateToField(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
-            {
-                this.dateToDateTextBox = new DateTextBox();
-                this.dateToDateTextBox.ID = "DateToDateTextBox";
-                this.dateToDateTextBox.CssClass = "date";
-                this.dateToDateTextBox.Mode = FrequencyType.MonthEndDate;
-                this.dateToDateTextBox.Required = true;
-                this.dateToDateTextBox.Catalog = this.Catalog;
-                this.dateToDateTextBox.OfficeId = this.OfficeId;
-
-                field.Controls.Add(this.dateToDateTextBox);
-                container.Controls.Add(field);
-            }
+            // Stubbed: WebForms UI building removed for net10.0
         }
     }
 }

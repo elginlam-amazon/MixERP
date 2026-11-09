@@ -1,12 +1,10 @@
-﻿using MixERP.Net.i18n.Resources;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using MixERP.Net.i18n.Resources;
 
 namespace MixERP.Net.WebControls.AttachmentFactory
 {
-    public sealed partial class Attachment
+    public sealed partial class Attachment : WebControlBase
     {
-        private void CreateCommentCell(TableRow row, int index)
+        private void CreateCommentCell(dynamic row, int index)
         {
             using (TableCell cell = new TableCell())
             {
@@ -22,7 +20,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory
             }
         }
 
-        private void CreateFilePathCell(TableRow row, int index)
+        private void CreateFilePathCell(dynamic row, int index)
         {
             using (TableCell cell = new TableCell())
             {
@@ -36,7 +34,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory
             }
         }
 
-        private void CreateProgressCell(TableRow row, int index)
+        private void CreateProgressCell(dynamic row, int index)
         {
             using (TableCell cell = new TableCell())
             {
@@ -53,7 +51,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory
             }
         }
 
-        private void CreateRow(Table table)
+        private void CreateRow(dynamic table)
         {
             if (this.Count.Equals(0))
             {
@@ -75,7 +73,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory
             }
         }
 
-        private void CreateUploadCell(TableRow row, int index)
+        private void CreateUploadCell(dynamic row, int index)
         {
             using (TableCell cell = new TableCell())
             {

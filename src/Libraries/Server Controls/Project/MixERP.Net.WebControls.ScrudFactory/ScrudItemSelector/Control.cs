@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,21 +18,18 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.WebControls.Common;
-using System.Web.UI;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
-    [ToolboxData("<{0}:ScrudItemSelector runat=server></{0}:ScrudItemSelector>")]
-    public sealed partial class ScrudItemSelector : CompositeControl
+        public sealed partial class ScrudItemSelector : WebControlBase
     {
-        public Panel container;
-        public TextBox filterInputText;
+        public dynamic container;
+        public dynamic filterInputText;
         public DropDownList filterSelect;
         public Button goButton;
         public MixERPGridView searchGridView;
 
-        protected override void CreateChildControls()
+        protected void CreateChildControls()
         {
             this.container = new Panel();
             this.AddJavascript();
@@ -41,12 +38,12 @@ namespace MixERP.Net.WebControls.ScrudFactory
             this.Controls.Add(this.container);
         }
 
-        protected override void RecreateChildControls()
+        protected void RecreateChildControls()
         {
             this.EnsureChildControls();
         }
 
-        protected override void Render(HtmlTextWriter w)
+        protected void Render(dynamic w)
         {
             this.container.RenderControl(w);
         }
@@ -55,7 +52,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
 
         private bool disposed;
 
-        public override void Dispose()
+        public void Dispose()
         {
             if (!this.disposed)
             {

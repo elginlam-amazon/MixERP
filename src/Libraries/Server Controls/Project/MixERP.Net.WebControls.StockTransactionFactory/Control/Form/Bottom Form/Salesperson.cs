@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,19 +19,18 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n.Resources;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private static void AddSalespersonField(HtmlGenericControl container)
+        private static void AddSalespersonField(dynamic container)
         {
-            using (HtmlGenericControl salespersonDiv = HtmlControlHelper.GetField())
+            using (dynamic salespersonDiv = HtmlControlHelper.GetField())
             {
                 salespersonDiv.ID = "SalespersonDiv";
 
-                using (HtmlGenericControl label = HtmlControlHelper.GetLabel(Titles.Salesperson, "SalesPersonSelect"))
+                using (dynamic label = HtmlControlHelper.GetLabel(Titles.Salesperson, "SalesPersonSelect"))
                 {
                     salespersonDiv.Controls.Add(label);
                 }

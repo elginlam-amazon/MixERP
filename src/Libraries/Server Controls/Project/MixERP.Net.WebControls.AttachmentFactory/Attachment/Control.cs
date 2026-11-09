@@ -1,17 +1,14 @@
-﻿using System.Web.UI;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.AttachmentFactory
 {
-    [ToolboxData("<{0}:Attachment runat=server></{0}:DateTextBox>")]
-    public sealed partial class Attachment : CompositeControl
+        public sealed partial class Attachment : WebControlBase
     {
         public Attachment(string catalog)
         {
             this.Catalog = catalog;
         }
 
-        protected override void CreateChildControls()
+        protected void CreateChildControls()
         {
             this.placeHolder = new PlaceHolder();
             this.CreateUploadPanel(this.placeHolder);
@@ -25,12 +22,12 @@ namespace MixERP.Net.WebControls.AttachmentFactory
             this.Controls.Add(this.placeHolder);
         }
 
-        protected override void RecreateChildControls()
+        protected void RecreateChildControls()
         {
             this.EnsureChildControls();
         }
 
-        protected override void Render(HtmlTextWriter w)
+        protected void Render(dynamic w)
         {
             this.EnsureChildControls();
             this.placeHolder.RenderControl(w);

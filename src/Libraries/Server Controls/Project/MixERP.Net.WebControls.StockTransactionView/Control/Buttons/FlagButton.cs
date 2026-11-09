@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,21 +18,14 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.i18n.Resources;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
-    public partial class StockTransactionView
+    public partial class StockTransactionView : WebControlBase
     {
-        private void CreateFlagButton(HtmlGenericControl container)
+        private void CreateFlagButton(dynamic container)
         {
-            using (HtmlInputButton flagButton = new HtmlInputButton())
-            {
-                flagButton.ID = "FlagButton";
-                flagButton.Value = Titles.Flag;
-                flagButton.Attributes.Add("class", "ui button");
-                container.Controls.Add(flagButton);
-            }
+            // Stubbed: WebForms UI building removed for net10.0
         }
     }
 }

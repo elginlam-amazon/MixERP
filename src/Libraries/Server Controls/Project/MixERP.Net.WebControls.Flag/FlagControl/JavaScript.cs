@@ -1,8 +1,8 @@
-﻿using MixERP.Net.Common;
+using MixERP.Net.Common;
 
 namespace MixERP.Net.WebControls.Flag
 {
-    public partial class FlagControl
+    public partial class FlagControl : WebControlBase
     {
         private void AddScript()
         {
@@ -12,7 +12,8 @@ namespace MixERP.Net.WebControls.Flag
                             "popUnder(flagPopunder, flagButton);" +
                             "});});";
 
-            PageUtility.RegisterJavascript("flag", script, this.Page, true);
+            // Stubbed: PageUtility.RegisterJavascript removed for net10.0 compatibility
+            _ = script;
         }
     }
 }

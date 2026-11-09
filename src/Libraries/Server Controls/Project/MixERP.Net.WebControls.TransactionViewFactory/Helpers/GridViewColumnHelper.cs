@@ -1,14 +1,11 @@
-﻿using MixERP.Net.Common.Helpers;
+using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n.Resources;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.TransactionViewFactory.Helpers
 {
     internal static class GridViewColumnHelper
     {
-        internal static void AddColumns(GridView grid)
+        internal static void AddColumns(dynamic grid)
         {
             grid.Columns.Clear();
 
@@ -33,7 +30,7 @@ namespace MixERP.Net.WebControls.TransactionViewFactory.Helpers
             GridViewHelper.AddDataBoundControl(grid, "FlagFg", "FlagFg");
         }
 
-        private static void AddTemplateFields(GridView grid)
+        private static void AddTemplateFields(dynamic grid)
         {
             TemplateField actionTemplateField = new TemplateField();
             actionTemplateField.HeaderText = Titles.Actions;
@@ -47,30 +44,30 @@ namespace MixERP.Net.WebControls.TransactionViewFactory.Helpers
             grid.Columns.Add(checkBoxTemplateField);
         }
 
-        internal class JournalViewActionTemplate : ITemplate
+        internal class JournalViewActionTemplate
         {
-            public void InstantiateIn(Control container)
+            public void InstantiateIn(dynamic container)
             {
-                using (HtmlGenericControl checkListIcon = new HtmlGenericControl("i"))
+                using (dynamic checkListIcon = new HtmlGenericControl("i"))
                 {
                     checkListIcon.Attributes.Add("class", "icon list layout");
                     checkListIcon.Attributes.Add("onclick", "showCheckList(this);");
                     container.Controls.Add(checkListIcon);
                 }
-                using (HtmlGenericControl previewIcon = new HtmlGenericControl("i"))
+                using (dynamic previewIcon = new HtmlGenericControl("i"))
                 {
                     previewIcon.Attributes.Add("class", "icon print");
                     previewIcon.Attributes.Add("onclick", "showPreview(this);");
                     container.Controls.Add(previewIcon);
                 }
-                using (HtmlGenericControl detailIcon = new HtmlGenericControl("i"))
+                using (dynamic detailIcon = new HtmlGenericControl("i"))
                 {
                     detailIcon.Attributes.Add("class", "icon grid layout");
                     detailIcon.Attributes.Add("onclick", "showStockDetail(this);");
                     container.Controls.Add(detailIcon);
                 }
 
-                using (HtmlGenericControl goTopIcon = new HtmlGenericControl("i"))
+                using (dynamic goTopIcon = new HtmlGenericControl("i"))
                 {
                     goTopIcon.Attributes.Add("class", "icon chevron circle up");
                     goTopIcon.Attributes.Add("onclick", "window.scroll(0);");

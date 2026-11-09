@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,10 +18,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
+using System.IO;
 using System.IO.Compression;
-using System.Security;
-using System.Security.Permissions;
-using System.Web.Hosting;
 
 namespace MixERP.Net.Common.Helpers
 {
@@ -34,11 +32,17 @@ namespace MixERP.Net.Common.Helpers
                 return false;
             }
 
-            FileIOPermission permission = new FileIOPermission(FileIOPermissionAccess.Write, HostingEnvironment.MapPath(directory));
-            PermissionSet permissionSet = new PermissionSet(PermissionState.None);
-            permissionSet.AddPermission(permission);
-
-            return permissionSet.IsSubsetOf(AppDomain.CurrentDomain.PermissionSet);
+            try
+            {
+                string testFile = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".tmp");
+                File.WriteAllText(testFile, string.Empty);
+                File.Delete(testFile);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static void Unzip(string archive, string destnation)

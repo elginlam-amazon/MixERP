@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -23,15 +23,14 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n;
 using System;
 using System.Threading;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ReportEngine
 {
-    public partial class Report
+    public partial class Report : WebControlBase
     {
-        private void GridView_DataBound(object sender, EventArgs e)
+        private void GridView_DataBound(dynamic sender, EventArgs e)
         {
-            GridView grid = (GridView) sender;
+            dynamic grid = (GridView) sender;
 
             int arg = Conversion.TryCastInteger(grid.ID.Replace("GridView", ""));
 
@@ -80,7 +79,7 @@ namespace MixERP.Net.WebControls.ReportEngine
             }
         }
 
-        private void GridView_RowDataBound(object sender, GridViewRowEventArgs e)
+        private void GridView_RowDataBound(dynamic sender, dynamic e)
         {
             if (e.Row.RowType == DataControlRowType.Header)
             {
@@ -99,7 +98,7 @@ namespace MixERP.Net.WebControls.ReportEngine
 
             if (e.Row.RowType == DataControlRowType.DataRow)
             {
-                GridView grid = (GridView) sender;
+                dynamic grid = (GridView) sender;
                 int arg = Conversion.TryCastInteger(grid.ID.Replace("GridView", ""));
 
 

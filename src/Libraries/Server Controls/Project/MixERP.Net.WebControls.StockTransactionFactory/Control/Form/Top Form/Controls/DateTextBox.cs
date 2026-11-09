@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,15 +19,14 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Entities;
 using MixERP.Net.WebControls.Common;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private void AddDateTextBoxCell(HtmlTableRow row)
+        private void AddDateTextBoxCell(dynamic row)
         {
-            using (HtmlTableCell cell = Helpers.TableHelper.GetFieldCell())
+            using (dynamic cell = Helpers.TableHelper.GetFieldCell())
             {
                 this.dateTextBox = new DateTextBox();
                 this.dateTextBox.ID = "DateTextBox";

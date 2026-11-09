@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,18 +17,14 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.TransactionChecklist
 {
-    [ToolboxData("<{0}:TransactionChecklistForm runat=server></{0}:TransactionChecklistForm>")]
-    public partial class TransactionChecklistForm : CompositeControl
+        public partial class TransactionChecklistForm : WebControlBase
     {
-        private HtmlGenericControl checkListContainer;
+        private dynamic checkListContainer;
 
-        protected override void CreateChildControls()
+        protected void CreateChildControls()
         {
             this.checkListContainer = new HtmlGenericControl();
             this.AddHeader(this.checkListContainer);
@@ -41,7 +37,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             this.Controls.Add(this.checkListContainer);
         }
 
-        protected override void RecreateChildControls()
+        protected void RecreateChildControls()
         {
             this.EnsureChildControls();
         }

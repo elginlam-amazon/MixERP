@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -22,7 +22,7 @@ using System.Globalization;
 
 namespace MixERP.Net.WebControls.TransactionChecklist
 {
-    public partial class TransactionChecklistForm
+    public partial class TransactionChecklistForm : WebControlBase
     {
         private const string TRAN_ID_PARAMETER_NAME = "TranId";
 

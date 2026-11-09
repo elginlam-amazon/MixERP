@@ -1,16 +1,14 @@
-﻿using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.AttachmentFactory
 {
-    public sealed partial class Attachment
+    public sealed partial class Attachment : WebControlBase
     {
         private bool disposed;
 
-        private PlaceHolder placeHolder;
-        private HtmlGenericControl warningLabel;
+        private dynamic placeHolder;
+        private dynamic warningLabel;
 
-        public override void Dispose()
+        public void Dispose()
         {
             if (!this.disposed)
             {

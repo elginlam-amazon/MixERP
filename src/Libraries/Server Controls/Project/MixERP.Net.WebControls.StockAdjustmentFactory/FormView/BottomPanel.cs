@@ -1,14 +1,13 @@
-﻿using MixERP.Net.i18n.Resources;
+using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.StockAdjustmentFactory.Helpers;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockAdjustmentFactory
 {
-    public partial class FormView
+    public partial class FormView : WebControlBase
     {
         private void AddErrorLabelBottom()
         {
-            using (HtmlGenericControl errorLabel = new HtmlGenericControl())
+            using (dynamic errorLabel = new HtmlGenericControl())
             {
                 errorLabel.TagName = "div";
                 errorLabel.ID = "ErrorLabel";
@@ -17,9 +16,9 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             }
         }
 
-        private void AddSaveButton(HtmlGenericControl div)
+        private void AddSaveButton(dynamic div)
         {
-            using (HtmlInputButton button = new HtmlInputButton())
+            using (dynamic button = new HtmlInputButton())
             {
                 button.ID = "SaveButton";
                 button.Value = Titles.Save;
@@ -28,11 +27,11 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             }
         }
 
-        private void AddStatementReferenceTextArea(HtmlGenericControl fields)
+        private void AddStatementReferenceTextArea(dynamic fields)
         {
-            using (HtmlGenericControl field = FormHelper.GetField())
+            using (dynamic field = FormHelper.GetField())
             {
-                using (HtmlGenericControl label = new HtmlGenericControl())
+                using (dynamic label = new HtmlGenericControl())
                 {
                     label.TagName = "label";
                     label.Attributes.Add("for", "StatementReferenceTextArea");
@@ -52,16 +51,16 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             }
         }
 
-        private void AddSourceStoreSelect(HtmlGenericControl fields)
+        private void AddSourceStoreSelect(dynamic fields)
         {
             if (!this.DisplaySourceStore)
             {
                 return;
             }
 
-            using (HtmlGenericControl field = FormHelper.GetField())
+            using (dynamic field = FormHelper.GetField())
             {
-                using (HtmlGenericControl label = new HtmlGenericControl())
+                using (dynamic label = new HtmlGenericControl())
                 {
                     label.TagName = "label";
                     label.Attributes.Add("for", "SourceStoreSelect");
@@ -80,16 +79,16 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             }
         }
 
-        private void AddShippingCompanySelect(HtmlGenericControl fields)
+        private void AddShippingCompanySelect(dynamic fields)
         {
             if (!this.DisplayShipper)
             {
                 return;
             }
 
-            using (HtmlGenericControl field = FormHelper.GetField())
+            using (dynamic field = FormHelper.GetField())
             {
-                using (HtmlGenericControl label = new HtmlGenericControl())
+                using (dynamic label = new HtmlGenericControl())
                 {
                     label.TagName = "label";
                     label.Attributes.Add("for", "ShippingCompanySelect");
@@ -110,7 +109,7 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
 
         private void CreateBottomPanel()
         {
-            using (HtmlGenericControl fields = FormHelper.GetFields())
+            using (dynamic fields = FormHelper.GetFields())
             {
                 fields.TagName = "div";
                 fields.Attributes.Add("class", "ui form");

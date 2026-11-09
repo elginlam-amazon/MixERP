@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -25,30 +25,27 @@ using MixERP.Net.WebControls.ScrudFactory.Helpers;
 using System;
 using System.Data;
 using System.Linq;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
 {
     internal static class ScrudDropDownList
     {
-        internal static void AddDropDownList(string catalog, HtmlTable htmlTable, string resourceClassName, string itemSelectorPath, string columnName, bool isNullable, string tableSchema, string tableName, string tableColumn, string defaultValue, string displayFields, string displayViews, bool useDisplayViewsAsParent, string selectedValues, string errorCssClass, bool disabled)
+        internal static void AddDropDownList(string catalog, dynamic htmlTable, string resourceClassName, string itemSelectorPath, string columnName, bool isNullable, string tableSchema, string tableName, string tableColumn, string defaultValue, string displayFields, string displayViews, bool useDisplayViewsAsParent, string selectedValues, string errorCssClass, bool disabled)
         {
             string label = ScrudLocalizationHelper.GetResourceString(resourceClassName, columnName);
 
-            using (DropDownList dropDownList = GetDropDownList(columnName + "_dropdownlist"))
+            using (dynamic dropDownList = GetDropDownList(columnName + "_dropdownlist"))
             {
                 if (disabled)
                 {
                     dropDownList.Attributes.Add("disabled", "disabled");
                 }
 
-                using (DataTable table = GetTable(catalog, tableSchema, tableName, tableColumn, displayViews, useDisplayViewsAsParent))
+                using (dynamic table = GetTable(catalog, tableSchema, tableName, tableColumn, displayViews, useDisplayViewsAsParent))
                 {
                     SetDisplayFields(catalog, dropDownList, table, tableSchema, tableName, tableColumn, displayFields);
 
-                    using (HtmlAnchor itemSelectorAnchor = GetItemSelector(catalog, dropDownList.ClientID, itemSelectorPath, tableSchema, tableName, tableColumn, displayViews, resourceClassName, label))
+                    using (dynamic itemSelectorAnchor = GetItemSelector(catalog, dropDownList.ClientID, itemSelectorPath, tableSchema, tableName, tableColumn, displayViews, resourceClassName, label))
                     {
                         if (disabled)
                         {
@@ -64,7 +61,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
                         }
                         else
                         {
-                            RequiredFieldValidator required = ScrudFactoryHelper.GetRequiredFieldValidator(dropDownList, errorCssClass);
+                            dynamic required = ScrudFactoryHelper.GetRequiredFieldValidator(dropDownList, errorCssClass);
                             ScrudFactoryHelper.AddDropDownList(htmlTable, label + Titles.RequiredFieldIndicator, dropDownList, itemSelectorAnchor, required);
                         }
                     }
@@ -73,9 +70,9 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
 
         }
 
-        private static DropDownList GetDropDownList(string id)
+        private static dynamic GetDropDownList(string id)
         {
-            using (DropDownList dropDownList = new DropDownList())
+            using (dynamic dropDownList = new DropDownList())
             {
                 dropDownList.ID = id;
                 dropDownList.ClientIDMode = ClientIDMode.Static;
@@ -130,14 +127,14 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
         /// <param name="resourceClassName">The resource class name containing localization.</param>
         /// <param name="columnNameLocalized">Localized name of the column to which item selector is bound to.</param>
         /// <returns></returns>
-        private static HtmlAnchor GetItemSelector(string catalog, string associatedControlId, string itemSelectorPath, string tableSchema, string tableName, string tableColumn, string displayViews, string resourceClassName, string columnNameLocalized)
+        private static dynamic GetItemSelector(string catalog, string associatedControlId, string itemSelectorPath, string tableSchema, string tableName, string tableColumn, string displayViews, string resourceClassName, string columnNameLocalized)
         {
             if (string.IsNullOrWhiteSpace(displayViews))
             {
                 return null;
             }
 
-            using (HtmlAnchor itemSelectorAnchor = new HtmlAnchor())
+            using (dynamic itemSelectorAnchor = new HtmlAnchor())
             {
                 //string relation = string.Empty;
 
@@ -197,7 +194,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
             return FormHelper.GetTable(catalog, tableSchema, tableName, "1");
         }
 
-        private static void SetDisplayFields(string catalog, DropDownList dropDownList, DataTable table, string tableSchema, string tableName, string tableColumn, string displayFields)
+        private static void SetDisplayFields(string catalog, dynamic dropDownList, DataTable table, string tableSchema, string tableName, string tableColumn, string displayFields)
         {
             //See DisplayFields Property for more information.
 
@@ -223,7 +220,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
             }
         }
 
-        private static void SetSelectedValue(string catalog, DropDownList dropDownList, string schema, string table, string column, string postbackValue, string selectedValueExpressions)
+        private static void SetSelectedValue(string catalog, dynamic dropDownList, string schema, string table, string column, string postbackValue, string selectedValueExpressions)
         {
             string selectedItemValue = string.Empty;
 
@@ -252,7 +249,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.ListControls
                     if (value.StartsWith("'", StringComparison.OrdinalIgnoreCase))
                     {
                         //If the value starts with a quote, find the value by the text.
-                        ListItem item = dropDownList.Items.FindByText(value.Replace("'", ""));
+                        dynamic item = dropDownList.Items.FindByText(value.Replace("'", ""));
 
                         if (item != null)
                         {

@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,31 +19,30 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System.Collections.ObjectModel;
 using System.Data;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ReportEngine
 {
-    public partial class Report
+    public partial class Report : WebControlBase
     {
-        private Literal bodyContentsLiteral;
-        private Literal bottomSectionLiteral;
-        private ImageButton closeImageButton;
+        private dynamic bodyContentsLiteral;
+        private dynamic bottomSectionLiteral;
+        private dynamic closeImageButton;
 
         /// <summary>
         ///     CommandPanel is displayed at the top of the report.
         /// </summary>
-        private Panel commandPanel;
+        private dynamic commandPanel;
 
         private Collection<DataTable> dataTableCollection;
         private Collection<string> decimalFieldIndicesCollection;
         private bool disposed;
-        private ImageButton emailImageButton;
-        private ImageButton filterImageButton;
-        private ImageButton goBottomImageButton;
-        private ImageButton goTopImageButton;
-        private PlaceHolder gridPlaceHolder;
+        private dynamic emailImageButton;
+        private dynamic filterImageButton;
+        private dynamic goBottomImageButton;
+        private dynamic goTopImageButton;
+        private dynamic gridPlaceHolder;
         private ReportHeader header;
-        private ImageButton printImageButton;
+        private dynamic printImageButton;
 
         /// <summary>
         ///     ReportBody is displayed below the CommandPanel and contains the following sections:
@@ -53,18 +52,18 @@ namespace MixERP.Net.WebControls.ReportEngine
         ///     4. Report Details (Grid)
         ///     5. Bottom Section
         /// </summary>
-        private Panel reportBody;
+        private dynamic reportBody;
 
-        private Panel reportContainer;
-        private HiddenField reportHidden;
+        private dynamic reportContainer;
+        private dynamic reportHidden;
         private string reportPath;
-        private HiddenField reportTitleHidden;
-        private Literal reportTitleLiteral;
+        private dynamic reportTitleHidden;
+        private dynamic reportTitleLiteral;
         private Collection<string> runningTotalFieldIndicesCollection;
         private Collection<int> runningTotalTextColumnIndexCollection;
-        private Literal topSectionLiteral;
+        private dynamic topSectionLiteral;
 
-        public override void Dispose()
+        public void Dispose()
         {
             if (!this.disposed)
             {

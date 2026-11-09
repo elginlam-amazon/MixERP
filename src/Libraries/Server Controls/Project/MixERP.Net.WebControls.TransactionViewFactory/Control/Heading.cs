@@ -1,13 +1,11 @@
-﻿using System.Web.UI;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
-    public partial class TransactionView
+    public partial class TransactionView : WebControlBase
     {
-        private void AddHeading(Control container)
+        private void AddHeading(dynamic container)
         {
-            using (HtmlGenericControl h1 = new HtmlGenericControl("h1"))
+            using (dynamic h1 = new HtmlGenericControl("h1"))
             {
                 h1.InnerText = this.Text;
 

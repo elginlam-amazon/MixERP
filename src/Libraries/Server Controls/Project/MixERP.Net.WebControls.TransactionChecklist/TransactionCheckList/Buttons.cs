@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -20,16 +20,14 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.Common;
 using MixERP.Net.i18n.Resources;
 using System.Globalization;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.TransactionChecklist
 {
-    public partial class TransactionChecklistForm
+    public partial class TransactionChecklistForm : WebControlBase
     {
-        private LinkButton emailLinkButton;
+        private dynamic emailLinkButton;
 
-        private void AddAttachmentAnchor(HtmlGenericControl h)
+        private void AddAttachmentAnchor(dynamic h)
         {
             if (this.DisplayAttachmentButton)
             {
@@ -52,7 +50,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
 
                 string attachmentUrl = string.Format(CultureInfo.InvariantCulture, "~/Modules/BackOffice/AttachmentManager.mix?OverridePath={0}&Book={1}&Id={2}", overridePath, this.AttachmentBookName, this.GetTranId());
 
-                using (HtmlAnchor anchor = new HtmlAnchor())
+                using (dynamic anchor = new HtmlAnchor())
                 {
                     anchor.ID = "AttachmentAnchor";
                     anchor.InnerHtml = "<i class='icon cloud upload'></i>" + Titles.UploadAttachmentsForThisTransaction;
@@ -64,9 +62,9 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddBackAnchor(HtmlGenericControl h)
+        private void AddBackAnchor(dynamic h)
         {
-            using (HtmlAnchor anchor = new HtmlAnchor())
+            using (dynamic anchor = new HtmlAnchor())
             {
                 anchor.InnerHtml = "<i class='icon backward'></i>" + Titles.Back;
                 anchor.Attributes.Add("class", "item");
@@ -75,9 +73,9 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddButtons(HtmlGenericControl p)
+        private void AddButtons(dynamic p)
         {
-            using (HtmlGenericControl div = new HtmlGenericControl())
+            using (dynamic div = new HtmlGenericControl())
             {
                 div.TagName = "div";
                 div.Attributes.Add("class", "ui vertical menu");
@@ -89,7 +87,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddCustomerReportAnchor(HtmlGenericControl h)
+        private void AddCustomerReportAnchor(dynamic h)
         {
             if (this.DisplayCustomerReportButton)
             {
@@ -105,7 +103,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
 
                 string customerReportUrl = this.ResolveUrl(this.CustomerReportPath + "?" + TRAN_ID_PARAMETER_NAME + "=" + this.GetTranId());
 
-                using (HtmlAnchor anchor = new HtmlAnchor())
+                using (dynamic anchor = new HtmlAnchor())
                 {
                     anchor.ID = "CustomerReportAnchor";
                     anchor.InnerHtml = "<i class='icon list layout'></i>" + this.CustomerReportButtonText;
@@ -117,7 +115,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddEmailReportLinkButton(HtmlGenericControl h)
+        private void AddEmailReportLinkButton(dynamic h)
         {
             if (this.DisplayEmailReportButton)
             {
@@ -132,12 +130,12 @@ namespace MixERP.Net.WebControls.TransactionChecklist
                 this.emailLinkButton.Text = @"<i class='icon mail'></i>" + this.EmailReportButtonText;
                 this.emailLinkButton.CausesValidation = false;
                 this.emailLinkButton.Attributes.Add("class", "item");
-                this.emailLinkButton.Click += this.EmailLinkButton_Click;
+                // this.emailLinkButton.Click += this.EmailLinkButton_Click; // stub: dynamic event not supported
                 h.Controls.Add(this.emailLinkButton);
             }
         }
 
-        private void AddNewAnchor(HtmlGenericControl h)
+        private void AddNewAnchor(dynamic h)
         {
             if (string.IsNullOrWhiteSpace(this.AddNewPath))
             {
@@ -146,7 +144,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
 
             string addNewUrl = this.ResolveUrl(this.AddNewPath);
 
-            using (HtmlAnchor anchor = new HtmlAnchor())
+            using (dynamic anchor = new HtmlAnchor())
             {
                 anchor.ID = "AddNewAnchor";
                 anchor.InnerHtml = "<i class='icon add sign'></i>" + Titles.AddNew;
@@ -156,7 +154,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddPanelBody(HtmlGenericControl div)
+        private void AddPanelBody(dynamic div)
         {
             this.AddWidthdrawAnchor(div);
             this.AddViewReportAnchor(div);
@@ -170,9 +168,9 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             this.AddBackAnchor(div);
         }
 
-        private void AddPanelHeader(HtmlGenericControl div)
+        private void AddPanelHeader(dynamic div)
         {
-            using (HtmlGenericControl header = new HtmlGenericControl())
+            using (dynamic header = new HtmlGenericControl())
             {
                 header.TagName = "div";
                 header.Attributes.Add("class", "ui header inverted green item");
@@ -182,7 +180,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddPrintGLAnchor(HtmlGenericControl h)
+        private void AddPrintGLAnchor(dynamic h)
         {
             if (this.DisplayPrintGlEntryButton)
             {
@@ -198,7 +196,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
 
                 string glAdviceUrl = this.ResolveUrl(this.GlAdvicePath + "?" + TRAN_ID_PARAMETER_NAME + "=" + this.GetTranId());
 
-                using (HtmlAnchor anchor = new HtmlAnchor())
+                using (dynamic anchor = new HtmlAnchor())
                 {
                     anchor.ID = "PrintGLAnchor";
                     anchor.InnerHtml = "<i class='icon print'></i>" + Titles.PrintGlEntry;
@@ -210,7 +208,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddPrintReceiptAnchor(HtmlGenericControl h)
+        private void AddPrintReceiptAnchor(dynamic h)
         {
             if (this.DisplayPrintReceiptButton)
             {
@@ -226,7 +224,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
 
                 string receiptUrl = this.ResolveUrl(this.ReceiptAdvicePath + "?" + TRAN_ID_PARAMETER_NAME + "=" + this.GetTranId());
 
-                using (HtmlAnchor anchor = new HtmlAnchor())
+                using (dynamic anchor = new HtmlAnchor())
                 {
                     anchor.ID = "PrintReceiptAnchor";
                     anchor.InnerHtml = "<i class='icon print'></i>" + Titles.PrintReceipt;
@@ -238,7 +236,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddViewAnchor(HtmlGenericControl h)
+        private void AddViewAnchor(dynamic h)
         {
             if (string.IsNullOrWhiteSpace(this.ViewPath))
             {
@@ -247,7 +245,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
 
             string viewUrl = this.ResolveUrl(this.ViewPath);
 
-            using (HtmlAnchor anchor = new HtmlAnchor())
+            using (dynamic anchor = new HtmlAnchor())
             {
                 anchor.ID = "ViewAnchor";
                 anchor.InnerHtml = "<i class='icon circle left'></i>" + Titles.ReturnToView;
@@ -257,7 +255,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddViewReportAnchor(HtmlGenericControl h)
+        private void AddViewReportAnchor(dynamic h)
         {
             if (this.DisplayViewReportButton)
             {
@@ -273,7 +271,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
 
                 string reportUrl = this.ResolveUrl(this.ReportPath + "?" + TRAN_ID_PARAMETER_NAME + "=" + this.GetTranId());
 
-                using (HtmlAnchor anchor = new HtmlAnchor())
+                using (dynamic anchor = new HtmlAnchor())
                 {
                     anchor.ID = "ViewReportAnchor";
                     anchor.InnerHtml = "<i class='icon grid layout'></i>" + this.ViewReportButtonText;
@@ -286,11 +284,11 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddWidthdrawAnchor(HtmlGenericControl h)
+        private void AddWidthdrawAnchor(dynamic h)
         {
             if (this.DisplayWithdrawButton)
             {
-                using (HtmlAnchor anchor = new HtmlAnchor())
+                using (dynamic anchor = new HtmlAnchor())
                 {
                     anchor.ID = "WithdrawAnchor";
                     anchor.InnerHtml = "<i class='icon hide'></i>" + Titles.WithdrawTransaction;

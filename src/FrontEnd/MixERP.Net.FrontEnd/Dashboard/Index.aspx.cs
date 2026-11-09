@@ -41,7 +41,7 @@ namespace MixERP.Net.FrontEnd.Dashboard
             this.LoadWidgets(widgets, this.WidgetPlaceholder, this.Page);
         }
 
-        public void LoadWidgets(IEnumerable<Widget> widgetModels, Control placeholder, TemplateControl page)
+        public void LoadWidgets(IEnumerable<Widget> widgetModels, Control placeholder, dynamic page)
         {
             if (placeholder == null)
             {
@@ -65,7 +65,7 @@ namespace MixERP.Net.FrontEnd.Dashboard
             {
                 foreach (Widget item in group)
                 {
-                    using (MixERPWidget widget = page.LoadControl(item.WidgetSource) as MixERPWidget)
+                    using (MixERPWidget widget = (page.LoadControl(item.WidgetSource) as object) as MixERPWidget)
                     {
                         if (widget != null)
                         {

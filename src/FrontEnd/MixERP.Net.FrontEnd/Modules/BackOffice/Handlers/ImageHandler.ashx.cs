@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,8 +19,8 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
+using SkiaSharp;
 using System;
-using System.Drawing;
 using System.Globalization;
 using System.Web;
 
@@ -31,13 +31,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
     /// </summary>
     public class ImageHandler : IHttpHandler
     {
-        public bool IsReusable
-        {
-            get
-            {
-                return false;
-            }
-        }
+        public bool IsReusable => false;
 
         public void ProcessRequest(HttpContext context)
         {
@@ -51,57 +45,44 @@ namespace MixERP.Net.Core.Modules.BackOffice.Handlers
             int height = 0;
 
             if (!string.IsNullOrWhiteSpace(context.Request.QueryString["Path"]))
-            {
                 path = Conversion.TryCastString(context.Request.QueryString["Path"]);
-            }
 
             if (!string.IsNullOrWhiteSpace(context.Request.QueryString["W"]))
-            {
                 width = Convert.ToInt32(context.Request.QueryString["W"], CultureInfo.InvariantCulture);
-            }
 
             if (!string.IsNullOrWhiteSpace(context.Request.QueryString["H"]))
-            {
                 height = Convert.ToInt32(context.Request.QueryString["H"], CultureInfo.InvariantCulture);
-            }
 
             context.Response.Clear();
 
-            if (System.IO.File.Exists(HttpContext.Current.Server.MapPath(path)))
+            string physicalPath = HttpContext.Current.Server.MapPath(path);
+            if (System.IO.File.Exists(physicalPath))
             {
-                System.IO.FileInfo file = new System.IO.FileInfo(HttpContext.Current.Server.MapPath(path));
+                System.IO.FileInfo file = new System.IO.FileInfo(physicalPath);
+                string imagePath = context.Server.MapPath(path);
 
-                path = context.Server.MapPath(path);
+                if (!IsValidImage(imagePath))
+                    imagePath = context.Server.MapPath("~/Static/images/document.png");
 
-                if(!IsValidBitmap(path))
-                {
-                    path = context.Server.MapPath("~/Static/images/document.png");
-                }
+                byte[] buffer = ImageHelper.GetResizedImage(imagePath, width, height);
 
-                using (Bitmap originalImage = new Bitmap(path))
-                {
-                    byte[] buffer = ImageHelper.GetResizedImage(originalImage, width, height);
+                context.Response.ContentType = ImageHelper.GetContentType(file.Extension);
+                context.Response.Cache.SetCacheability(HttpCacheability.Public);
+                context.Response.Cache.SetExpires(DateTime.Now.AddMonths(1));
+                context.Response.Cache.SetMaxAge(new TimeSpan(30, 0, 0, 0, 0));
+                context.Response.AddHeader("Last-Modified", DateTime.Now.ToShortDateString());
 
-                    context.Response.ContentType = ImageHelper.GetContentType(file.Extension);
-                    context.Response.Cache.SetCacheability(HttpCacheability.Public);
-                    context.Response.Cache.SetExpires(DateTime.Now.AddMonths(1));
-                    context.Response.Cache.SetMaxAge(new TimeSpan(30, 0, 0, 0, 0));
-                    context.Response.AddHeader("Last-Modified", DateTime.Now.ToShortDateString());
-
-                    context.Response.OutputStream.Write(buffer, 0, buffer.Length);
-                    context.Response.End();
-                }
+                context.Response.OutputStream.Write(buffer, 0, buffer.Length);
+                context.Response.End();
             }
         }
 
-        private static bool IsValidBitmap(string path)
+        private static bool IsValidImage(string path)
         {
             try
             {
-                using (new Bitmap(path))
-                {
-                    return true;
-                }
+                using var bmp = SKBitmap.Decode(path);
+                return bmp != null;
             }
             catch
             {

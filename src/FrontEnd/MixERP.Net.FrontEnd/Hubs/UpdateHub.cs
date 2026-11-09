@@ -34,7 +34,6 @@ using Serilog;
 
 namespace MixERP.Net.FrontEnd.Hubs
 {
-    [CLSCompliant(false)]
     public class UpdateHub : Hub
     {
         public void InstallUpdates()

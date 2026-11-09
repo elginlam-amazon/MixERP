@@ -1,10 +1,10 @@
-﻿using MixERP.Net.Common.Helpers;
+using MixERP.Net.Common.Helpers;
 using System;
 using System.Globalization;
 
 namespace MixERP.Net.WebControls.AttachmentFactory
 {
-    public sealed partial class Attachment
+    public sealed partial class Attachment : WebControlBase
     {
         private void CheckPermission()
         {

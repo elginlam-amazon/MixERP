@@ -1,13 +1,11 @@
-﻿using System.Web.UI;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
-    public partial class TransactionView
+    public partial class TransactionView : WebControlBase
     {
-        private HiddenField selectedValuesHidden;
+        private dynamic selectedValuesHidden;
 
-        private void AddHiddenFields(Control container)
+        private void AddHiddenFields(dynamic container)
         {
             this.selectedValuesHidden = new HiddenField();
             this.selectedValuesHidden.ID = "SelectedValuesHidden";

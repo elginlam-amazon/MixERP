@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,25 +18,23 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.i18n.Resources;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.PartyControl
 {
-    public partial class PartyControl
+    public partial class PartyControl : WebControlBase
     {
-        private void AddHiddenField(Panel p, string id)
+        private void AddHiddenField(dynamic p, string id)
         {
-            using (HiddenField hidden = new HiddenField())
+            using (dynamic hidden = new HiddenField())
             {
                 hidden.ID = id;
                 p.Controls.Add(hidden);
             }
         }
 
-        private void AddTabBody(Panel p)
+        private void AddTabBody(dynamic p)
         {
-            using (HtmlGenericControl homeTab = ControlHelper.GetGenericControl(@"div", "ui active tab bottom stacked attached segment"))
+            using (dynamic homeTab = ControlHelper.GetGenericControl(@"div", "ui active tab bottom stacked attached segment"))
             {
                 homeTab.Attributes.Add("data-tab", "home");
                 homeTab.ID = "home";
@@ -48,21 +46,21 @@ namespace MixERP.Net.WebControls.PartyControl
             p.Controls.Add(this.GetAddressInfoTab());
         }
 
-        private HtmlGenericControl GetAddressInfoTab()
+        private dynamic GetAddressInfoTab()
         {
-            using (HtmlGenericControl addressInfoDiv = ControlHelper.GetGenericControl(@"div", @"ui tab bottom stacked attached teal segment"))
+            using (dynamic addressInfoDiv = ControlHelper.GetGenericControl(@"div", @"ui tab bottom stacked attached teal segment"))
             {
                 addressInfoDiv.Attributes.Add("data-tab", "contact-info");
                 addressInfoDiv.ID = "addresses-and-contact-info";
 
-                using (HtmlGenericControl h3 = ControlHelper.GetGenericControl("h3", "ui header"))
+                using (dynamic h3 = ControlHelper.GetGenericControl("h3", "ui header"))
                 {
                     h3.InnerHtml = "  <i class='globe icon'></i>" + Titles.AddressAndContactInfo;
 
                     addressInfoDiv.Controls.Add(h3);
                 }
 
-                using (HtmlTable table = new HtmlTable())
+                using (dynamic table = new HtmlTable())
                 {
                     table.Attributes.Add("class", "ui table segment");
                     table.Rows.Add(ControlHelper.GetNewRow(Titles.DefaultAddress, @"AddressDiv", "div"));
@@ -74,15 +72,15 @@ namespace MixERP.Net.WebControls.PartyControl
             }
         }
 
-        private HtmlGenericControl GetPartySummaryTab()
+        private dynamic GetPartySummaryTab()
         {
-            using (HtmlGenericControl partSummaryDiv = ControlHelper.GetGenericControl(@"div", @"ui tab bottom stacked attached green segment"))
+            using (dynamic partSummaryDiv = ControlHelper.GetGenericControl(@"div", @"ui tab bottom stacked attached green segment"))
             {
                 partSummaryDiv.Attributes.Add("data-tab", "party-summary");
 
                 partSummaryDiv.ID = "party-summary";
 
-                using (HtmlTable table = new HtmlTable())
+                using (dynamic table = new HtmlTable())
                 {
                     table.Attributes.Add("class", "ui table segment");
                     table.Rows.Add(ControlHelper.GetNewRow(Titles.PartyType, @"PartyTypeSpan", @"span"));
@@ -102,15 +100,15 @@ namespace MixERP.Net.WebControls.PartyControl
             }
         }
 
-        private HtmlGenericControl GetTransactionSummaryTab()
+        private dynamic GetTransactionSummaryTab()
         {
-            using (HtmlGenericControl transactionSummaryDiv = ControlHelper.GetGenericControl(@"div", @"ui tab bottom stacked attached red segment"))
+            using (dynamic transactionSummaryDiv = ControlHelper.GetGenericControl(@"div", @"ui tab bottom stacked attached red segment"))
             {
                 transactionSummaryDiv.Attributes.Add("data-tab", "transaction-summary");
 
                 transactionSummaryDiv.ID = "transaction-summary";
 
-                using (HtmlTable table = new HtmlTable())
+                using (dynamic table = new HtmlTable())
                 {
                     table.Attributes.Add("class", "ui table segment");
                     table.Rows.Add(ControlHelper.GetNewRow(Titles.TotalDueAmount, @"TotalDueAmountSpan", @"span"));

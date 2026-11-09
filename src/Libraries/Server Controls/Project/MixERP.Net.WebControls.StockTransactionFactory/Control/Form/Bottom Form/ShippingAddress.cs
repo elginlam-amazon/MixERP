@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,19 +19,18 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n.Resources;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private static void AddShippingAddressTextAreaField(HtmlGenericControl container)
+        private static void AddShippingAddressTextAreaField(dynamic container)
         {
-            using (HtmlGenericControl shippingAddressDiv = HtmlControlHelper.GetField())
+            using (dynamic shippingAddressDiv = HtmlControlHelper.GetField())
             {
                 shippingAddressDiv.ID = "ShippingAddressDiv";
 
-                using (HtmlGenericControl label = HtmlControlHelper.GetLabel(Titles.ShippingAddress, "ShippingAddressTextArea"))
+                using (dynamic label = HtmlControlHelper.GetLabel(Titles.ShippingAddress, "ShippingAddressTextArea"))
                 {
                     shippingAddressDiv.Controls.Add(label);
                 }

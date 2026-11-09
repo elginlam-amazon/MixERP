@@ -1,12 +1,11 @@
-﻿using MixERP.Net.WebControls.Flag;
+using MixERP.Net.WebControls.Flag;
 using System;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
-    public partial class TransactionView
+    public partial class TransactionView : WebControlBase
     {
-        private void Flag_Updated(object sender, FlagUpdatedEventArgs e)
+        private void Flag_Updated(dynamic sender, FlagUpdatedEventArgs e)
         {
             int flagTypeId = e.FlagId;
 
@@ -20,12 +19,12 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             this.BindGrid();
         }
 
-        private void ShowButton_Click(object sender, EventArgs e)
+        private void ShowButton_Click(dynamic sender, EventArgs e)
         {
             this.BindGrid();
         }
 
-        private void TransactionGridView_RowDataBound(object sender, GridViewRowEventArgs e)
+        private void TransactionGridView_RowDataBound(dynamic sender, dynamic e)
         {
         }
     }

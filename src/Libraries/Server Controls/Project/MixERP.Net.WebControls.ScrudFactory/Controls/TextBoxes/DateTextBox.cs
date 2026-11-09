@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -22,9 +22,6 @@ using MixERP.Net.Common.jQueryHelper;
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.ScrudFactory.Helpers;
 using System;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
 {
@@ -47,7 +44,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
             return date.ToString("f");
         }
 
-        internal static void AddDateTextBox(HtmlTable htmlTable, string resourceClassName, string columnName, string defaultValue, bool isNullable, string validatorCssClass, bool disabled)
+        internal static void AddDateTextBox(dynamic htmlTable, string resourceClassName, string columnName, string defaultValue, bool isNullable, string validatorCssClass, bool disabled)
         {
             if (htmlTable == null)
             {
@@ -61,7 +58,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
 
             string id = columnName + "_textbox";
 
-            using (TextBox textBox = ScrudTextBox.GetTextBox(id, 100))
+            using (dynamic textBox = ScrudTextBox.GetTextBox(id, 100))
             {
                 jQueryUI.AddjQueryUIDatePicker(null, id, null, null);
 
@@ -71,11 +68,11 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
                 textBox.ReadOnly = disabled;
                 textBox.CssClass = "date";
 
-                using (CompareValidator dateValidator = GetDateValidator(textBox, validatorCssClass))
+                using (dynamic dateValidator = GetDateValidator(textBox, validatorCssClass))
                 {
                     if (!isNullable)
                     {
-                        using (RequiredFieldValidator required = ScrudFactoryHelper.GetRequiredFieldValidator(textBox, validatorCssClass))
+                        using (dynamic required = ScrudFactoryHelper.GetRequiredFieldValidator(textBox, validatorCssClass))
                         {
                             ScrudFactoryHelper.AddRow(htmlTable, label + Titles.RequiredFieldIndicator, textBox, dateValidator, required);
                             return;
@@ -87,14 +84,14 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls.TextBoxes
             }
         }
 
-        private static CompareValidator GetDateValidator(Control controlToValidate, string cssClass)
+        private static dynamic GetDateValidator(dynamic controlToValidate, string cssClass)
         {
             if (controlToValidate == null)
             {
                 return null;
             }
 
-            using (CompareValidator validator = new CompareValidator())
+            using (dynamic validator = new CompareValidator())
             {
                 validator.ID = controlToValidate.ID + "CompareValidator";
                 validator.ErrorMessage = @"<br/>" + Titles.InvalidDate;

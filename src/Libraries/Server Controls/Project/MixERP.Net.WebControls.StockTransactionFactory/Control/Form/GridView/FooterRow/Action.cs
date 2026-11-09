@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,18 +18,16 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.i18n.Resources;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private static void CreateActionField(TableRow row)
+        private static void CreateActionField(dynamic row)
         {
-            using (TableCell cell = new TableCell())
+            using (dynamic cell = new TableCell())
             {
-                using (HtmlInputButton addButton = new HtmlInputButton())
+                using (dynamic addButton = new HtmlInputButton())
                 {
                     addButton.ID = "AddButton";
                     addButton.Attributes.Add("class", "small ui button blue");

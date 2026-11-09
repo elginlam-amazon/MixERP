@@ -23,7 +23,6 @@ using System;
 
 namespace MixERP.Net.FrontEnd.Hubs
 {
-    [CLSCompliant(false)]
     public class BaseHub : Hub
     {
         public void Terminate(int counter)

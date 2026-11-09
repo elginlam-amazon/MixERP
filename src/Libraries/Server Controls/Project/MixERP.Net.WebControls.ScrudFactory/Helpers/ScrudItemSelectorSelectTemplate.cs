@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -21,13 +21,10 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n.Resources;
 using System;
 using System.Data;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Helpers
 {
-    internal sealed class ScrudItemSelectorSelectTemplate : ITemplate, IDisposable
+    internal sealed class ScrudItemSelectorSelectTemplate: IDisposable
     {
         public string Catalog { get; set; }
 
@@ -38,7 +35,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
 
         private HtmlAnchor selectAnchor;
 
-        public void InstantiateIn(Control container)
+        public void InstantiateIn(dynamic container)
         {
             this.selectAnchor = new HtmlAnchor();
 
@@ -50,11 +47,11 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
             container.Controls.Add(this.selectAnchor);
         }
 
-        public void BindData(object sender, EventArgs e)
+        public void BindData(dynamic sender, EventArgs e)
         {
-            using (GridViewRow container = (GridViewRow) this.selectAnchor.NamingContainer)
+            using (dynamic container = (GridViewRow) this.selectAnchor.NamingContainer)
             {
-                DataRowView rowView = container.DataItem as DataRowView;
+                dynamic rowView = container.DataItem as DataRowView;
                 if (rowView != null)
                 {
                     this.selectAnchor.Attributes.Add("onclick", "sisUpdateValue('" + rowView[0] + "');");

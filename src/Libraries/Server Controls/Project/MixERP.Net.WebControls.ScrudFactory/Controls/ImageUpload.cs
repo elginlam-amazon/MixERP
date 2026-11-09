@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -23,20 +23,17 @@ using MixERP.Net.WebControls.ScrudFactory.Helpers;
 using System;
 using System.IO;
 using System.Web;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls
 {
     internal static class ScrudFileUpload
     {
-        public static void AddFileUpload(HtmlTable htmlTable, string resourceClassName, string columnName,
+        public static void AddFileUpload(dynamic htmlTable, string resourceClassName, string columnName,
             bool isNullable, string errorCssClass)
         {
             string label = ScrudLocalizationHelper.GetResourceString(resourceClassName, columnName);
-            FileUpload fileUpload = GetFileUpload(columnName + "_fileupload");
-            RegularExpressionValidator validator = GetImageValidator(fileUpload, errorCssClass);
+            dynamic fileUpload = GetFileUpload(columnName + "_fileupload");
+            dynamic validator = GetImageValidator(fileUpload, errorCssClass);
 
             //Todo: One of the following:
             //1. Ask the script manager to do a synchronous postback on save button click event.
@@ -44,7 +41,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
 
             if (!isNullable)
             {
-                RequiredFieldValidator required = ScrudFactoryHelper.GetRequiredFieldValidator(fileUpload, errorCssClass);
+                dynamic required = ScrudFactoryHelper.GetRequiredFieldValidator(fileUpload, errorCssClass);
                 ScrudFactoryHelper.AddRow(htmlTable, label + Titles.RequiredFieldIndicator, fileUpload, required,
                     validator);
                 return;
@@ -53,7 +50,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
             ScrudFactoryHelper.AddRow(htmlTable, label, fileUpload, validator);
         }
 
-        public static string UploadFile(string catalog, FileUpload fileUpload)
+        public static string UploadFile(string catalog, dynamic fileUpload)
         {
             if (fileUpload == null)
             {
@@ -81,9 +78,9 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
             return id;
         }
 
-        private static FileUpload GetFileUpload(string id)
+        private static dynamic GetFileUpload(string id)
         {
-            using (FileUpload fileUpload = new FileUpload())
+            using (dynamic fileUpload = new FileUpload())
             {
                 fileUpload.ID = id;
 
@@ -91,9 +88,9 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
             }
         }
 
-        private static RegularExpressionValidator GetImageValidator(Control controlToValidate, string cssClass)
+        private static dynamic GetImageValidator(dynamic controlToValidate, string cssClass)
         {
-            using (RegularExpressionValidator validator = new RegularExpressionValidator())
+            using (dynamic validator = new RegularExpressionValidator())
             {
                 validator.ID = controlToValidate.ID + "RegexValidator";
                 validator.ErrorMessage = @"<br/>" + Titles.InvalidImage;

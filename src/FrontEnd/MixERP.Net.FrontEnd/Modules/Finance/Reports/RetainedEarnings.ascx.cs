@@ -81,7 +81,7 @@ namespace MixERP.Net.Core.Modules.Finance.Reports
             }
         }
 
-        protected virtual void Dispose(bool disposing)
+        protected override void Dispose(bool disposing)
         {
             if (!disposing)
             {

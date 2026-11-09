@@ -1,16 +1,14 @@
-﻿using MixERP.Net.i18n.Resources;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using MixERP.Net.i18n.Resources;
 
 namespace MixERP.Net.WebControls.StockAdjustmentFactory
 {
-    public partial class FormView
+    public partial class FormView : WebControlBase
     {
-        private void AddButton(TableRow row)
+        private void AddButton(dynamic row)
         {
-            using (TableCell cell = this.GetCell())
+            using (dynamic cell = this.GetCell())
             {
-                using (HtmlInputButton addButton = new HtmlInputButton())
+                using (dynamic addButton = new HtmlInputButton())
                 {
                     addButton.ID = "AddButton";
                     addButton.Value = Titles.Add;
@@ -23,9 +21,9 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             }
         }
 
-        private void AddItemCodeInputText(TableRow row)
+        private void AddItemCodeInputText(dynamic row)
         {
-            using (TableCell cell = this.GetCell())
+            using (dynamic cell = this.GetCell())
             {
                 using (HtmlInputText itemCodeInputText = new HtmlInputText())
                 {
@@ -38,9 +36,9 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             }
         }
 
-        private void AddItemSelect(TableRow row)
+        private void AddItemSelect(dynamic row)
         {
-            using (TableCell cell = this.GetCell())
+            using (dynamic cell = this.GetCell())
             {
                 using (HtmlSelect itemSelect = new HtmlSelect())
                 {
@@ -53,9 +51,9 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             }
         }
 
-        private void AddQuantityInputText(TableRow row)
+        private void AddQuantityInputText(dynamic row)
         {
-            using (TableCell cell = this.GetCell())
+            using (dynamic cell = this.GetCell())
             {
                 using (HtmlInputText quantityInputText = new HtmlInputText())
                 {
@@ -68,9 +66,9 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             }
         }
 
-        private void AddStoreSelect(TableRow row)
+        private void AddStoreSelect(dynamic row)
         {
-            using (TableCell cell = this.GetCell())
+            using (dynamic cell = this.GetCell())
             {
                 using (HtmlSelect storeSelect = new HtmlSelect())
                 {
@@ -83,9 +81,9 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             }
         }
 
-        private void AddTransactionTypeSelect(TableRow row)
+        private void AddTransactionTypeSelect(dynamic row)
         {
-            using (TableCell cell = this.GetCell())
+            using (dynamic cell = this.GetCell())
             {
                 using (HtmlSelect transactionTypeSelect = new HtmlSelect())
                 {
@@ -101,9 +99,9 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             }
         }
 
-        private void AddUnitSelect(TableRow row)
+        private void AddUnitSelect(dynamic row)
         {
-            using (TableCell cell = this.GetCell())
+            using (dynamic cell = this.GetCell())
             {
                 using (HtmlSelect unitSelect = new HtmlSelect())
                 {
@@ -115,17 +113,17 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory
             }
         }
 
-        private TableCell GetCell()
+        private dynamic GetCell()
         {
-            using (TableCell cell = new TableCell())
+            using (dynamic cell = new TableCell())
             {
                 return cell;
             }
         }
 
-        private TableRow GetControlRow()
+        private dynamic GetControlRow()
         {
-            using (TableRow row = new TableRow())
+            using (dynamic row = new TableRow())
             {
                 row.Attributes.Add("class", "footer-row ui form");
 

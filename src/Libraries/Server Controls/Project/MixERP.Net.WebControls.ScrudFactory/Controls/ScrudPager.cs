@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -21,7 +21,6 @@ using MixERP.Net.i18n.Resources;
 using System;
 using System.Globalization;
 using System.Threading;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Controls
 {
@@ -38,7 +37,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
         internal string QueryString { get; set; }
         public int BlockCount { get; set; }
 
-        internal HtmlGenericControl GetPager()
+        internal dynamic GetPager()
         {
             if (this.PageSize.Equals(0))
             {
@@ -56,7 +55,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
             }
 
 
-            using (HtmlGenericControl paginationMenu = new HtmlGenericControl("div"))
+            using (dynamic paginationMenu = new HtmlGenericControl("div"))
             {
                 paginationMenu.Attributes.Add("class", this.CssClass);
 
@@ -69,7 +68,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 string title;
                 if (start - this.BlockCount > 0)
                 {
-                    using (HtmlAnchor anchor = this.GetIconAnchor("icon item", "", start - 1))
+                    using (dynamic anchor = this.GetIconAnchor("icon item", "", start - 1))
                     {
                         title = string.Format(Thread.CurrentThread.CurrentCulture, Titles.PageN, start - 1);
                         anchor.Attributes.Add("title", title);
@@ -98,7 +97,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 //The next page block
                 if (start + this.BlockCount < this.TotalPages)
                 {
-                    using (HtmlAnchor anchor = this.GetIconAnchor("icon item", "", end + 1))
+                    using (dynamic anchor = this.GetIconAnchor("icon item", "", end + 1))
                     {
                         title = string.Format(Thread.CurrentThread.CurrentCulture, Titles.PageN, end + 1);
                         anchor.Attributes.Add("title", title);
@@ -117,7 +116,7 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
             }
         }
 
-        private HtmlAnchor FirstItem()
+        private dynamic FirstItem()
         {
             int page = 0;
 
@@ -126,14 +125,14 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 page = 1;
             }
 
-            using (HtmlAnchor anchor = this.GetIconAnchor("icon item", "chevron circle left icon", page))
+            using (dynamic anchor = this.GetIconAnchor("icon item", "chevron circle left icon", page))
             {
                 anchor.Attributes.Add("title", Titles.FirstPage);
                 return anchor;
             }
         }
 
-        private HtmlAnchor PreviousItem()
+        private dynamic PreviousItem()
         {
             int page = 0;
             if (this.CurrentPage > 1)
@@ -141,14 +140,14 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 page = this.CurrentPage - 1;
             }
 
-            using (HtmlAnchor anchor = this.GetIconAnchor("icon item", "arrow circle left icon", page))
+            using (dynamic anchor = this.GetIconAnchor("icon item", "arrow circle left icon", page))
             {
                 anchor.Attributes.Add("title", Titles.PreviousPage);
                 return anchor;
             }
         }
 
-        private HtmlAnchor NextItem()
+        private dynamic NextItem()
         {
             int page = 0;
 
@@ -157,14 +156,14 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 page = this.CurrentPage + 1;
             }
 
-            using (HtmlAnchor anchor = this.GetIconAnchor("icon item", "arrow circle right icon", page))
+            using (dynamic anchor = this.GetIconAnchor("icon item", "arrow circle right icon", page))
             {
                 anchor.Attributes.Add("title", Titles.NextPage);
                 return anchor;
             }
         }
 
-        private HtmlAnchor LastItem()
+        private dynamic LastItem()
         {
             int page = 0;
 
@@ -173,16 +172,16 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
                 page = this.TotalPages;
             }
 
-            using (HtmlAnchor anchor = this.GetIconAnchor("icon item", "chevron circle right icon", page))
+            using (dynamic anchor = this.GetIconAnchor("icon item", "chevron circle right icon", page))
             {
                 anchor.Attributes.Add("title", Titles.LastPage);
                 return anchor;
             }
         }
 
-        private HtmlAnchor GetAnchor(int pageNumber)
+        private dynamic GetAnchor(int pageNumber)
         {
-            using (HtmlAnchor anchor = new HtmlAnchor())
+            using (dynamic anchor = new HtmlAnchor())
             {
                 if (pageNumber.Equals(this.CurrentPage))
                 {
@@ -216,13 +215,13 @@ namespace MixERP.Net.WebControls.ScrudFactory.Controls
             }
         }
 
-        private HtmlAnchor GetIconAnchor(string cssClass, string iconCssClass, int pageNumber)
+        private dynamic GetIconAnchor(string cssClass, string iconCssClass, int pageNumber)
         {
-            using (HtmlAnchor anchor = new HtmlAnchor())
+            using (dynamic anchor = new HtmlAnchor())
             {
                 anchor.Attributes.Add("class", cssClass);
 
-                using (HtmlGenericControl icon = new HtmlGenericControl("i"))
+                using (dynamic icon = new HtmlGenericControl("i"))
                 {
                     icon.Attributes.Add("class", iconCssClass);
                     anchor.Controls.Add(icon);

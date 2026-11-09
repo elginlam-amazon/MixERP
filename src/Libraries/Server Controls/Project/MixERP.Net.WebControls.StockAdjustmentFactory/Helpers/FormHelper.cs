@@ -1,12 +1,11 @@
-﻿using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockAdjustmentFactory.Helpers
 {
     internal class FormHelper
     {
-        internal static HtmlGenericControl GetFields()
+        internal static dynamic GetFields()
         {
-            using (HtmlGenericControl row = new HtmlGenericControl())
+            using (dynamic row = new HtmlGenericControl())
             {
                 row.TagName = "div";
                 row.Attributes.Add("class", "inline fields");
@@ -15,9 +14,9 @@ namespace MixERP.Net.WebControls.StockAdjustmentFactory.Helpers
             }
         }
 
-        internal static HtmlGenericControl GetField()
+        internal static dynamic GetField()
         {
-            using (HtmlGenericControl formGroup = new HtmlGenericControl())
+            using (dynamic formGroup = new HtmlGenericControl())
             {
                 formGroup.TagName = "div";
                 formGroup.Attributes.Add("class", "small field");

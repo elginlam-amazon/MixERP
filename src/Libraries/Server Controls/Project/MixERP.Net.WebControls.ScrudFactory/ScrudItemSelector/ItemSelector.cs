@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -20,12 +20,10 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.Common;
 using MixERP.Net.WebControls.ScrudFactory.Helpers;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
-    public partial class ScrudItemSelector
+    public partial class ScrudItemSelector : WebControlBase
     {
         private TemplateField GetSelectColumnTemplateField()
         {
@@ -40,7 +38,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
             return selectTemplate;
         }
 
-        private void LoadGridPanel(Panel gridPanel)
+        private void LoadGridPanel(dynamic gridPanel)
         {
             gridPanel.ID = "GridPanel";
             gridPanel.CssClass = this.GridPanelCssClass;
@@ -73,7 +71,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
             gridPanel.Controls.Add(this.searchGridView);
         }
 
-        private void LoadItemSelector(Panel panel)
+        private void LoadItemSelector(dynamic panel)
         {
             using (var topPanel = new Panel())
             {
@@ -88,11 +86,11 @@ namespace MixERP.Net.WebControls.ScrudFactory
             }
         }
 
-        private void LoadTopPanel(Panel topPanel)
+        private void LoadTopPanel(dynamic topPanel)
         {
             topPanel.CssClass = this.TopPanelCssClass;
 
-            using (HtmlGenericControl form = new HtmlGenericControl("div"))
+            using (dynamic form = new HtmlGenericControl("div"))
             {
                 form.Attributes.Add("class", "ui small form");
                 using (var fields = new HtmlGenericControl("div"))

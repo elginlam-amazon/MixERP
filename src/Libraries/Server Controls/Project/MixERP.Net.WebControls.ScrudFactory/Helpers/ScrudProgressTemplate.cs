@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,12 +17,10 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory.Helpers
 {
-    internal sealed class AjaxProgressTemplate : ITemplate
+    internal sealed class AjaxProgressTemplate
     {
         private readonly string cssClass;
         private readonly string spinnerImageCssClass;
@@ -35,13 +33,13 @@ namespace MixERP.Net.WebControls.ScrudFactory.Helpers
             this.spinnerImagePath = spinnerImagePath;
         }
 
-        public void InstantiateIn(Control container)
+        public void InstantiateIn(dynamic container)
         {
-            using (HtmlGenericControl ajaxProgressDiv = new HtmlGenericControl("div"))
+            using (dynamic ajaxProgressDiv = new HtmlGenericControl("div"))
             {
                 ajaxProgressDiv.Attributes.Add("class", this.cssClass);
 
-                using (HtmlGenericControl ajaxImage = new HtmlGenericControl("img"))
+                using (dynamic ajaxImage = new HtmlGenericControl("img"))
                 {
                     ajaxImage.Attributes.Add("src", this.spinnerImagePath);
                     ajaxImage.Attributes.Add("class", this.spinnerImageCssClass);

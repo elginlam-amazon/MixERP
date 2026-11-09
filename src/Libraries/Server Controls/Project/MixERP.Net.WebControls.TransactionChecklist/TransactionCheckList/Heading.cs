@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,27 +18,25 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.i18n.Resources;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.TransactionChecklist
 {
-    public partial class TransactionChecklistForm
+    public partial class TransactionChecklistForm : WebControlBase
     {
-        private Literal subTitleLiteral;
-        private Literal titleLiteral;
-        private Label verificationLabel;
+        private dynamic subTitleLiteral;
+        private dynamic titleLiteral;
+        private dynamic verificationLabel;
 
-        private void AddBreak(HtmlGenericControl p)
+        private void AddBreak(dynamic p)
         {
-            using (HtmlGenericControl line = new HtmlGenericControl())
+            using (dynamic line = new HtmlGenericControl())
             {
                 line.TagName = "br";
                 p.Controls.Add(line);
             }
         }
 
-        private void AddHeader(HtmlGenericControl p)
+        private void AddHeader(dynamic p)
         {
             this.AddTitle(p);
             this.AddRuler(p);
@@ -48,18 +46,18 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             this.AddBreak(p);
         }
 
-        private void AddRuler(HtmlGenericControl p)
+        private void AddRuler(dynamic p)
         {
-            using (HtmlGenericControl ruler = new HtmlGenericControl("hr"))
+            using (dynamic ruler = new HtmlGenericControl("hr"))
             {
                 ruler.Attributes.Add("class", "ui divider");
                 p.Controls.Add(ruler);
             }
         }
 
-        private void AddSubtitle(HtmlGenericControl p)
+        private void AddSubtitle(dynamic p)
         {
-            using (HtmlGenericControl subTitleHeading = new HtmlGenericControl())
+            using (dynamic subTitleHeading = new HtmlGenericControl())
             {
                 subTitleHeading.TagName = "h2";
                 this.subTitleLiteral = new Literal();
@@ -69,9 +67,9 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             }
         }
 
-        private void AddTitle(HtmlGenericControl p)
+        private void AddTitle(dynamic p)
         {
-            using (HtmlGenericControl titleHeading = new HtmlGenericControl())
+            using (dynamic titleHeading = new HtmlGenericControl())
             {
                 titleHeading.TagName = "h1";
                 this.titleLiteral = new Literal();
@@ -80,7 +78,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
                 p.Controls.Add(titleHeading);
             }
         }
-        private void AddVerificationLabel(HtmlGenericControl p)
+        private void AddVerificationLabel(dynamic p)
         {
             this.verificationLabel = new Label();
             this.ShowVerificationStatus(this.GetTranId(), this.verificationLabel);

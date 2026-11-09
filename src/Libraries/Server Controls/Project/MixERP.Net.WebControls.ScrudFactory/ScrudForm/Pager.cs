@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -20,13 +20,12 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.Common;
 using MixERP.Net.WebControls.ScrudFactory.Controls;
 using MixERP.Net.WebControls.ScrudFactory.Data;
-using System.Web.UI;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
-    public partial class ScrudForm
+    public partial class ScrudForm : WebControlBase
     {
-        private void CreatePager(Control container)
+        private void CreatePager(dynamic container)
         {
             int pageSize = this.GetPageSize();
             int totalRecords = FormHelper.GetTotalRecords(this.Catalog, this.ViewSchema, this.View);
@@ -51,7 +50,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
             this.CreatePager(container, pageSize, totalRecords, currentPage, blockCount, cssClass, activeCssClass, itemCssClass);
         }
 
-        private void CreatePager(Control container, int pageSize, int totalRecords, int currentPage, int blockCount, string cssClass, string activeCssClass, string itemCssClass)
+        private void CreatePager(dynamic container, int pageSize, int totalRecords, int currentPage, int blockCount, string cssClass, string activeCssClass, string itemCssClass)
         {
             string queryString = this.Page.Request.QueryString.ToString();
            

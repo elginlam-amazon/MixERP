@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,14 +17,12 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private void CreateHiddenFields(Control container)
+        private void CreateHiddenFields(dynamic container)
         {
             this.CreateItemCodeHidden(container);
             this.CreateItemIdHidden(container);
@@ -42,7 +40,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             this.CreateSalesPersonIdHidden(container);
         }
 
-        private void CreateItemCodeHidden(Control container)
+        private void CreateItemCodeHidden(dynamic container)
         {
             this.itemCodeHidden = new HiddenField();
             this.itemCodeHidden.ID = "ItemCodeHidden";
@@ -50,7 +48,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             container.Controls.Add(this.itemCodeHidden);
         }
 
-        private void CreateItemIdHidden(Control container)
+        private void CreateItemIdHidden(dynamic container)
         {
             this.itemIdHidden = new HiddenField();
             this.itemIdHidden.ID = "ItemIdHidden";
@@ -58,7 +56,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             container.Controls.Add(this.itemIdHidden);
         }
 
-        private void CreateModeHidden(Control container)
+        private void CreateModeHidden(dynamic container)
         {
             this.modeHidden = new HiddenField();
             this.modeHidden.ID = "ModeHiddenField";
@@ -66,7 +64,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             container.Controls.Add(this.modeHidden);
         }
 
-        private void CreatePartyCodeHidden(Control container)
+        private void CreatePartyCodeHidden(dynamic container)
         {
             this.partyCodeHidden = new HiddenField();
             this.partyCodeHidden.ID = "PartyCodeHidden";
@@ -74,7 +72,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             container.Controls.Add(this.partyCodeHidden);
         }
 
-        private void CreatePartyIdHidden(Control container)
+        private void CreatePartyIdHidden(dynamic container)
         {
             this.partyIdHidden = new HiddenField();
             this.partyIdHidden.ID = "PartyIdHidden";
@@ -82,7 +80,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             container.Controls.Add(this.partyIdHidden);
         }
 
-        private void CreateProductGridViewDataHidden(Control container)
+        private void CreateProductGridViewDataHidden(dynamic container)
         {
             this.productGridViewDataHidden = new HiddenField();
             this.productGridViewDataHidden.ID = "ProductGridViewDataHidden";
@@ -90,7 +88,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             container.Controls.Add(productGridViewDataHidden);
         }
 
-        private void CreatePriceTypeIdHidden(Control container)
+        private void CreatePriceTypeIdHidden(dynamic container)
         {
             this.priceTypeIdHidden = new HiddenField();
             this.priceTypeIdHidden.ID = "PriceTypeIdHidden";
@@ -98,7 +96,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             container.Controls.Add(this.priceTypeIdHidden);
         }
 
-        private void CreateTranIdCollectionHidden(Control container)
+        private void CreateTranIdCollectionHidden(dynamic container)
         {
             this.tranIdCollectionHidden = new HiddenField();
             this.tranIdCollectionHidden.ID = "TranIdCollectionHiddenField";
@@ -106,7 +104,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             container.Controls.Add(this.tranIdCollectionHidden);
         }
 
-        private void CreateUnitIdHidden(Control container)
+        private void CreateUnitIdHidden(dynamic container)
         {
             this.unitIdHidden = new HiddenField();
             this.unitIdHidden.ID = "UnitIdHidden";
@@ -114,7 +112,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             container.Controls.Add(this.unitIdHidden);
         }
 
-        private void CreateUnitNameHidden(Control container)
+        private void CreateUnitNameHidden(dynamic container)
         {
             this.unitNameHidden = new HiddenField();
             this.unitNameHidden.ID = "UnitNameHidden";
@@ -122,7 +120,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             container.Controls.Add(this.unitNameHidden);
         }
 
-        private void CreateStoreIdHidden(Control container)
+        private void CreateStoreIdHidden(dynamic container)
         {
             this.storeIdHidden = new HiddenField();
             this.storeIdHidden.ID = "StoreIdHidden";
@@ -130,7 +128,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             container.Controls.Add(this.storeIdHidden);
         }
 
-        private void CreateShipperIdHidden(Control container)
+        private void CreateShipperIdHidden(dynamic container)
         {
             this.shipperIdHidden = new HiddenField();
             this.shipperIdHidden.ID = "ShipperIdHidden";
@@ -138,7 +136,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             container.Controls.Add(this.shipperIdHidden);
         }
 
-        private void CreateShippingAddressCodeHidden(Control container)
+        private void CreateShippingAddressCodeHidden(dynamic container)
         {
             this.shippingAddressCodeHidden = new HiddenField();
             this.shippingAddressCodeHidden.ID = "ShippingAddressCodeHidden";
@@ -146,7 +144,7 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             container.Controls.Add(this.shippingAddressCodeHidden);
         }
 
-        private void CreateSalesPersonIdHidden(Control container)
+        private void CreateSalesPersonIdHidden(dynamic container)
         {
             this.salesPersonIdHidden = new HiddenField();
             this.salesPersonIdHidden.ID = "SalesPersonIdHidden";

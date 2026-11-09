@@ -27,6 +27,9 @@ using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.TransactionViewFactory;
 using System;
 using System.Web.UI.HtmlControls;
+using HtmlGenericControl = System.Web.UI.HtmlControls.HtmlGenericControl;
+using HtmlInputButton = System.Web.UI.HtmlControls.HtmlInputButton;
+using HtmlTextArea = System.Web.UI.HtmlControls.HtmlTextArea;
 
 namespace MixERP.Net.Core.Modules.Finance
 {

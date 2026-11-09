@@ -33,7 +33,7 @@ namespace MixERP.Net.DbFactory
 {
     public class DbNotificationArgs : EventArgs
     {
-        public NpgsqlError Notice { get; set; }
+        public PostgresNotice Notice { get; set; }
         public string Message { get; set; }
     }
 
@@ -41,7 +41,6 @@ namespace MixERP.Net.DbFactory
     {
         public EventHandler<DbNotificationArgs> Listen;
 
-        [CLSCompliant(false)]
         public static bool ExecuteNonQuery(string catalog, NpgsqlCommand command)
         {
             try
@@ -65,7 +64,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -75,7 +74,6 @@ namespace MixERP.Net.DbFactory
             }
         }
 
-        [CLSCompliant(false)]
         public static bool ExecuteNonQuery(string catalog, string sql)
         {
             if (string.IsNullOrWhiteSpace(sql))
@@ -88,9 +86,10 @@ namespace MixERP.Net.DbFactory
 
         private static string GetDBErrorResource(NpgsqlException ex)
         {
-            string message = DbErrors.Get(ex.Code);
+            string sqlState = ex.SqlState ?? string.Empty;
+            string message = DbErrors.Get(sqlState);
 
-            if (message == ex.Code)
+            if (message == sqlState)
             {
                 return ex.Message;
             }
@@ -98,7 +97,6 @@ namespace MixERP.Net.DbFactory
             return message;
         }
 
-        [CLSCompliant(false)]
         public static NpgsqlDataAdapter GetDataAdapter(string catalog, NpgsqlCommand command)
         {
             try
@@ -123,7 +121,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -133,7 +131,6 @@ namespace MixERP.Net.DbFactory
             }
         }
 
-        [CLSCompliant(false)]
         public static NpgsqlDataReader GetDataReader(string catalog, NpgsqlCommand command)
         {
             try
@@ -155,7 +152,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -165,7 +162,6 @@ namespace MixERP.Net.DbFactory
             }
         }
 
-        [CLSCompliant(false)]
         public static DataSet GetDataSet(string catalog, NpgsqlCommand command)
         {
             try
@@ -187,7 +183,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -197,7 +193,6 @@ namespace MixERP.Net.DbFactory
             }
         }
 
-        [CLSCompliant(false)]
         public static DataTable GetDataTable(NpgsqlCommand command, string connectionString)
         {
             try
@@ -227,7 +222,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -237,13 +232,11 @@ namespace MixERP.Net.DbFactory
             }
         }
 
-        [CLSCompliant(false)]
         public static DataTable GetDataTable(string catalog, NpgsqlCommand command)
         {
             return GetDataTable(command, DbConnection.GetConnectionString(catalog));
         }
 
-        [CLSCompliant(false)]
         public static DataView GetDataView(string catalog, NpgsqlCommand command)
         {
             if (ValidateCommand(command))
@@ -257,7 +250,6 @@ namespace MixERP.Net.DbFactory
             return null;
         }
 
-        [CLSCompliant(false)]
         public static object GetScalarValue(string catalog, NpgsqlCommand command)
         {
             try
@@ -279,7 +271,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -334,7 +326,7 @@ namespace MixERP.Net.DbFactory
                             {
                                 string errorMessage = ex.Message;
 
-                                if (ex.Code.StartsWith("P"))
+                                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                                 {
                                     errorMessage = GetDBErrorResource(ex);
                                 }
@@ -362,7 +354,7 @@ namespace MixERP.Net.DbFactory
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (ex.SqlState != null && ex.SqlState.StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -424,7 +416,7 @@ namespace MixERP.Net.DbFactory
                 DbNotificationArgs args = new DbNotificationArgs
                 {
                     Notice = e.Notice,
-                    Message = e.Notice.Message
+                    Message = e.Notice.MessageText
                 };
 
                 listen(this, args);

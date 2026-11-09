@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -22,10 +22,10 @@ using System.Collections.ObjectModel;
 
 namespace MixERP.Net.WebControls.ReportEngine
 {
-    public partial class Report
+    public partial class Report : WebControlBase
     {
-        private readonly Collection<Collection<KeyValuePair<string, object>>> parameterCollection =
-            new Collection<Collection<KeyValuePair<string, object>>>();
+        private readonly Collection<Collection<KeyValuePair<string, dynamic>>> parameterCollection =
+            new Collection<Collection<KeyValuePair<string, dynamic>>>();
 
         public bool AutoInitialize { get; set; }
         public string Catalog { get; set; }
@@ -38,7 +38,7 @@ namespace MixERP.Net.WebControls.ReportEngine
         ///     The datasource parameter collection is a collection of
         ///     parameters stored in KeyValuePair.
         /// </summary>
-        public Collection<Collection<KeyValuePair<string, object>>> ParameterCollection
+        public Collection<Collection<KeyValuePair<string, dynamic>>> ParameterCollection
         {
             get { return this.parameterCollection; }
         }
@@ -47,7 +47,7 @@ namespace MixERP.Net.WebControls.ReportEngine
         public string ReportNotFoundErrorMessage { get; set; }
         public string RunningTotalText { get; set; }
 
-        public void AddParameterToCollection(Collection<KeyValuePair<string, object>> parameter)
+        public void AddParameterToCollection(Collection<KeyValuePair<string, dynamic>> parameter)
         {
             this.parameterCollection.Add(parameter);
         }

@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -57,7 +57,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist.Helpers
         }
 
 
-        private void Serializer_ImageSaved(object sender, ImageSavedEventArgs e)
+        private void Serializer_ImageSaved(dynamic sender, ImageSavedEventArgs e)
         {
             Processor processor = new Processor(this.Catalog);
             processor.Send(this.Recipient, this.Subject, this.EmailBody, AttachmentFactory.GetAttachments(e.ImagePath));

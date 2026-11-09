@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -21,30 +21,17 @@ using MixERP.Net.Framework;
 using MixERP.Net.i18n.Resources;
 using System;
 using System.Collections.ObjectModel;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
-    public partial class StockTransactionView
+    public partial class StockTransactionView : WebControlBase
     {
-        private void CreateReturnButton(HtmlGenericControl container)
+        private void CreateReturnButton(dynamic container)
         {
-            if (this.ShowReturnButton)
-            {
-                this.returnButton = new Button();
-                this.returnButton.ID = "ReturnButton";
-                this.returnButton.CssClass = "ui button";
-                this.returnButton.Text = Titles.Return;
-                this.returnButton.OnClientClick = "if(!getSelectedItems()){return false;};";
-
-                this.returnButton.Click += this.ReturnButton_Click;
-
-                container.Controls.Add(this.returnButton);
-            }
+            // Stubbed: WebForms UI building removed for net10.0
         }
 
-        private void ReturnButton_Click(object sender, EventArgs e)
+        private void ReturnButton_Click(dynamic sender, EventArgs e)
         {
             Collection<long> values = this.GetSelectedValues();
 

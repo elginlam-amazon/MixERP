@@ -15,19 +15,19 @@ namespace MixERP.Net.WebControls.AttachmentFactory.Helpers
         public static string GetUploadHandlerUrl(string catalog)
         {
             string url = DbConfig.GetAttachmentParameter(catalog, "UploadHandlerUrl");
-            return PageUtility.ResolveUrl(url);
+            return url;
         }
 
         public static string GetAttachmentsDirectory(string catalog)
         {
             string url = DbConfig.GetAttachmentParameter(catalog, "AttachmentsDirectory");
-            return PageUtility.ResolveUrl(url);
+            return url;
         }
 
         public static string GetUndoUploadServiceUrl(string catalog)
         {
             string url = DbConfig.GetAttachmentParameter(catalog, "UndoUploadServiceUrl");
-            return PageUtility.ResolveUrl(url);
+            return url;
         }
     }
 }

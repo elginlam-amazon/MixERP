@@ -19,11 +19,12 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 namespace MixERP.Net.Framework.Controls
 {
-    public abstract class MixERPWidget: MixERPUserControlBase, IWidget
+    public abstract class MixERPWidget: MixERPUserControlBase, IWidget, System.IDisposable
     {
         public override AccessLevel AccessLevel
         {
             get { return AccessLevel.PolicyBased; }
         }
+        public override void Dispose() { }
     }
 }

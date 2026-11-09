@@ -1,8 +1,8 @@
-﻿using MixERP.Net.Entities;
+using MixERP.Net.Entities;
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
-    public partial class TransactionView
+    public partial class TransactionView : WebControlBase
     {
         public string AddNewPath { get; set; }
         public string Book { get; set; }

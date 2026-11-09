@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -22,15 +22,14 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.WebControls.ScrudFactory.Data;
 using MixERP.Net.WebControls.ScrudFactory.Helpers;
 using System;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
-    public partial class ScrudItemSelector
+    public partial class ScrudItemSelector : WebControlBase
     {
-        private void FilterSelectDataBound(object sender, EventArgs e)
+        private void FilterSelectDataBound(dynamic sender, EventArgs e)
         {
-            using (DropDownList dropDownList = sender as DropDownList)
+            using (dynamic dropDownList = sender as DropDownList)
             {
                 if (dropDownList == null)
                 {
@@ -64,7 +63,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
             return Conversion.TryCastString(this.Page.Request["View"]);
         }
 
-        private void GoButton_Click(object sender, EventArgs e)
+        private void GoButton_Click(dynamic sender, EventArgs e)
         {
             if (string.IsNullOrWhiteSpace(this.GetSchema()))
             {
@@ -84,7 +83,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
             }
         }
 
-        private void SearchGridView_RowDataBound(object sender, GridViewRowEventArgs e)
+        private void SearchGridView_RowDataBound(dynamic sender, dynamic e)
         {
             if (e == null)
             {

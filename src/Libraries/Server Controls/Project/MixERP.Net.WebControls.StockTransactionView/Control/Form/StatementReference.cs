@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,23 +19,14 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n.Resources;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
-    public partial class StockTransactionView
+    public partial class StockTransactionView : WebControlBase
     {
-        private void CreateStatementReferenceField(HtmlGenericControl container)
+        private void CreateStatementReferenceField(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
-            {
-                this.statementReferenceInputText = new HtmlInputText();
-                this.statementReferenceInputText.ID = "StatementReferenceTextBox";
-                this.statementReferenceInputText.Attributes.Add("placeholder", Titles.StatementReference);
-
-                field.Controls.Add(this.statementReferenceInputText);
-                container.Controls.Add(field);
-            }
+            // Stubbed: WebForms UI building removed for net10.0
         }
     }
 }

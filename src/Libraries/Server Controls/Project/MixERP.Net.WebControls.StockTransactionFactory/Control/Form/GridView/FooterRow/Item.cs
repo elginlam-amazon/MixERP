@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,16 +17,14 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private static void CreateItemCodeField(TableRow row)
+        private static void CreateItemCodeField(dynamic row)
         {
-            using (TableCell cell = new TableCell())
+            using (dynamic cell = new TableCell())
             {
                 using (HtmlInputText itemCodeInputText = new HtmlInputText())
                 {
@@ -40,9 +38,9 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             }
         }
 
-        private static void CreateItemField(TableRow row)
+        private static void CreateItemField(dynamic row)
         {
-            using (TableCell cell = new TableCell())
+            using (dynamic cell = new TableCell())
             {
                 using (HtmlSelect itemSelect = new HtmlSelect())
                 {

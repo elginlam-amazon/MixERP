@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -22,7 +22,7 @@ using MixERP.Net.WebControls.StockTransactionViewFactory.Data.Models;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
         /// <summary>
         ///     This property is used to temporarily store pre assigned instance of transactions for

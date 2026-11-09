@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,36 +18,34 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.WebControls.Common;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public sealed partial class StockTransactionForm
+    public sealed partial class StockTransactionForm : WebControlBase
     {
-        private DateTextBox dateTextBox;
+        private dynamic dateTextBox;
         private bool disposed;
-        private HiddenField itemCodeHidden;
-        private HiddenField itemIdHidden;
-        private HiddenField modeHidden;
-        private HiddenField partyCodeHidden;
-        private HtmlInputText partyCodeInputText;
-        private HiddenField partyIdHidden;
-        private PlaceHolder placeHolder;
-        private HiddenField priceTypeIdHidden;
-        private HiddenField productGridViewDataHidden;
-        private HtmlInputText referenceNumberInputText;
-        private HiddenField salesPersonIdHidden;
-        private HiddenField shipperIdHidden;
-        private HiddenField shippingAddressCodeHidden;
+        private dynamic itemCodeHidden;
+        private dynamic itemIdHidden;
+        private dynamic modeHidden;
+        private dynamic partyCodeHidden;
+        private dynamic partyCodeInputText;
+        private dynamic partyIdHidden;
+        private dynamic placeHolder;
+        private dynamic priceTypeIdHidden;
+        private dynamic productGridViewDataHidden;
+        private dynamic referenceNumberInputText;
+        private dynamic salesPersonIdHidden;
+        private dynamic shipperIdHidden;
+        private dynamic shippingAddressCodeHidden;
         private HtmlTextArea statementReferenceTextArea;
-        private HiddenField storeIdHidden;
-        private HtmlGenericControl title;
-        private HiddenField tranIdCollectionHidden;
-        private HiddenField unitIdHidden;
-        private HiddenField unitNameHidden;
+        private dynamic storeIdHidden;
+        private dynamic title;
+        private dynamic tranIdCollectionHidden;
+        private dynamic unitIdHidden;
+        private dynamic unitNameHidden;
 
-        public override void Dispose()
+        public void Dispose()
         {
             if (!this.disposed)
             {

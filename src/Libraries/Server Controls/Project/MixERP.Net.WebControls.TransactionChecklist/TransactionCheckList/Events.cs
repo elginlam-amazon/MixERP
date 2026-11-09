@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -26,9 +26,9 @@ using MixERP.Net.TransactionGovernor.Verification;
 
 namespace MixERP.Net.WebControls.TransactionChecklist
 {
-    public partial class TransactionChecklistForm
+    public partial class TransactionChecklistForm : WebControlBase
     {
-        private void EmailLinkButton_Click(object sender, EventArgs e)
+        private void EmailLinkButton_Click(dynamic sender, EventArgs e)
         {
             string tranId = this.GetTranId();
 
@@ -54,7 +54,7 @@ namespace MixERP.Net.WebControls.TransactionChecklist
             this.subTitleLiteral.Text = string.Format(CultureInfo.CurrentCulture, Labels.EmailSentConfirmation, this.PartyEmailAddress);
         }
 
-        private void OkButton_Click(object sender, EventArgs e)
+        private void OkButton_Click(dynamic sender, EventArgs e)
         {
             if (this.RestrictedTransactionMode)
             {

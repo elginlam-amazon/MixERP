@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -30,12 +30,12 @@ using System.Threading;
 
 namespace MixERP.Net.WebControls.ScrudFactory
 {
-    public partial class ScrudForm
+    public partial class ScrudForm : WebControlBase
     {
         public event EventHandler SaveButtonClick;
         public event EventHandler UseButtonClick;
 
-        private void CancelButton_Click(object sender, EventArgs e)
+        private void CancelButton_Click(dynamic sender, EventArgs e)
         {
             //Clear the form.
             this.formContainer.Controls.Clear();
@@ -44,14 +44,14 @@ namespace MixERP.Net.WebControls.ScrudFactory
             this.ClearSelectedValue();
 
             //Load the form again.
-            using (DataTable table = new DataTable())
+            using (dynamic table = new DataTable())
             {
                 table.Locale = Thread.CurrentThread.CurrentCulture;
                 this.LoadForm(this.formContainer, table);
             }
         }
 
-        private void DeleteButton_Click(object sender, EventArgs e)
+        private void DeleteButton_Click(dynamic sender, EventArgs e)
         {
             string id = this.GetSelectedValue();
             if (string.IsNullOrWhiteSpace(id))
@@ -80,7 +80,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
             }
         }
 
-        private void EditButton_Click(object sender, EventArgs e)
+        private void EditButton_Click(dynamic sender, EventArgs e)
         {
             string id = this.GetSelectedValue();
             if (string.IsNullOrWhiteSpace(id))
@@ -88,7 +88,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
                 return;
             }
 
-            using (DataTable table = FormHelper.GetTable(this.Catalog, this.TableSchema, this.Table, this.KeyColumn, id, this.KeyColumn))
+            using (dynamic table = FormHelper.GetTable(this.Catalog, this.TableSchema, this.Table, this.KeyColumn, id, this.KeyColumn))
             {
                 if (table.Rows.Count.Equals(1))
                 {
@@ -136,7 +136,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
                         //Clear the form container.
                         this.formContainer.Controls.Clear();
 
-                        using (DataTable table = new DataTable())
+                        using (dynamic table = new DataTable())
                         {
                             //Load the form again.
                             this.LoadForm(this.formContainer, table);
@@ -182,7 +182,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
                         this.formContainer.Controls.Clear();
 
                         //Load the form again.
-                        using (DataTable table = new DataTable())
+                        using (dynamic table = new DataTable())
                         {
                             table.Locale = Thread.CurrentThread.CurrentCulture;
 
@@ -206,7 +206,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
             }
         }
 
-        private void SaveButton_Click(object sender, EventArgs e)
+        private void SaveButton_Click(dynamic sender, EventArgs e)
         {
             this.Page.Validate();
 
@@ -224,7 +224,7 @@ namespace MixERP.Net.WebControls.ScrudFactory
             this.Save(false);
         }
 
-        private void UseButton_Click(object sender, EventArgs e)
+        private void UseButton_Click(dynamic sender, EventArgs e)
         {
             this.Page.Validate();
             if (!this.Page.IsValid)

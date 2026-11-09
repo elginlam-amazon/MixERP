@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,12 +17,10 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using SkiaSharp;
 using System;
-using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
-using System.Linq;
 
 namespace MixERP.Net.Common.Helpers
 {
@@ -30,7 +28,7 @@ namespace MixERP.Net.Common.Helpers
     {
         public static string GetContentType(string extension)
         {
-            switch (extension)
+            switch ((extension ?? string.Empty).ToLowerInvariant())
             {
                 case ".bmp": return "Image/bmp";
                 case ".gif": return "Image/gif";
@@ -41,115 +39,66 @@ namespace MixERP.Net.Common.Helpers
             }
         }
 
-        public static ImageCodecInfo GetEncoder(ImageFormat format)
+        public static byte[] GetResizedImage(string path, int width, int height)
         {
-            if (format == null)
-            {
-                return null;
-            }
-
-            ImageCodecInfo[] codecs = ImageCodecInfo.GetImageDecoders();
-
-            foreach (ImageCodecInfo codec in codecs)
-            {
-                if (codec.FormatID == format.Guid)
-                {
-                    return codec;
-                }
-            }
-            return null;
+            if (string.IsNullOrEmpty(path)) return null;
+            using var original = SKBitmap.Decode(path);
+            return ResizeCore(original, width, height);
         }
 
-        public static string GetFileExtension(ImageFormat format)
+        public static byte[] GetResizedImage(byte[] data, int width, int height)
         {
-            return ImageCodecInfo.GetImageEncoders()
-                .First(x => x.FormatID == format.Guid)
-                .FilenameExtension
-                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .First()
-                .Trim('*')
-                .ToUpperInvariant();
+            if (data == null || data.Length == 0) return null;
+            using var original = SKBitmap.Decode(data);
+            return ResizeCore(original, width, height);
         }
 
-        public static ImageFormat GetImageFormat(String path)
+        private static byte[] ResizeCore(SKBitmap original, int width, int height)
         {
-            switch (Path.GetExtension(path))
+            if (original == null) return null;
+
+            int targetW = width == 0 ? original.Width : width;
+            int targetH = height == 0 ? original.Height : height;
+
+            float ratio = CalculateScalingRatio(original.Width, original.Height, targetW, targetH);
+            int scaledW = (int)Math.Round(original.Width * ratio);
+            int scaledH = (int)Math.Round(original.Height * ratio);
+            int left = (targetW - scaledW) / 2;
+            int top = (targetH - scaledH) / 2;
+
+            if (scaledW < scaledH && scaledH > targetH)
+                top = (targetH - scaledH) / 4;
+
+            using var thumbnail = new SKBitmap(targetW, targetH);
+            using var canvas = new SKCanvas(thumbnail);
+            canvas.Clear(SKColors.Transparent);
+            var dest = new SKRect(left, top, left + scaledW, top + scaledH);
+            canvas.DrawBitmap(original, dest);
+
+            using var image = SKImage.FromBitmap(thumbnail);
+            using var encoded = image.Encode(SKEncodedImageFormat.Png, 100);
+            return encoded.ToArray();
+        }
+
+#pragma warning disable CA1416
+        public static ImageFormat GetImageFormat(string extension)
+        {
+            switch ((extension ?? string.Empty).ToLowerInvariant())
             {
                 case ".bmp": return ImageFormat.Bmp;
                 case ".gif": return ImageFormat.Gif;
                 case ".jpg": return ImageFormat.Jpeg;
                 case ".png": return ImageFormat.Png;
-            }
-            return ImageFormat.Jpeg;
-        }
-
-        public static byte[] GetResizedImage(Image image, int width, int height)
-        {
-            Size thumbnailSize = new Size(width, height);
-
-            if (image == null)
-            {
-                return null;
-            }
-
-            if (thumbnailSize.Width.Equals(0))
-            {
-                thumbnailSize.Width = image.Size.Width;
-            }
-
-            if (thumbnailSize.Height.Equals(0))
-            {
-                thumbnailSize.Height = image.Size.Height;
-            }
-
-            float scalingRatio = CalculateScalingRatio(image.Size, thumbnailSize);
-
-            int scaledWidth = (int)Math.Round(image.Size.Width * scalingRatio);
-            int scaledHeight = (int)Math.Round(image.Size.Height * scalingRatio);
-            int scaledLeft = (thumbnailSize.Width - scaledWidth) / 2;
-            int scaledTop = (thumbnailSize.Height - scaledHeight) / 2;
-
-            // For portrait mode, adjust the vertical top of the crop area so that we get more of
-            // the top area
-            if (scaledWidth < scaledHeight && scaledHeight > thumbnailSize.Height)
-            {
-                scaledTop = (thumbnailSize.Height - scaledHeight) / 4;
-            }
-
-            Rectangle cropArea = new Rectangle(scaledLeft, scaledTop, scaledWidth, scaledHeight);
-
-            using (Bitmap thumbnail = new Bitmap(thumbnailSize.Width, thumbnailSize.Height, PixelFormat.Format32bppPArgb))
-            {
-                using (Graphics thumbnailGraphics = Graphics.FromImage(thumbnail))
-                {
-                    thumbnailGraphics.CompositingQuality = CompositingQuality.HighQuality;
-                    thumbnailGraphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-                    thumbnailGraphics.SmoothingMode = SmoothingMode.HighQuality;
-                    thumbnailGraphics.Clear(Color.Transparent);
-                    thumbnailGraphics.DrawImage(image, cropArea);
-                }
-
-                return Conversion.TryCastByteArray(thumbnail);
+                default: return ImageFormat.Jpeg;
             }
         }
+#pragma warning restore CA1416
 
-        private static float CalculateScalingRatio(Size originalSize, Size targetSize)
+        private static float CalculateScalingRatio(int origW, int origH, int targetW, int targetH)
         {
-            float originalAspectRatio = (float)originalSize.Width / originalSize.Height;
-            float targetAspectRatio = (float)targetSize.Width / targetSize.Height;
-
-            float scalingRatio;
-
-            if (targetAspectRatio >= originalAspectRatio)
-            {
-                scalingRatio = (float)targetSize.Width / originalSize.Width;
-            }
-            else
-            {
-                scalingRatio = (float)targetSize.Height / originalSize.Height;
-            }
-
-            return scalingRatio;
+            float origAR = (float)origW / origH;
+            float targetAR = (float)targetW / targetH;
+            return targetAR >= origAR ? (float)targetW / origW : (float)targetH / origH;
         }
     }
 }

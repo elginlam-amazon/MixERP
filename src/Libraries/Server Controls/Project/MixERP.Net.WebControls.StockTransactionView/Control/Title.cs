@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -17,16 +17,14 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
-    public partial class StockTransactionView
+    public partial class StockTransactionView : WebControlBase
     {
-        private void CreateTitle(Control container)
+        private void CreateTitle(dynamic container)
         {
-            using (HtmlGenericControl title = new HtmlGenericControl("h2"))
+            using (dynamic title = new HtmlGenericControl("h2"))
             {
                 title.InnerText = this.Text;
                 container.Controls.Add(title);

@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,15 +19,14 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.StockTransactionFactory.Helpers;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private static void CreateHeaderRow(Table grid)
+        private static void CreateHeaderRow(dynamic grid)
         {
-            using (TableRow header = new TableRow())
+            using (dynamic header = new TableRow())
             {
                 header.TableSection = TableRowSection.TableHeader;
 

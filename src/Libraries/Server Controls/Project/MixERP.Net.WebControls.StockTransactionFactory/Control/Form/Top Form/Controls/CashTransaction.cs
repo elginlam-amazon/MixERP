@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -20,29 +20,28 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.StockTransactionFactory.Helpers;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private void AddCashTransactionDivCell(HtmlTableRow row)
+        private void AddCashTransactionDivCell(dynamic row)
         {
-            using (HtmlTableCell cell = TableHelper.GetFieldCell())
+            using (dynamic cell = TableHelper.GetFieldCell())
             {
                 if (this.ShowTransactionType)
                 {
-                    using (HtmlGenericControl toggleCheckBox = HtmlControlHelper.GetToggleCheckBox())
+                    using (dynamic toggleCheckBox = HtmlControlHelper.GetToggleCheckBox())
                     {
                         toggleCheckBox.ID = "CashTransactionDiv";
-                        using (HtmlInputCheckBox cashTransactionInputCheckBox = new HtmlInputCheckBox())
+                        using (dynamic cashTransactionInputCheckBox = new HtmlInputCheckBox())
                         {
                             cashTransactionInputCheckBox.ID = "CashTransactionInputCheckBox";
                             cashTransactionInputCheckBox.Attributes.Add("checked", "checked");
                             toggleCheckBox.Controls.Add(cashTransactionInputCheckBox);
                         }
 
-                        using (HtmlGenericControl label = HtmlControlHelper.GetLabel(Titles.CashTransaction))
+                        using (dynamic label = HtmlControlHelper.GetLabel(Titles.CashTransaction))
                         {
                             toggleCheckBox.Controls.Add(label);
                         }

@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,17 +19,16 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.i18n.Resources;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private static void AddGrandTotalField(HtmlGenericControl container)
+        private static void AddGrandTotalField(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
-                using (HtmlGenericControl label = HtmlControlHelper.GetLabel(Titles.GrandTotal, "GrandTotalInputTextInputText"))
+                using (dynamic label = HtmlControlHelper.GetLabel(Titles.GrandTotal, "GrandTotalInputTextInputText"))
                 {
                     field.Controls.Add(label);
                 }
@@ -46,11 +45,11 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             }
         }
 
-        private static void AddRunningTotalField(HtmlGenericControl container)
+        private static void AddRunningTotalField(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
-                using (HtmlGenericControl label = HtmlControlHelper.GetLabel(Titles.RunningTotal, "RunningTotalInputText"))
+                using (dynamic label = HtmlControlHelper.GetLabel(Titles.RunningTotal, "RunningTotalInputText"))
                 {
                     field.Controls.Add(label);
                 }
@@ -67,11 +66,11 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             }
         }
 
-        private static void AddTaxTotalField(HtmlGenericControl container)
+        private static void AddTaxTotalField(dynamic container)
         {
-            using (HtmlGenericControl field = HtmlControlHelper.GetField())
+            using (dynamic field = HtmlControlHelper.GetField())
             {
-                using (HtmlGenericControl label = HtmlControlHelper.GetLabel(Titles.TaxTotal, "TaxTotalInputText"))
+                using (dynamic label = HtmlControlHelper.GetLabel(Titles.TaxTotal, "TaxTotalInputText"))
                 {
                     field.Controls.Add(label);
                 }
@@ -88,9 +87,9 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             }
         }
 
-        private static void AddTotalFields(HtmlGenericControl container)
+        private static void AddTotalFields(dynamic container)
         {
-            using (HtmlGenericControl fields = HtmlControlHelper.GetFields("three fields"))
+            using (dynamic fields = HtmlControlHelper.GetFields("three fields"))
             {
                 AddRunningTotalField(fields);
                 AddTaxTotalField(fields);

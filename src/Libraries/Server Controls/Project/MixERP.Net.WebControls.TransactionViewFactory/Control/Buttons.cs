@@ -1,13 +1,11 @@
-﻿using MixERP.Net.i18n.Resources;
+using MixERP.Net.i18n.Resources;
 using System.Globalization;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.TransactionViewFactory
 {
-    public partial class TransactionView
+    public partial class TransactionView : WebControlBase
     {
-        private void AddAddButton(HtmlGenericControl container)
+        private void AddAddButton(dynamic container)
         {
             if (this.DisplayAddButton)
             {
@@ -24,7 +22,7 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddApproveButton(HtmlGenericControl container)
+        private void AddApproveButton(dynamic container)
         {
             if (this.DisplayApproveButton)
             {
@@ -41,9 +39,9 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddButtons(Control container)
+        private void AddButtons(dynamic container)
         {
-            using (HtmlGenericControl iconButtons = new HtmlGenericControl("div"))
+            using (dynamic iconButtons = new HtmlGenericControl("div"))
             {
                 iconButtons.Attributes.Add("class", "ui icon buttons");
                 this.AddAddButton(iconButtons);
@@ -56,7 +54,7 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddFlagButton(HtmlGenericControl container)
+        private void AddFlagButton(dynamic container)
         {
             if (this.DisplayFlagButton)
             {
@@ -72,7 +70,7 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddPrintButton(HtmlGenericControl container)
+        private void AddPrintButton(dynamic container)
         {
             if (this.DisplayPrintButton)
             {
@@ -87,7 +85,7 @@ namespace MixERP.Net.WebControls.TransactionViewFactory
             }
         }
 
-        private void AddRejectButton(HtmlGenericControl container)
+        private void AddRejectButton(dynamic container)
         {
             if (this.DisplayRejectButton)
             {

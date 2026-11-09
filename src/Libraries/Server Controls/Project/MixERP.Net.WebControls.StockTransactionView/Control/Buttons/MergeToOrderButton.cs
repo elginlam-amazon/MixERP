@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -20,29 +20,18 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.i18n.Resources;
 using System;
 using System.Collections.ObjectModel;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.StockTransactionViewFactory
 {
-    public partial class StockTransactionView
+    public partial class StockTransactionView : WebControlBase
     {
-        private void CreateMergeToOrderButton(HtmlGenericControl container)
+        private void CreateMergeToOrderButton(dynamic container)
         {
-            if (this.ShowMergeToOrderButton)
-            {
-                this.mergeToOrderButton = new Button();
-                this.mergeToOrderButton.ID = "MergeToOrderButton";
-                this.mergeToOrderButton.CssClass = "ui button";
-                this.mergeToOrderButton.Text = Titles.MergeBatchToSalesOrder;
-                this.mergeToOrderButton.OnClientClick = "if(!getSelectedItems()){return false;};";
-                this.mergeToOrderButton.Click += this.MergeToOrderButton_Click;
-                container.Controls.Add(this.mergeToOrderButton);
-            }
+            // Stubbed: WebForms UI building removed for net10.0
         }
 
 
-        private void MergeToOrderButton_Click(object sender, EventArgs e)
+        private void MergeToOrderButton_Click(dynamic sender, EventArgs e)
         {
             Collection<long> values = this.GetSelectedValues();
 

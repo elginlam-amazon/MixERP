@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -19,18 +19,16 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.Entities;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
 
 namespace MixERP.Net.WebControls.StockTransactionFactory
 {
-    public partial class StockTransactionForm
+    public partial class StockTransactionForm : WebControlBase
     {
-        private void CreateTopFormPanel(Control container)
+        private void CreateTopFormPanel(dynamic container)
         {
-            using (HtmlGenericControl segment = HtmlControlHelper.GetSegment())
+            using (dynamic segment = HtmlControlHelper.GetSegment())
             {
-                using (HtmlTable table = new HtmlTable())
+                using (dynamic table = new HtmlTable())
                 {
                     table.Attributes.Add("class", "ui form");
 
@@ -43,9 +41,9 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
             }
 
 
-            using (HtmlGenericControl form = HtmlControlHelper.GetForm())
+            using (dynamic form = HtmlControlHelper.GetForm())
             {
-                using (HtmlGenericControl fields = HtmlControlHelper.GetFields("two fields"))
+                using (dynamic fields = HtmlControlHelper.GetFields("two fields"))
                 {
                     if (this.ShowShippingInformation)
                     {

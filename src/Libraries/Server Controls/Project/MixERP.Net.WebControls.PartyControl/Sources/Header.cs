@@ -1,4 +1,4 @@
-﻿/********************************************************************************
+/********************************************************************************
 Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
 
 This file is part of MixERP.
@@ -18,23 +18,20 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using MixERP.Net.i18n.Resources;
-using System.Web.UI;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
 
 namespace MixERP.Net.WebControls.PartyControl
 {
-    public partial class PartyControl
+    public partial class PartyControl : WebControlBase
     {
-        private static Control GetHeader()
+        private static dynamic GetHeader()
         {
-            using (HtmlGenericControl form = ControlHelper.GetGenericControl(@"div", @"ui form"))
+            using (dynamic form = ControlHelper.GetGenericControl(@"div", @"ui form"))
             {
-                using (HtmlGenericControl fields = ControlHelper.GetGenericControl("div", "inline fields"))
+                using (dynamic fields = ControlHelper.GetGenericControl("div", "inline fields"))
                 {
-                    using (HtmlGenericControl partyCodeField = ControlHelper.GetGenericControl(@"div", @"small field"))
+                    using (dynamic partyCodeField = ControlHelper.GetGenericControl(@"div", @"small field"))
                     {
-                        using (Literal partyDropDownListLabelLiteral = new Literal())
+                        using (dynamic partyDropDownListLabelLiteral = new Literal())
                         {
                             partyDropDownListLabelLiteral.Text = ControlHelper.GetLabelText(@"PartyCodeTextBox", Titles.SelectCustomer);
 
@@ -48,7 +45,7 @@ namespace MixERP.Net.WebControls.PartyControl
                         }
                     }
 
-                    using (HtmlGenericControl partyDropDownListField = ControlHelper.GetGenericControl("div", "medium field"))
+                    using (dynamic partyDropDownListField = ControlHelper.GetGenericControl("div", "medium field"))
                     {
                         using (HtmlSelect partyDropDownList = ControlHelper.GetSelect(@"PartyDropDownList", string.Empty))
                         {
@@ -58,7 +55,7 @@ namespace MixERP.Net.WebControls.PartyControl
                         fields.Controls.Add(partyDropDownListField);
                     }
 
-                    using (HtmlButton goButton = ControlHelper.GetButton(@"GoButton", @"ui small teal button", Titles.Go))
+                    using (dynamic goButton = ControlHelper.GetButton(@"GoButton", @"ui small teal button", Titles.Go))
                     {
                         fields.Controls.Add(goButton);
                     }
