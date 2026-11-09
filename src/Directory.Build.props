@@ -1,0 +1,30 @@
+<Project>
+  <!-- Settings shared by every MixERP project. -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <!--
+      Each project keeps its own Properties\AssemblyInfo.cs (title, company, versions, CLSCompliant, ...),
+      so the SDK must not generate those attributes. The SDK still generates the target framework and
+      supported OS platform attributes.
+    -->
+    <GenerateAssemblyTitleAttribute>false</GenerateAssemblyTitleAttribute>
+    <GenerateAssemblyDescriptionAttribute>false</GenerateAssemblyDescriptionAttribute>
+    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+    <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
+    <GenerateAssemblyCopyrightAttribute>false</GenerateAssemblyCopyrightAttribute>
+    <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
+    <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
+    <GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
+    <!--
+      The assemblies are [CLSCompliant(true)], but System.Web (WebFormsForCore) and Npgsql are not marked
+      CLS-compliant, so every public member exposing their types raises CS3001/CS3002/CS3003/CS3009.
+      On .NET Framework, System.Web was marked CLS-compliant and these warnings did not occur.
+    -->
+    <NoWarn>$(NoWarn);CS3001;CS3002;CS3003;CS3009</NoWarn>
+    <WebFormsForCoreVersion>1.6.8</WebFormsForCoreVersion>
+    <!-- Npgsql 9+ no longer ships a netstandard2.0 build; the netstandard2.0 leg stays on the 8.0 line. -->
+    <NpgsqlVersion>10.0.3</NpgsqlVersion>
+    <NpgsqlVersion Condition="'$(TargetFramework)' == 'netstandard2.0'">8.0.9</NpgsqlVersion>
+  </PropertyGroup>
+</Project>
