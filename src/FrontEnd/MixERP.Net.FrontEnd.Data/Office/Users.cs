@@ -18,7 +18,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System.Linq;
-using System.Web;
+using Microsoft.AspNetCore.Http;
 using MixERP.Net.Entities.Office;
 using MixERP.Net.Framework;
 using Npgsql;
@@ -71,10 +71,10 @@ namespace MixERP.Net.FrontEnd.Data.Office
         {
             if (context != null)
             {
-                string remoteAddress = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"];
-                string remoteUser = HttpContext.Current.Request.ServerVariables["REMOTE_USER"];
+                string remoteAddress = context.Connection.RemoteIpAddress?.ToString();
+                string remoteUser = context.User?.Identity?.Name;
 
-                DbSignInResult result = SignIn(catalog, officeId, userName, password, context.Request.UserAgent,
+                DbSignInResult result = SignIn(catalog, officeId, userName, password, context.Request.Headers.UserAgent.ToString(),
                     remoteAddress,
                     remoteUser, culture, challenge);
 

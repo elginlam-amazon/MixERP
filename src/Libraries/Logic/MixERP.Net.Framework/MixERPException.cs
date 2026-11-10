@@ -17,11 +17,6 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System;
-using System.Runtime.Serialization;
-using System.Security.Permissions;
-using System.Web;
-using Serilog;
 
 namespace MixERP.Net.Framework
 {
@@ -50,22 +45,25 @@ namespace MixERP.Net.Framework
             this.dbConstraintName = dbConstraintName;
         }
 
-        public MixERPException(SerializationInfo info, StreamingContext context)
-            : base(info, context)
-        {
-        }
-
         public string DBConstraintName
         {
             get { return this.dbConstraintName; }
         }
 
-        [SecurityPermission(SecurityAction.Demand, SerializationFormatter = true)]
-        public override void GetObjectData(SerializationInfo info, StreamingContext context)
-        {
-            base.GetObjectData(info, context);
-        }
-
+        /// <summary>
+        ///     Hands the exception over to the application's exception handler, which records
+        ///     it for the runtime-error page and navigates the user there.
+        /// </summary>
+        /// <remarks>
+        ///     On .NET Framework this stored the exception in <c>Session["ex"]</c> and performed
+        ///     a <c>Server.TransferRequest("~/Site/RuntimeError.aspx")</c>. Both are gone on
+        ///     modern .NET, so the behaviour now lives in
+        ///     <see cref="IMixERPExceptionHandler" />, which the host registers and wires into
+        ///     this facade at startup through <see cref="SetHandler" />. Until a handler is
+        ///     wired up the exception is rethrown so that it reaches the ASP.NET Core
+        ///     exception-handling middleware (which renders the runtime-error page) — it is
+        ///     never silently swallowed.
+        /// </remarks>
         public static void Handle(MixERPException ex)
         {
             if (ex == null)
@@ -73,14 +71,23 @@ namespace MixERP.Net.Framework
                 return;
             }
 
-            if (HttpContext.Current.Session != null)
-            {
-                HttpContext.Current.Session["ex"] = ex;
-                Log.Information("Exception object was added to session.");
+            IMixERPExceptionHandler handler = MixERPExceptionHandlerRegistry.Handler;
 
-                HttpContext.Current.Server.TransferRequest("~/Site/RuntimeError.aspx", true);
+            if (handler == null)
+            {
+                throw ex;
             }
+
+            handler.Handle(ex);
         }
 
+        /// <summary>
+        ///     Wires the application's exception handler into the static <see cref="Handle" />
+        ///     facade. Call this from the host's startup code.
+        /// </summary>
+        public static void SetHandler(IMixERPExceptionHandler handler)
+        {
+            MixERPExceptionHandlerRegistry.Handler = handler;
+        }
     }
 }

@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Web;
 using MixERP.Net.Framework;
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.Updater.Installation.Models;
@@ -76,8 +75,8 @@ namespace MixERP.Net.Updater.Installation
 
         private string GetFakeDownloadUrl()
         {
-            return HttpContext.Current.Request.Url.Scheme + "://" + HttpContext.Current.Request.Url.Authority +
-                   HttpContext.Current.Request.ApplicationPath + "update.zip";
+            var request = WebContext.Current.Request;
+            return request.Scheme + "://" + request.Host + request.PathBase.Value.TrimEnd('/') + "/update.zip";
         }
 
         protected virtual void OnProgress(ProgressInfo progressInfo)

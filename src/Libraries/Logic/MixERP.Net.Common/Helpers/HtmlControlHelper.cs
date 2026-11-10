@@ -19,176 +19,126 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Globalization;
-using System.Web.UI.HtmlControls;
-using System.Web.UI.WebControls;
+using System.IO;
+using System.Text.Encodings.Web;
+using Microsoft.AspNetCore.Html;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace MixERP.Net.Common.Helpers
 {
+    /// <summary>
+    ///     Builds the Semantic UI markup fragments shared by the MixERP controls. The Web Forms
+    ///     version returned <c>HtmlGenericControl</c>s; this version returns ASP.NET Core
+    ///     <see cref="TagBuilder" />s, which are appended to a parent through
+    ///     <c>parent.InnerHtml.AppendHtml(child)</c> and rendered with <see cref="Render" />.
+    /// </summary>
     public static class HtmlControlHelper
     {
-        public static HtmlGenericControl GetDivider()
+        public static TagBuilder GetElement(string tagName, string cssClass = "", string id = "")
         {
-            using (HtmlGenericControl divider = new HtmlGenericControl("div"))
-            {
-                divider.Attributes.Add("class", "ui divider");
+            TagBuilder element = new TagBuilder(tagName);
 
-                return divider;
+            if (!string.IsNullOrWhiteSpace(cssClass))
+            {
+                element.MergeAttribute("class", cssClass);
             }
+
+            if (!string.IsNullOrWhiteSpace(id))
+            {
+                element.MergeAttribute("id", id);
+            }
+
+            return element;
         }
 
-        public static HtmlGenericControl GetModalHeader(string text = "", string icon = "")
+        public static TagBuilder GetDivider()
         {
-            using (HtmlGenericControl header = new HtmlGenericControl("div"))
-            {
-                header.Attributes.Add("class", "header");
-
-
-                if (!string.IsNullOrWhiteSpace(icon))
-                {
-                    using (HtmlGenericControl headerIcon = GetIcon(icon))
-                    {
-                        header.Controls.Add(headerIcon);
-                    }
-                }
-
-                using (Literal literal = new Literal())
-                {
-                    literal.Text = text;
-                    header.Controls.Add(literal);
-                }
-
-                return header;
-            }
+            return GetElement("div", "ui divider");
         }
 
-        public static HtmlGenericControl GetField()
+        public static TagBuilder GetModalHeader(string text = "", string icon = "")
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", "field");
+            TagBuilder header = GetElement("div", "header");
 
-                return field;
+            if (!string.IsNullOrWhiteSpace(icon))
+            {
+                header.InnerHtml.AppendHtml(GetIcon(icon));
             }
+
+            header.InnerHtml.AppendHtml(text ?? string.Empty);
+            return header;
         }
 
-        public static HtmlGenericControl GetField(string cssClass)
+        public static TagBuilder GetField()
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", cssClass);
-
-                return field;
-            }
+            return GetElement("div", "field");
         }
 
-        public static HtmlGenericControl GetFields()
+        public static TagBuilder GetField(string cssClass)
         {
-            using (HtmlGenericControl fields = new HtmlGenericControl("div"))
-            {
-                fields.Attributes.Add("class", "fields");
-
-                return fields;
-            }
+            return GetElement("div", cssClass);
         }
 
-        public static HtmlGenericControl GetFields(string cssClass)
+        public static TagBuilder GetFields()
         {
-            using (HtmlGenericControl fields = new HtmlGenericControl("div"))
-            {
-                fields.Attributes.Add("class", cssClass);
-
-                return fields;
-            }
+            return GetElement("div", "fields");
         }
 
-        public static HtmlGenericControl GetForm()
+        public static TagBuilder GetFields(string cssClass)
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", "ui form");
-
-                return field;
-            }
+            return GetElement("div", cssClass);
         }
 
-        public static HtmlGenericControl GetFormSegment()
+        public static TagBuilder GetForm()
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", "ui form segment");
-
-                return field;
-            }
+            return GetElement("div", "ui form");
         }
 
-        public static HtmlGenericControl GetFormSegment(string cssClass)
+        public static TagBuilder GetFormSegment()
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", cssClass);
-
-                return field;
-            }
+            return GetElement("div", "ui form segment");
         }
 
-        public static HtmlGenericControl GetIcon(string cssClass)
+        public static TagBuilder GetFormSegment(string cssClass)
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("i"))
-            {
-                field.Attributes.Add("class", cssClass);
-
-                return field;
-            }
+            return GetElement("div", cssClass);
         }
 
-        public static HtmlGenericControl GetInlineFields()
+        public static TagBuilder GetIcon(string cssClass)
         {
-            using (HtmlGenericControl fields = new HtmlGenericControl("div"))
-            {
-                fields.Attributes.Add("class", "inline fields");
-
-                return fields;
-            }
+            return GetElement("i", cssClass);
         }
 
-        public static HtmlGenericControl GetLabel(string text)
+        public static TagBuilder GetInlineFields()
         {
-            using (HtmlGenericControl label = new HtmlGenericControl("label"))
-            {
-                label.InnerText = text;
-                return label;
-            }
+            return GetElement("div", "inline fields");
         }
 
-        public static HtmlGenericControl GetLabel(string text, string targetControlId)
+        public static TagBuilder GetLabel(string text)
         {
-            using (HtmlGenericControl label = new HtmlGenericControl("label"))
-            {
-                label.Attributes.Add("for", targetControlId);
-                label.InnerText = text;
-                return label;
-            }
+            TagBuilder label = new TagBuilder("label");
+            label.InnerHtml.Append(text ?? string.Empty);
+            return label;
         }
 
-        public static HtmlGenericControl GetPageHeader(string text)
+        public static TagBuilder GetLabel(string text, string targetControlId)
         {
-            using (HtmlGenericControl header = new HtmlGenericControl("div"))
-            {
-                using (HtmlGenericControl h1 = new HtmlGenericControl("h1"))
-                {
-                    h1.Attributes.Add("class", "ui purple header");
-                    h1.InnerText = text;
+            TagBuilder label = GetLabel(text);
+            label.MergeAttribute("for", targetControlId);
+            return label;
+        }
 
-                    header.Controls.Add(h1);
-                }
+        public static TagBuilder GetPageHeader(string text)
+        {
+            TagBuilder header = new TagBuilder("div");
 
-                using (HtmlGenericControl divider = GetDivider())
-                {
-                    header.Controls.Add(divider);
-                }
+            TagBuilder h1 = GetElement("h1", "ui purple header");
+            h1.InnerHtml.Append(text ?? string.Empty);
 
-                return header;
-            }
+            header.InnerHtml.AppendHtml(h1);
+            header.InnerHtml.AppendHtml(GetDivider());
+
+            return header;
         }
 
         public static string GetLabelHtml(string text)
@@ -201,77 +151,84 @@ namespace MixERP.Net.Common.Helpers
             return String.Format(CultureInfo.InvariantCulture, "<label for='{1}'>{0}</label>", text, targetControlId);
         }
 
-        public static HtmlGenericControl GetLeftIconInput()
+        public static TagBuilder GetLeftIconInput()
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", "ui left icon input");
-
-                return field;
-            }
+            return GetElement("div", "ui left icon input");
         }
 
-        public static HtmlGenericControl GetModal()
+        public static TagBuilder GetModal()
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", "ui modal");
-
-                return field;
-            }
+            return GetElement("div", "ui modal");
         }
 
-        public static HtmlGenericControl GetModal(string cssClass, string id = "")
+        public static TagBuilder GetModal(string cssClass, string id = "")
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", cssClass);
-
-                if (!string.IsNullOrWhiteSpace(id))
-                {
-                    field.ID = id;
-                }
-
-                return field;
-            }
+            return GetElement("div", cssClass, id);
         }
 
-        public static HtmlGenericControl GetSegment()
+        public static TagBuilder GetSegment()
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", "ui segment");
-
-                return field;
-            }
+            return GetElement("div", "ui segment");
         }
 
-        public static HtmlGenericControl GetSegment(string cssClass)
+        public static TagBuilder GetSegment(string cssClass)
         {
-            using (HtmlGenericControl field = new HtmlGenericControl("div"))
-            {
-                field.Attributes.Add("class", cssClass);
-
-                return field;
-            }
+            return GetElement("div", cssClass);
         }
 
-        public static void AddListItem(HtmlGenericControl container, string key, object value)
+        public static void AddListItem(TagBuilder container, string key, object value)
         {
-            using (HtmlGenericControl li = new HtmlGenericControl("li"))
+            if (container == null)
             {
-                li.InnerText = key + " : " + value;
-                container.Controls.Add(li);
+                return;
             }
+
+            TagBuilder li = new TagBuilder("li");
+            li.InnerHtml.Append(key + " : " + value);
+            container.InnerHtml.AppendHtml(li);
         }
 
-        public static HtmlGenericControl GetToggleCheckBox()
+        public static TagBuilder GetToggleCheckBox()
         {
-            using (HtmlGenericControl toggleCheckBox = new HtmlGenericControl("div"))
-            {
-                toggleCheckBox.Attributes.Add("class", "ui toggle checkbox");
+            return GetElement("div", "ui toggle checkbox");
+        }
 
-                return toggleCheckBox;
+        /// <summary>
+        ///     Creates an input element (text, hidden, button, checkbox, ...).
+        /// </summary>
+        public static TagBuilder GetInput(string type, string id = "", string value = null, string cssClass = "")
+        {
+            TagBuilder input = GetElement("input", cssClass, id);
+            input.TagRenderMode = TagRenderMode.SelfClosing;
+            input.MergeAttribute("type", type);
+
+            if (!string.IsNullOrWhiteSpace(id))
+            {
+                input.MergeAttribute("name", id);
+            }
+
+            if (value != null)
+            {
+                input.MergeAttribute("value", value);
+            }
+
+            return input;
+        }
+
+        /// <summary>
+        ///     Renders an HTML fragment to a string.
+        /// </summary>
+        public static string Render(IHtmlContent content)
+        {
+            if (content == null)
+            {
+                return string.Empty;
+            }
+
+            using (StringWriter writer = new StringWriter(CultureInfo.InvariantCulture))
+            {
+                content.WriteTo(writer, HtmlEncoder.Default);
+                return writer.ToString();
             }
         }
     }

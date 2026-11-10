@@ -21,19 +21,31 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
-using System.Web.UI;
 
 namespace MixERP.Net.Common.Helpers
 {
     public static class JSUtility
     {
-        public static void AddJSReference(Page page, string resourceName, string key, Type type)
+        /// <summary>
+        ///     Returns an inline script block with the content of an embedded JavaScript resource.
+        ///     Replaces the Web Forms WebResource.axd reference registered through the page's
+        ///     ClientScriptManager.
+        /// </summary>
+        public static string GetJSReference(string resourceName, Type type)
         {
-            if (page != null)
+            if (type == null)
             {
-                string script = "<script type='text/javascript' src='" + page.Request.Url.GetLeftPart(UriPartial.Authority) + page.ClientScript.GetWebResourceUrl(type, resourceName) + "'></script>";
-                PageUtility.RegisterJavascript(key, script, page, false);
+                return string.Empty;
             }
+
+            string script = GetEmbeddedScript(resourceName, type.Assembly);
+
+            if (string.IsNullOrWhiteSpace(script))
+            {
+                return string.Empty;
+            }
+
+            return "<script type='text/javascript'>" + script + "</script>";
         }
 
         public static string GetEmbeddedScript(string embeddedScriptName, Assembly assembly)

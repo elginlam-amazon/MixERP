@@ -41,6 +41,11 @@ namespace MixERP.Net.i18n
             var cultureString = culture.ToString();
             if (cultureString.Equals("fr") || cultureString.Equals("ru"))
             {
+                // CultureInfo.CurrentUICulture may be a read-only (cached) instance, whose
+                // NumberFormat throws InvalidOperationException on assignment. Cloning
+                // yields a writable copy, so the French/Russian space group separator is
+                // applied exactly as before without mutating shared culture state.
+                culture = (CultureInfo)culture.Clone();
                 culture.NumberFormat.CurrencyGroupSeparator = "\x0020";
                 culture.NumberFormat.NumberGroupSeparator = "\x0020";
             }

@@ -1,69 +1,83 @@
-﻿using MixERP.Net.ApplicationState.Cache;
+﻿/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Web;
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using MixERP.Net.ApplicationState.Cache;
+using MixERP.Net.Framework;
 
 namespace MixERP.Net.WebControls.AttachmentFactory
 {
-    public class FileUploadHanlder : IHttpHandler
+    /// <summary>
+    ///     Receives attachment uploads. Replaces the FileUploadHanlder.ashx IHttpHandler (same
+    ///     url, same plain-text "file1,file2" response).
+    /// </summary>
+    [Route("FileUploadHanlder.ashx")]
+    public class FileUploadHanlder : Controller
     {
-        /// <summary>
-        ///     You will need to configure this handler in the Web.config file of your
-        ///     web and register it with IIS before being able to use it. For more information
-        ///     see the following link: http://go.microsoft.com/?linkid=8101007
-        /// </summary>
-
-        #region IHttpHandler Members
-        public bool IsReusable
-        {
-            // Return false in case your Managed Handler cannot be reused for another request.
-            // Usually this would be false in case you have some state information preserved per request.
-            get { return true; }
-        }
-
-        public void ProcessRequest(HttpContext context)
+        [AcceptVerbs("GET", "POST")]
+        public IActionResult ProcessRequest()
         {
             string attachmentsDirectory = Helpers.ConfigurationHelper.GetAttachmentsDirectory(AppUsers.GetCurrentUserDB());
             Collection<string> uploadedFiles = new Collection<string>();
 
-            if (context.Request.Files.Count > 0)
+            if (this.Request.HasFormContentType && this.Request.Form.Files.Count > 0)
             {
-                HttpFileCollection files = context.Request.Files;
+                List<string> allowedExtensions = GetAllowedExtensions();
 
-                for (int i = 0; i < files.Count; i++)
+                foreach (IFormFile file in this.Request.Form.Files)
                 {
-                    HttpPostedFile file = files[i];
                     string extension = Path.GetExtension(file.FileName);
 
-                    if (this.GetAllowedExtensions().Contains(extension.Replace(".", "")))
+                    if (allowedExtensions.Contains(extension.Replace(".", "")))
                     {
-                        string fileName = this.RandomNumber().ToString(CultureInfo.InvariantCulture) + "_" + Path.GetFileName(file.FileName);
-                        string savePath = context.Server.MapPath(Path.Combine(attachmentsDirectory, fileName));
-                        file.SaveAs(savePath);
+                        string fileName = RandomNumber().ToString(CultureInfo.InvariantCulture) + "_" + Path.GetFileName(file.FileName);
+                        string savePath = WebContext.MapPath(Path.Combine(attachmentsDirectory, fileName));
+
+                        using (FileStream stream = new FileStream(savePath, FileMode.Create, FileAccess.Write))
+                        {
+                            file.CopyTo(stream);
+                        }
+
                         uploadedFiles.Add(fileName);
                     }
                 }
             }
 
-            context.Response.ContentType = "text/plain";
-            context.Response.Write(string.Join(",", uploadedFiles));
+            return this.Content(string.Join(",", uploadedFiles), "text/plain");
         }
 
-        private List<string> GetAllowedExtensions()
+        private static List<string> GetAllowedExtensions()
         {
             return Helpers.ConfigurationHelper.GetAllowedExtensions(AppUsers.GetCurrentUserDB()).Split(',').ToList();
         }
 
-        private int RandomNumber()
+        private static int RandomNumber()
         {
-            Random rnd = new Random();
-            return rnd.Next(9999999);
+            return RandomNumberGenerator.GetInt32(9999999);
         }
-
-        #endregion
     }
 }

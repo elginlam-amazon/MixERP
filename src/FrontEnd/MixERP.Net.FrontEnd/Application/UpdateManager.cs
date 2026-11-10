@@ -18,7 +18,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
-using System.Web;
+using System.Threading.Tasks;
 using MixERP.Net.Common;
 using MixERP.Net.Common.Helpers;
 using MixERP.Net.Updater.Api;
@@ -28,7 +28,12 @@ namespace MixERP.Net.FrontEnd.Application
 {
     internal static class UpdateManager
     {
-        internal static async void CheckForUpdates(HttpApplicationState application)
+        /// <summary>
+        ///     Set when a newer release is available (was the "UpdateAvailable" HttpApplicationState entry).
+        /// </summary>
+        internal static bool UpdateAvailable { get; private set; }
+
+        internal static async Task CheckForUpdates()
         {
             bool autoSuggestUpdate =
                 Conversion.TryCastBoolean(ConfigurationHelper.GetUpdaterParameter("AutoSuggestUpdate"));
@@ -42,7 +47,7 @@ namespace MixERP.Net.FrontEnd.Application
 
                     if (release != null)
                     {
-                        application["UpdateAvailable"] = true;
+                        UpdateAvailable = true;
                     }
                 }
                 catch (Exception ex)

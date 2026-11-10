@@ -22,7 +22,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
-using System.Web.Hosting;
+using MixERP.Net.Framework;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Models
 {
@@ -38,7 +38,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Models
             Collection<Report> models = new Collection<Report>();
 
             string reportContainer =
-                HostingEnvironment.MapPath(ConfigurationHelper.GetReportParameter("ReportContainer"));
+                WebContext.MapPath(ConfigurationHelper.GetReportParameter("ReportContainer"));
 
             if (reportContainer != null)
             {

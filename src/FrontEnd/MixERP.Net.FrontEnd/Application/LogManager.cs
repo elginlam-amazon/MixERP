@@ -19,7 +19,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.IO;
-using System.Web.Hosting;
+using MixERP.Net.Framework;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common.Helpers;
 using Serilog;
@@ -36,7 +36,7 @@ namespace MixERP.Net.FrontEnd.Application
 
             if (string.IsNullOrWhiteSpace(path))
             {
-                return HostingEnvironment.MapPath("~/Resource/Temp");
+                return WebContext.MapPath("~/Resource/Temp");
             }
 
             if (!Directory.Exists(path))
@@ -68,7 +68,7 @@ namespace MixERP.Net.FrontEnd.Application
 
             return
                 new LoggerConfiguration().MinimumLevel.ControlledBy(levelSwitch)
-                    .WriteTo.RollingFile(GetLogFileName());
+                    .WriteTo.File(GetLogFileName());
         }
 
         internal static void IntializeLogger()

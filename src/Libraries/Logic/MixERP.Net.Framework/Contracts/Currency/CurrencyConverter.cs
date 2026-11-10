@@ -1,6 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using MixERP.Net.Framework.Contracts.Checklist;
 
 namespace MixERP.Net.Framework.Contracts.Currency
 {
@@ -17,17 +15,26 @@ namespace MixERP.Net.Framework.Contracts.Currency
 
         public static IEnumerable<CurrencyConverter> GetAll()
         {
-            Type type = typeof (ICurrencyConverter);
+            Type type = typeof(ICurrencyConverter);
 
             return AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(s => s.GetTypes())
+                .SelectMany(FirstStep.GetLoadableTypes)
                 .Where(p => type.IsAssignableFrom(p))
                 .Where(p => p.Name != type.Name)
+                // The interface itself, other interfaces deriving from it and abstract
+                // implementations cannot be instantiated — excluding them keeps
+                // Activator.CreateInstance from throwing and aborting the scan.
+                .Where(p => !p.IsInterface && !p.IsAbstract && !p.IsGenericTypeDefinition)
+                .Select(p => new
+                {
+                    Type = p,
+                    Instance = Activator.CreateInstance(p)
+                })
                 .Select(p => new CurrencyConverter
                 {
-                    Name = GetPropValue(Activator.CreateInstance(p), "ConverterName").ToString(),
-                    AssemblyQualifiedName = p.AssemblyQualifiedName,
-                    Enabled = bool.Parse(GetPropValue(Activator.CreateInstance(p), "Enabled"))
+                    Name = GetPropValue(p.Instance, "ConverterName"),
+                    AssemblyQualifiedName = p.Type.AssemblyQualifiedName,
+                    Enabled = bool.Parse(GetPropValue(p.Instance, "Enabled"))
                 });
         }
 

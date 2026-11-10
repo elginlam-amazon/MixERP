@@ -1,16 +1,24 @@
-﻿using MixERP.Net.Framework;
-using MixERP.Net.i18n.Resources;
 using System;
-using System.Drawing.Imaging;
-using System.Web.Hosting;
+using System.IO;
+using MixERP.Net.Framework;
+using MixERP.Net.i18n.Resources;
 
 namespace MixERP.Net.HtmlParser.ImageSerializer
 {
+    /// <summary>
+    ///     Saves the HTML to a uniquely named file under <see cref="TempDirectory" /> and raises
+    ///     <see cref="ImageSaved" /> with its path.
+    /// </summary>
+    /// <remarks>
+    ///     The .NET Framework version rasterised the HTML to a bitmap through Internet Explorer's
+    ///     WebBrowser control or HtmlRenderer.WinForms. Both need Windows Forms/GDI+, which do
+    ///     not exist on Linux, so the document is now kept as a self-contained HTML file. The
+    ///     consumers (e-mail attachments) receive the file path exactly as before.
+    /// </remarks>
     public class HtmlImageSerializer : IHtmlImageSerializer
     {
         public string TempDirectory { get; set; }
         public string Html { get; set; }
-        public ImageFormat ImageFormat { get; set; }
         public event EventHandler<ImageSavedEventArgs> ImageSaved;
 
         public void Serialize()
@@ -20,7 +28,7 @@ namespace MixERP.Net.HtmlParser.ImageSerializer
                 throw new MixERPException(Messages.TempDirectoryNullError);
             }
 
-            string imagePath = HostingEnvironment.MapPath(this.TempDirectory + Guid.NewGuid());
+            string imagePath = WebContext.MapPath(this.TempDirectory + Guid.NewGuid());
 
             if (string.IsNullOrWhiteSpace(imagePath))
             {
@@ -32,6 +40,16 @@ namespace MixERP.Net.HtmlParser.ImageSerializer
 
         internal virtual void CreateImage(string imagePath)
         {
+            string directory = Path.GetDirectoryName(imagePath);
+
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            string path = imagePath + ".html";
+            File.WriteAllText(path, this.Html ?? string.Empty);
+            this.OnImageSaved(new ImageSavedEventArgs(path));
         }
 
         public void OnImageSaved(ImageSavedEventArgs e)

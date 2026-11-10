@@ -22,8 +22,6 @@ using PetaPoco;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Runtime.Caching;
-using System.Web;
 
 namespace MixERP.Net.ApplicationState.Cache
 {
@@ -31,7 +29,9 @@ namespace MixERP.Net.ApplicationState.Cache
     {
         public static void SetCurrentLogin()
         {
-            long globalLoginId = long.Parse(HttpContext.Current.User.Identity.Name);
+            // Was the legacy static HTTP context user identity name; the ambient HTTP context is now
+            // reached through IHttpContextAccessor via AppUserHttpContext.
+            long globalLoginId = long.Parse(AppUserHttpContext.UserName, CultureInfo.InvariantCulture);
             SetCurrentLogin(globalLoginId);
         }
 
@@ -41,7 +41,7 @@ namespace MixERP.Net.ApplicationState.Cache
             {
                 string key = globalLoginId.ToString(CultureInfo.InvariantCulture);
 
-                if (MemoryCache.Default[key] == null)
+                if (CacheFactory.GetFromDefaultCacheByKey(key) == null)
                 {
                     MetaLogin metaLogin = GetMetaLogin(globalLoginId);
                     Dictionary<string, object> dictionary = GetDictionary(metaLogin);
@@ -56,9 +56,14 @@ namespace MixERP.Net.ApplicationState.Cache
         {
             long globalLoginId = 0;
 
-            if (HttpContext.Current.User != null)
+            // Was the legacy static HTTP context user; null both when nobody is signed in and when
+            // there is no ambient HTTP context at all (e.g. Blazor Server SignalR
+            // rendering), in which case we fall through to the empty-login path below.
+            string userName = AppUserHttpContext.UserName;
+
+            if (!string.IsNullOrWhiteSpace(userName))
             {
-                long.TryParse(HttpContext.Current.User.Identity.Name, out globalLoginId);
+                long.TryParse(userName, NumberStyles.Integer, CultureInfo.InvariantCulture, out globalLoginId);
             }
 
             return GetCurrent(globalLoginId);

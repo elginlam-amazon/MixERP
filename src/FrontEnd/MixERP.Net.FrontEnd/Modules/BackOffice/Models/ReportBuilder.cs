@@ -21,7 +21,7 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Web.Hosting;
+using MixERP.Net.Framework;
 using System.Xml;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Models
@@ -202,7 +202,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Models
 
         private string GetLicense()
         {
-            string licenseFile = HostingEnvironment.MapPath("~/License.txt");
+            string licenseFile = WebContext.MapPath("~/License.txt");
 
             if (!string.IsNullOrWhiteSpace(licenseFile) && File.Exists(licenseFile))
             {

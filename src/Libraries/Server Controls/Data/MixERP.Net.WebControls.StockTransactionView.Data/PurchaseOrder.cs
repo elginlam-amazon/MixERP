@@ -26,7 +26,6 @@ namespace MixERP.Net.WebControls.StockTransactionViewFactory.Data
 {
     public static class PurchaseOrder
     {
-        [CLSCompliant(false)]
         public static NpgsqlCommand GetPurchaseOrderViewCommand(Collection<long> ids)
         {
             if (ids == null)
