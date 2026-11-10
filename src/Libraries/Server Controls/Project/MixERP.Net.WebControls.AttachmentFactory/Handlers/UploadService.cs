@@ -1,44 +1,38 @@
-﻿using MixERP.Net.ApplicationState.Cache;
-using System;
+﻿/********************************************************************************
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+***********************************************************************************/
+
 using System.Collections.ObjectModel;
-using System.Reflection;
-using System.Security.Permissions;
-using System.Web;
-using System.Web.Script.Serialization;
-using System.Web.Script.Services;
-using System.Web.Services;
-using System.Web.Services.Protocols;
+using Microsoft.AspNetCore.Mvc;
+using MixERP.Net.ApplicationState.Cache;
+using MixERP.Net.Common.Helpers;
+using MixERP.Net.Framework;
+using MixERP.Net.Framework.Web;
 
 namespace MixERP.Net.WebControls.AttachmentFactory.Handlers
 {
-    [WebService(Namespace = "http://tempuri.org/")]
-    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
-    [ScriptService]
-    [PermissionSet(SecurityAction.InheritanceDemand, Unrestricted = true)]
-    public class UploadService : WebService, IHttpHandlerFactory
+    /// <summary>
+    ///     Replaces the FileUploadHanlder.asmx script service (UndoUpload) at the same url.
+    /// </summary>
+    [Route("FileUploadHanlder.asmx")]
+    public class UploadService : ScriptServiceController
     {
-        public IHttpHandler GetHandler(HttpContext context, string requestType, string url, string pathTranslated)
-        {
-            WebServiceHandlerFactory factory = new WebServiceHandlerFactory();
-            MethodInfo method = typeof (WebServiceHandlerFactory).GetMethod("CoreGetHandler",
-                BindingFlags.NonPublic | BindingFlags.Instance, null,
-                new Type[] {typeof (Type), typeof (HttpContext), typeof (HttpRequest), typeof (HttpResponse)}, null);
-
-            return (IHttpHandler) method.Invoke(factory, new object[]
-            {
-                this.GetType(),
-                context,
-                context.Request,
-                context.Response
-            });
-        }
-
-        public void ReleaseHandler(IHttpHandler handler)
-        {
-        }
-
-        [WebMethod]
-        [ScriptMethod(ResponseFormat = ResponseFormat.Xml)]
+        [HttpPost("UndoUpload")]
         public bool UndoUpload(string uploadedFilesJson)
         {
             Collection<Entities.Core.Attachment> uploads = GetAttachmentCollection(uploadedFilesJson);
@@ -48,7 +42,7 @@ namespace MixERP.Net.WebControls.AttachmentFactory.Handlers
 
             foreach (Entities.Core.Attachment upload in uploads)
             {
-                string path = this.Server.MapPath(attachmentsDirectory + upload.FilePath);
+                string path = WebContext.MapPath(attachmentsDirectory + upload.FilePath);
 
                 if (System.IO.File.Exists(path))
                 {
@@ -62,9 +56,8 @@ namespace MixERP.Net.WebControls.AttachmentFactory.Handlers
         public static Collection<Entities.Core.Attachment> GetAttachmentCollection(string json)
         {
             Collection<Entities.Core.Attachment> details = new Collection<Entities.Core.Attachment>();
-            var jss = new JavaScriptSerializer();
 
-            dynamic result = jss.Deserialize<dynamic>(json);
+            dynamic result = JSONHelper.DeserializeDynamic(json);
 
             if (result != null)
             {

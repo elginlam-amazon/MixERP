@@ -17,7 +17,11 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace MixERP.Net.Framework
 {
@@ -46,6 +50,29 @@ namespace MixERP.Net.Framework
             // which is what Session["ex"] used to provide.
             services.AddScoped<MixERPErrorState>();
             services.AddScoped<IMixERPExceptionHandler, MixERPExceptionHandler>();
+
+            services.AddHttpContextAccessor();
+
+            return services;
+        }
+
+        /// <summary>
+        ///     Bridges the static facades (<see cref="CacheFactory" /> and
+        ///     <see cref="WebContext" />) to the host's services. Call once after the app is built.
+        /// </summary>
+        public static IServiceProvider UseMixERPFramework(this IServiceProvider services)
+        {
+            ArgumentNullException.ThrowIfNull(services);
+
+            CacheFactory.Configure(services.GetRequiredService<ICacheFactory>());
+
+            IHostEnvironment environment = services.GetService<IHostEnvironment>();
+            IWebHostEnvironment webEnvironment = services.GetService<IWebHostEnvironment>();
+
+            WebContext.Configure(services.GetRequiredService<IHttpContextAccessor>(),
+                services.GetService<IConfiguration>(),
+                environment?.ContentRootPath,
+                webEnvironment?.WebRootPath);
 
             return services;
         }

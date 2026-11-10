@@ -1,0 +1,16 @@
+<Project>
+  <!--
+    The module UI assemblies reference the MixERP.Net.FrontEnd host, so the host cannot
+    reference them back. As in the Web Forms site (whose modules built into its bin folder),
+    each module copies its build output next to the host, where Program.cs loads it.
+  -->
+  <Target Name="CopyModuleToHost" AfterTargets="Build" Condition="'$(MixERPModule)' == 'true'">
+    <PropertyGroup>
+      <MixERPHostOutDir>$(MSBuildThisFileDirectory)../bin/$(Configuration)/$(TargetFramework)/</MixERPHostOutDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <ModuleOutputFiles Include="$(TargetDir)MixERP.Net.Core.Modules.*.dll;$(TargetDir)MixERP.Net.Core.Modules.*.pdb;$(TargetDir)MixERP.Net.WebControls.*.dll;$(TargetDir)MixERP.Net.WebControls.*.pdb" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ModuleOutputFiles)" DestinationFolder="$(MixERPHostOutDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

@@ -17,13 +17,23 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Configuration;
-using System.Web.Hosting;
+using System.IO;
+using System.Linq;
+using System.Xml.Linq;
+using MixERP.Net.Framework;
 
 namespace MixERP.Net.Common.Helpers
 {
+    /// <summary>
+    ///     Reads and writes the <c>appSettings</c> of MixERP's external configuration files
+    ///     (DbServer.config, Parameters.config, ...). The application setting named by
+    ///     <c>configFileName</c> holds the location of the file. The Web Forms version used
+    ///     <c>ConfigurationManager.OpenMappedExeConfiguration</c>; the files are now read
+    ///     with <see cref="XDocument" />, so the existing files keep working unchanged.
+    /// </summary>
     public static class ConfigurationHelper
     {
         public static string GetConfigurationValue(string configFileName, string sectionName)
@@ -33,22 +43,36 @@ namespace MixERP.Net.Common.Helpers
                 return string.Empty;
             }
 
-            string path = HostingEnvironment.MapPath(ConfigurationManager.AppSettings[configFileName]);
+            string location = WebContext.GetAppSetting(configFileName);
 
-            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap {ExeConfigFilename = path};
-            Configuration config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap,
-                ConfigurationUserLevel.None);
-            AppSettingsSection section = config.GetSection("appSettings") as AppSettingsSection;
-
-            if (section != null)
+            if (string.IsNullOrWhiteSpace(location))
             {
-                if (section.Settings[sectionName] != null)
-                {
-                    return section.Settings[sectionName].Value;
-                }
+                return string.Empty;
             }
 
-            return string.Empty;
+            string path = WebContext.MapPath(location);
+            return ReadAppSetting(path, sectionName);
+        }
+
+        /// <summary>
+        ///     Reads a key from the appSettings section of the given physical config file.
+        ///     Returns an empty string when the file, section or key is missing.
+        /// </summary>
+        public static string ReadAppSetting(string path, string key)
+        {
+            if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(key) || !File.Exists(path))
+            {
+                return string.Empty;
+            }
+
+            XElement element = FindAppSetting(XDocument.Load(path), key);
+
+            if (element == null)
+            {
+                return string.Empty;
+            }
+
+            return element.Attribute("value")?.Value ?? string.Empty;
         }
 
         public static string GetDbServerParameter(string key)
@@ -61,7 +85,6 @@ namespace MixERP.Net.Common.Helpers
             return GetConfigurationValue("ParameterConfigFileLocation", key);
         }
 
-
         public static string GetReportParameter(string key)
         {
             return GetConfigurationValue("ReportConfigFileLocation", key);
@@ -69,7 +92,7 @@ namespace MixERP.Net.Common.Helpers
 
         public static string GetResourceDirectory()
         {
-            return HostingEnvironment.MapPath(ConfigurationManager.AppSettings["ResourceDirectory"]);
+            return WebContext.MapPath(WebContext.GetAppSetting("ResourceDirectory"));
         }
 
         public static string GetStockTransactionFactoryParameter(string key)
@@ -87,33 +110,33 @@ namespace MixERP.Net.Common.Helpers
             return GetConfigurationValue("UpdaterConfigFileLocation", key);
         }
 
-
         public static string SetConfigurationValues(string configFileName, string sectionName, string value)
         {
-            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap {ExeConfigFilename = configFileName};
-            var config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap, ConfigurationUserLevel.None);
-            AppSettingsSection section = config.GetSection("appSettings") as AppSettingsSection;
-
-            if (section != null)
+            Collection<KeyValuePair<string, string>> sections = new Collection<KeyValuePair<string, string>>
             {
-                if (section.Settings[sectionName] != null)
-                {
-                    section.Settings[sectionName].Value = value;
-                }
-            }
-            config.Save(ConfigurationSaveMode.Modified);
+                new KeyValuePair<string, string>(sectionName, value)
+            };
+
+            SetConfigurationValues(configFileName, sections);
 
             return string.Empty;
         }
 
+        /// <summary>
+        ///     Updates existing appSettings keys in the given physical config file. Keys that are
+        ///     not present are ignored, as before.
+        /// </summary>
         public static void SetConfigurationValues(string configFileName,
             Collection<KeyValuePair<string, string>> sections)
         {
-            ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap {ExeConfigFilename = configFileName};
-            var config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap, ConfigurationUserLevel.None);
-            AppSettingsSection appsetting = config.GetSection("appSettings") as AppSettingsSection;
+            if (string.IsNullOrWhiteSpace(configFileName) || !File.Exists(configFileName))
+            {
+                return;
+            }
 
-            if (appsetting == null)
+            XDocument document = XDocument.Load(configFileName);
+
+            if (document.Root?.Element("appSettings") == null)
             {
                 return;
             }
@@ -122,17 +145,29 @@ namespace MixERP.Net.Common.Helpers
             {
                 foreach (var section in sections)
                 {
-                    if (section.Key != null)
+                    if (section.Key == null)
                     {
-                        if (appsetting.Settings[section.Key] != null)
-                        {
-                            appsetting.Settings[section.Key].Value = section.Value;
-                        }
+                        continue;
+                    }
+
+                    XElement element = FindAppSetting(document, section.Key);
+
+                    if (element != null)
+                    {
+                        element.SetAttributeValue("value", section.Value);
                     }
                 }
             }
 
-            config.Save(ConfigurationSaveMode.Modified);
+            document.Save(configFileName);
+        }
+
+        private static XElement FindAppSetting(XDocument document, string key)
+        {
+            XElement appSettings = document.Root?.Element("appSettings");
+
+            return appSettings?.Elements("add")
+                .FirstOrDefault(x => string.Equals(x.Attribute("key")?.Value, key, StringComparison.Ordinal));
         }
     }
 }

@@ -17,13 +17,32 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web;
-using System.Web.SessionState;
+using System.Linq;
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using MixERP.Net.Framework;
 
 namespace MixERP.Net.Common.Helpers
 {
+    /// <summary>
+    ///     Session access for library code. ASP.NET Core sessions store strings/bytes only, so
+    ///     values are kept as JSON and read back with <see cref="GetSessionKey{T}" />.
+    ///     Requires <c>AddSession()</c>/<c>UseSession()</c> in the host.
+    /// </summary>
     public static class SessionHelper
     {
+        private static ISession GetSession()
+        {
+            HttpContext context = WebContext.Current;
+
+            if (context == null || context.Features.Get<Microsoft.AspNetCore.Http.Features.ISessionFeature>() == null)
+            {
+                return null;
+            }
+
+            return context.Session;
+        }
+
         public static void RemoveSessionKey(string key)
         {
             if (string.IsNullOrWhiteSpace(key))
@@ -31,9 +50,9 @@ namespace MixERP.Net.Common.Helpers
                 return;
             }
 
-            HttpSessionState session = HttpContext.Current.Session;
+            ISession session = GetSession();
 
-            if (session != null && session[key] != null)
+            if (session != null && session.Keys.Contains(key))
             {
                 session.Remove(key);
             }
@@ -46,32 +65,28 @@ namespace MixERP.Net.Common.Helpers
                 return;
             }
 
-            HttpSessionState session = HttpContext.Current.Session;
+            ISession session = GetSession();
+
             if (session != null)
             {
-                if (session[key] == null)
-                {
-                    session[key] = value;
-                }
-                else
-                {
-                    session.Add(key, value);
-                }
+                session.SetString(key, JsonSerializer.Serialize(value));
             }
         }
 
-        public static object GetSessionKey(string key)
+        public static T GetSessionKey<T>(string key)
         {
             if (!string.IsNullOrWhiteSpace(key))
             {
-                HttpSessionState session = HttpContext.Current.Session;
-                if (session != null && session[key] != null)
+                ISession session = GetSession();
+                string value = session?.GetString(key);
+
+                if (!string.IsNullOrEmpty(value))
                 {
-                    return session[key];
+                    return JsonSerializer.Deserialize<T>(value);
                 }
             }
 
-            return null;
+            return default(T);
         }
     }
 }

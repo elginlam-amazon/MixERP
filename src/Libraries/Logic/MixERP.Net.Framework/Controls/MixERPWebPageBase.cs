@@ -188,14 +188,15 @@ namespace MixERP.Net.Framework.Controls
 
             return builder =>
             {
-                int sequence = 0;
-                builder.OpenComponent(sequence++, componentType);
+                builder.OpenComponent(0, componentType);
 
                 if (parameters != null)
                 {
+                    // Parameters added in a loop share one sequence number, as recommended for
+                    // generated render trees (ASP0006).
                     foreach (KeyValuePair<string, object> parameter in parameters)
                     {
-                        builder.AddComponentParameter(sequence++, parameter.Key, parameter.Value);
+                        builder.AddComponentParameter(1, parameter.Key, parameter.Value);
                     }
                 }
 

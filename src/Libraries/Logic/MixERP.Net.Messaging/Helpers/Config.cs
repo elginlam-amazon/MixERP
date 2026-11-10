@@ -22,7 +22,7 @@ using MixERP.Net.Common.Helpers;
 using System;
 using System.Net.Mail;
 using System.Security;
-using System.Web.Hosting;
+using MixERP.Net.Framework;
 
 namespace MixERP.Net.Messaging.Email.Helpers
 {
@@ -43,7 +43,7 @@ namespace MixERP.Net.Messaging.Email.Helpers
 
             this.DeliveryMethod = GetSmtpDeliveryMethod();
             this.PickupDirectory =
-                HostingEnvironment.MapPath(DbConfig.GetMessagingParameter(this.Catalog,
+                WebContext.MapPath(DbConfig.GetMessagingParameter(this.Catalog,
                     "SpecifiedPickupDirectoryLocation"));
         }
 

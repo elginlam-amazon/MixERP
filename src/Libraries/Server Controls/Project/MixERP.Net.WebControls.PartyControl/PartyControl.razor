@@ -1,0 +1,108 @@
+@*
+Copyright (C) Binod Nepal, Mix Open Foundation (http://mixof.org).
+
+This file is part of MixERP.
+
+MixERP is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+MixERP is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
+*@
+@*
+    Party (customer/supplier) summary panel. Previously a System.Web.UI CompositeControl that
+    built the same markup from HtmlGenericControls and registered PartyControl.js as a
+    WebResource. The markup, element ids (the site used clientIDMode="Static") and CSS
+    classes are unchanged; the script is emitted inline from the same embedded resource.
+*@
+@namespace MixERP.Net.WebControls.PartyControl
+@using MixERP.Net.Common.Helpers
+@using MixERP.Net.i18n.Resources
+
+<div>
+    <div class="ui form">
+        <div class="inline fields">
+            <div class="small field">
+                <label for="PartyCodeTextBox">@Titles.SelectCustomer</label>
+                <input type="text" id="PartyCodeTextBox" name="PartyCodeTextBox" />
+            </div>
+            <div class="medium field">
+                <select id="PartyDropDownList" name="PartyDropDownList"></select>
+            </div>
+            <button type="button" id="GoButton" class="ui small teal button">@Titles.Go</button>
+        </div>
+    </div>
+
+    <div class="ui tabular top attached menu">
+        <a class="active item" data-tab="home"><i class="home icon"></i>@Titles.Home</a>
+        <a class="item" data-tab="party-summary"><i class="user icon"></i>@Titles.PartySummary</a>
+        <a class="item" data-tab="transaction-summary"><i class="book icon"></i>@Titles.TransactionSummary</a>
+        <a class="item" data-tab="contact-info"><i class="globe icon"></i>@Titles.AddressAndContactInfo</a>
+    </div>
+
+    <div class="ui active tab bottom stacked attached segment" data-tab="home" id="home"></div>
+
+    <div class="ui tab bottom stacked attached green segment" data-tab="party-summary" id="party-summary">
+        <table class="ui table segment">
+            @Row(Titles.PartyType, "PartyTypeSpan", "span")
+            @Row(Titles.EmailAddress, "EmailAddressSpan", "span")
+            @Row(Titles.PANNumber, "PANNumberSpan", "span")
+            @Row(Titles.SSTNumber, "SSTNumberSpan", "span")
+            @Row(Titles.CSTNumber, "CSTNumberSpan", "span")
+            @Row(Titles.CreditAllowed, "CreditAllowedSpan", "span")
+            @Row(Titles.MaximumCreditPeriod, "MaxCreditPeriodSpan", "span")
+            @Row(Titles.MaximumCreditAmount, "MaxCreditAmountSpan", "span")
+            @Row(Titles.GLHead, "GLHeadSpan", "span")
+            @Row(Titles.DefaultCurrency, "DefaultCurrencySpan", "span")
+        </table>
+    </div>
+
+    <div class="ui tab bottom stacked attached red segment" data-tab="transaction-summary" id="transaction-summary">
+        <table class="ui table segment">
+            @Row(Titles.TotalDueAmount, "TotalDueAmountSpan", "span")
+            @Row(Titles.TotalDueAmountCurrentOffice, "OfficeDueAmountSpan", "span")
+            @Row(Titles.LastPaymentDate, "LastPaymentDateSpan", "span")
+            @Row(Titles.TransactionValue, "TransactionValueSpan", "span")
+        </table>
+    </div>
+
+    <div class="ui tab bottom stacked attached teal segment" data-tab="contact-info" id="addresses-and-contact-info">
+        <h3 class="ui header">  <i class="globe icon"></i>@Titles.AddressAndContactInfo</h3>
+        <table class="ui table segment">
+            @Row(Titles.DefaultAddress, "AddressDiv", "div")
+            @Row(Titles.ShippingAddresses, "ShippingAddressesDiv", "div")
+        </table>
+    </div>
+
+    <input type="hidden" id="TotalDueAmountHidden" name="TotalDueAmountHidden" />
+    <input type="hidden" id="OfficeDueAmountHidden" name="OfficeDueAmountHidden" />
+    <input type="hidden" id="AccruedInterestHidden" name="AccruedInterestHidden" />
+</div>
+
+@((MarkupString)JSUtility.GetJSReference("MixERP.Net.WebControls.PartyControl.PartyControl.js", typeof(PartyControl)))
+
+@code {
+    private static RenderFragment Row(string text, string id, string tagName) => __builder =>
+    {
+        <tr>
+            <td style="width:300px;"><strong>@text</strong></td>
+            <td>
+                @if (tagName == "div")
+                {
+                    <div id="@id"></div>
+                }
+                else
+                {
+                    <span id="@id"></span>
+                }
+            </td>
+        </tr>
+    };
+}

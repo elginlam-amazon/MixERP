@@ -135,11 +135,9 @@ namespace PetaPoco
             // Npgsql 8 renamed UserName to Username and removed SyncNotification (the
             // asynchronous-notification listener is always on now). The legacy SSL boolean
             // is also gone; it is superseded by SslMode, which was already set to Prefer.
-            // TrustServerCertificate = true is REQUIRED to keep the original behaviour:
-            // under Npgsql 2.x "SSL = true" with SslMode.Prefer did NOT validate the
-            // server certificate, whereas Npgsql 6+ validates it, which would break every
-            // existing installation whose PostgreSQL server uses a self-signed or
-            // private-CA certificate.
+            // In Npgsql 8, SslMode.Prefer encrypts when the server supports it but does not
+            // validate the server certificate (only VerifyCA/VerifyFull do), which matches the
+            // Npgsql 2.x behaviour; TrustServerCertificate is obsolete and no longer needed.
             var connectionStringBuilder = new NpgsqlConnectionStringBuilder
             {
                 Host = ConfigurationHelper.GetDbServerParameter("Server"),
@@ -149,7 +147,6 @@ namespace PetaPoco
                 Port = int.Parse(ConfigurationHelper.GetDbServerParameter("Port"), CultureInfo.InvariantCulture),
                 Pooling = true,
                 SslMode = SslMode.Prefer,
-                TrustServerCertificate = true,
                 MinPoolSize = 10,
                 MaxPoolSize = 100,
                 ApplicationName = "MixERP"

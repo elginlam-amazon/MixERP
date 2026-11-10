@@ -22,8 +22,6 @@ using MixERP.Net.i18n;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Web;
-using System.Web.UI;
 
 namespace MixERP.Net.Common.jQueryHelper
 {
@@ -31,29 +29,25 @@ namespace MixERP.Net.Common.jQueryHelper
     public static class jQueryUI
     {
         ////////////////////////////////////////////////////////////////////////////////////////////////////
-        /// <summary>Add jQueryUI datepicker control.</summary>
+        /// <summary>
+        ///     Gets the script block that binds a jQuery UI datepicker to the target control.
+        ///     Replaces the Web Forms ScriptManager.RegisterStartupScript call: the caller emits
+        ///     the returned markup together with the control it renders.
+        /// </summary>
         ///
-        /// <param name="p">        The page instance.</param>
         /// <param name="controlId">Target control id to bind jQuery UI datepicker to.</param>
         /// <param name="minDate">  The minimum date.</param>
         /// <param name="maxDate">  The maximum date.</param>
         ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        public static void AddjQueryUIDatePicker(Page p, string controlId, DateTime? minDate, DateTime? maxDate)
+        public static string GetjQueryUIDatePicker(string controlId, DateTime? minDate, DateTime? maxDate)
         {
             if (string.IsNullOrWhiteSpace(controlId))
             {
-                return;
+                return string.Empty;
             }
 
-            if (p == null)
-            {
-                p = HttpContext.Current.Handler as Page;
-            }
-
-            string script = GetDatePickerScript(controlId, minDate, maxDate);
-
-            PageUtility.RegisterJavascript("datePicker_" + controlId + RandomNumber().ToString(CultureInfo.InvariantCulture), script, p, true);
+            return "<script type='text/javascript'>" + GetDatePickerScript(controlId, minDate, maxDate) + "</script>";
         }
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -139,12 +133,6 @@ namespace MixERP.Net.Common.jQueryHelper
             }
 
             return script;
-        }
-
-        private static int RandomNumber()
-        {
-            Random rnd = new Random();
-            return rnd.Next(2000);
         }
 
         #region Helpers

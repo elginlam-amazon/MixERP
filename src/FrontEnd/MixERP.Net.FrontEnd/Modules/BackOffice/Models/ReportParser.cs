@@ -22,7 +22,7 @@ using MixERP.Net.Common.Helpers;
 using MixERP.Net.Core.Modules.BackOffice.Data;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Web.Hosting;
+using MixERP.Net.Framework;
 using System.Xml;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Models
@@ -30,7 +30,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Models
     internal sealed class ReportParser
     {
         private static readonly string reportContainer =
-            HostingEnvironment.MapPath(ConfigurationHelper.GetReportParameter("ReportContainer"));
+            WebContext.MapPath(ConfigurationHelper.GetReportParameter("ReportContainer"));
 
         internal ReportParser(string fileName)
         {

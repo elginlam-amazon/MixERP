@@ -1,5 +1,5 @@
-﻿using System.Configuration;
-using System.Web.Hosting;
+using System;
+﻿using MixERP.Net.Framework;
 using MixERP.Net.Common.Helpers;
 
 namespace MixERP.Net.Updater
@@ -36,12 +36,12 @@ namespace MixERP.Net.Updater
                 return @"C:\inetpub\wwwroot\MixERP";
             }
 
-            return HostingEnvironment.MapPath("~");
+            return WebContext.ContentRootPath;
         }
 
         public static bool IsDevelopmentMode()
         {
-            return ConfigurationManager.AppSettings["IsIDE"].ToUpperInvariant().StartsWith("T");
+            return (WebContext.GetAppSetting("IsIDE") ?? string.Empty).ToUpperInvariant().StartsWith("T", StringComparison.Ordinal);
         }
 
         private static string GetConfigValue(string key)

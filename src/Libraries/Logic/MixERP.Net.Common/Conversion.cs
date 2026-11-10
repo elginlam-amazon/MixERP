@@ -20,34 +20,16 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 using MixERP.Net.i18n;
 using Serilog;
 using System;
-using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Web;
-using System.Web.UI;
-using System.Web.UI.WebControls;
-using Image = System.Drawing.Image;
+using MixERP.Net.Framework;
 
 namespace MixERP.Net.Common
 {
     public static class Conversion
     {
-        public static byte[] ConvertImageToByteArray(Image imageToConvert, ImageFormat formatOfImage)
-        {
-            if (imageToConvert == null)
-            {
-                return null;
-            }
-
-            using (MemoryStream ms = new MemoryStream())
-            {
-                imageToConvert.Save(ms, formatOfImage);
-                return ms.ToArray();
-            }
-        }
-
         public static DateTime GetLocalDateTime(string timeZone, DateTime utc)
         {
             TimeZoneInfo zone = TimeZoneInfo.FindSystemTimeZoneById(timeZone);
@@ -74,7 +56,7 @@ namespace MixERP.Net.Common
                 return null;
             }
 
-            using (SHA512CryptoServiceProvider provider = new SHA512CryptoServiceProvider())
+            using (SHA512 provider = SHA512.Create())
             {
                 return BitConverter.ToString(provider.ComputeHash(Encoding.UTF8.GetBytes(password + salt))).Replace("-", "").ToLower(CultureInfo.InvariantCulture);
             }
@@ -102,7 +84,7 @@ namespace MixERP.Net.Common
             {
                 return null;
             }
-            string physicalApplicationPath = HttpContext.Current.Request.PhysicalApplicationPath;
+            string physicalApplicationPath = WebContext.ContentRootPath;
 
             if (string.IsNullOrWhiteSpace(physicalApplicationPath))
             {
@@ -114,14 +96,7 @@ namespace MixERP.Net.Common
 
         public static string ResolveUrl(string url)
         {
-            Page page = HttpContext.Current.Handler as Page;
-
-            if (page == null)
-            {
-                return url;
-            }
-
-            return (page).ResolveUrl(url);
+            return WebContext.ResolveUrl(url);
         }
 
         public static bool TryCastBoolean(object value)
@@ -150,20 +125,6 @@ namespace MixERP.Net.Common
             }
 
             return retVal;
-        }
-
-        public static byte[] TryCastByteArray(Image image)
-        {
-            if (image == null)
-            {
-                return null;
-            }
-
-            using (var ms = new MemoryStream())
-            {
-                image.Save(ms, ImageFormat.Jpeg);
-                return ms.ToArray();
-            }
         }
 
         public static DateTime TryCastDate(object value)
@@ -388,20 +349,26 @@ namespace MixERP.Net.Common
             return string.Empty;
         }
 
-        public static Unit TryCastUnit(object value)
+        /// <summary>
+        ///     Converts a configured width/height (formerly a System.Web.UI.WebControls.Unit) to a
+        ///     CSS length. Bare numbers are treated as pixels, exactly as Unit.Parse did.
+        /// </summary>
+        public static string TryCastUnit(object value)
         {
             if (value == null)
             {
-                return new Unit();
+                return string.Empty;
             }
 
-            if (value is Unit)
+            string unit = value.ToString().Trim();
+
+            double number;
+            if (double.TryParse(unit, NumberStyles.Any, CultureInfo.InvariantCulture, out number))
             {
-                return (Unit) value;
+                return number.ToString(CultureInfo.InvariantCulture) + "px";
             }
 
-
-            return Unit.Parse(value.ToString(), CultureInfo.DefaultThreadCurrentCulture);
+            return unit;
         }
 
         public static DateTime? TryCastNullableDate(object value)

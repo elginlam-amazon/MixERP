@@ -27,6 +27,7 @@
          Microsoft.Extensions.Logging.Abstractions (ILogger<T>) — the modern
          replacements for System.Web.UI, System.Runtime.Caching and Serilog. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
 
   <ItemGroup>

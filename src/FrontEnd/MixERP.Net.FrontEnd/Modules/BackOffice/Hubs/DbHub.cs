@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using Microsoft.AspNet.SignalR;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.VisualBasic.FileIO;
 using MixERP.Net.ApplicationState.Cache;
 using MixERP.Net.Common;
@@ -32,28 +32,26 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
-using System.Web.Hosting;
+using MixERP.Net.Framework;
 using MixERP.Net.Common.Extensions;
 
 namespace MixERP.Net.Core.Modules.BackOffice.Hubs
 {
-    [CLSCompliant(false)]
     public class DbHub : Hub
     {
         private string backupDirectory;
-        private string batchFile;
 
         public void BackupDatabase(string fileName)
         {
             if (!this.IsValidRequest())
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied, Warnings.AccessIsDenied);
+                this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied, Warnings.AccessIsDenied).GetAwaiter().GetResult();
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(fileName))
             {
-                this.Clients.Caller.backupFailed(Warnings.NoFileSpecified);
+                this.Clients.Caller.SendAsync("backupFailed", Warnings.NoFileSpecified).GetAwaiter().GetResult();
                 return;
             }
 
@@ -77,13 +75,13 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
                 return;
             }
 
-            this.Clients.Caller.backupFailed(Warnings.ConfigurationError);
+            this.Clients.Caller.SendAsync("backupFailed", Warnings.ConfigurationError).GetAwaiter().GetResult();
         }
 
         private void Backup(PostgreSQLServer server, string fileName)
         {
-            string pgdumpPath = Path.Combine(server.BinDirectory, "pg_dump.exe");
-            backupDirectory = HostingEnvironment.MapPath(server.DatabaseBackupDirectory);
+            string pgdumpPath = Path.Combine(server.BinDirectory, OperatingSystem.IsWindows() ? "pg_dump.exe" : "pg_dump");
+            backupDirectory = WebContext.MapPath(server.DatabaseBackupDirectory);
 
             if (backupDirectory != null)
             {
@@ -108,11 +106,11 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
                     message.Append(Labels.ClickHereToDownload);
                     message.Append("</a>");
 
-                    this.Clients.Caller.backupCompleted(message.ToString());
+                    this.Clients.Caller.SendAsync("backupCompleted", message.ToString()).GetAwaiter().GetResult();
                     return;
                 }
 
-                this.Clients.Caller.backupFailed(Warnings.CannotCreateABackup);
+                this.Clients.Caller.SendAsync("backupFailed", Warnings.CannotCreateABackup).GetAwaiter().GetResult();
             }
         }
 
@@ -128,11 +126,26 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
 
         private bool BackupDatabase(string pgDumpPath, PostgreSQLServer server, string fileName)
         {
-            this.CreateBatchFile(server, pgDumpPath, fileName);
-
             using (Process process = new Process())
             {
-                process.StartInfo.FileName = batchFile;
+                // pg_dump is started directly (it used to be wrapped in a generated .bat file,
+                // which only ran on Windows and left the password on disk). The password is
+                // passed through the process environment only.
+                process.StartInfo.FileName = pgDumpPath;
+                process.StartInfo.ArgumentList.Add("--host");
+                process.StartInfo.ArgumentList.Add(server.HostName);
+                process.StartInfo.ArgumentList.Add("--port");
+                process.StartInfo.ArgumentList.Add(server.PortNumber.ToString(CultureInfo.InvariantCulture));
+                process.StartInfo.ArgumentList.Add("--username");
+                process.StartInfo.ArgumentList.Add(server.UserId);
+                process.StartInfo.ArgumentList.Add("--format");
+                process.StartInfo.ArgumentList.Add("custom");
+                process.StartInfo.ArgumentList.Add("--blobs");
+                process.StartInfo.ArgumentList.Add("--verbose");
+                process.StartInfo.ArgumentList.Add("--file");
+                process.StartInfo.ArgumentList.Add(fileName);
+                process.StartInfo.ArgumentList.Add(server.DatabaseName);
+                process.StartInfo.Environment["PGPASSWORD"] = server.Password;
 
                 process.StartInfo.CreateNoWindow = true;
                 process.StartInfo.ErrorDialog = false;
@@ -159,10 +172,9 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
 
         private void Completed(object sender, EventArgs e)
         {
-            this.RemoveFile(batchFile);
             this.CopyResource();
             this.CompressBackupDirectory(true);
-            this.Clients.Caller.backupCompleted(string.Empty);
+            this.Clients.Caller.SendAsync("backupCompleted", string.Empty).GetAwaiter().GetResult();
         }
 
         private void CopyResource()
@@ -173,43 +185,11 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
             FileSystem.CopyDirectory(source, destination);
         }
 
-        private void CreateBatchFile(PostgreSQLServer server, string pgDumpPath, string fileName)
-        {
-            Collection<string> commands = new Collection<string>();
-            commands.Add("@echo off");
-            commands.Add("SET PGPASSWORD=" + server.Password);
-            string command =
-                @"""{0}"" --host ""{1}"" --port {2} --username ""{3}"" --format custom --blobs --verbose --file ""{4}"" ""{5}""";
-            command = string.Format(CultureInfo.InvariantCulture, command, pgDumpPath, server.HostName,
-                server.PortNumber, server.UserId, fileName, server.DatabaseName);
-            commands.Add(command);
-            commands.Add("exit");
-
-            batchFile = fileName + ".bat";
-
-            File.WriteAllText(batchFile, string.Join(Environment.NewLine, commands));
-        }
-
         private void Data_Received(object sender, DataReceivedEventArgs e)
         {
             if (!string.IsNullOrWhiteSpace(e.Data))
             {
-                this.Clients.Caller.getNotification(e.Data);
-            }
-        }
-
-        private void RemoveFile(string fileName)
-        {
-            try
-            {
-                if (File.Exists(fileName))
-                {
-                    File.Delete(fileName);
-                }
-            }
-            catch
-            {
-                Log.Warning("Could not delete file: {FileName}.", fileName);
+                this.Clients.Caller.SendAsync("getNotification", e.Data).GetAwaiter().GetResult();
             }
         }
 
@@ -219,7 +199,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
 
             if (this.Context == null)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied).GetAwaiter().GetResult();
                 return false;
             }
 
@@ -227,7 +207,7 @@ namespace MixERP.Net.Core.Modules.BackOffice.Hubs
 
             if (globalLoginId <= 0)
             {
-                this.Clients.Caller.getNotification(Warnings.AccessIsDenied);
+                this.Clients.Caller.SendAsync("getNotification", Warnings.AccessIsDenied).GetAwaiter().GetResult();
                 return false;
             }
 

@@ -17,7 +17,6 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using MixERP.Net.Common.Helpers;
 using MixERP.Net.HtmlParser.ImageSerializer;
 using MixERP.Net.i18n.Resources;
 using MixERP.Net.Messaging.Email;
@@ -45,12 +44,12 @@ namespace MixERP.Net.WebControls.TransactionChecklist.Helpers
         internal void SendEmail()
         {
 
-            IHtmlImageSerializer serializer = new HtmlRendererImageSerializer();
-
-            string extension = ConfigurationHelper.GetTransactionChecklistParameter("EmailImageExtension") ?? ".png";
+            // The transaction document is attached as an HTML file. The Windows-only HTML to
+            // image renderer (and with it the EmailImageExtension setting) is not available on
+            // .NET 10 / Linux.
+            IHtmlImageSerializer serializer = new HtmlImageSerializer();
 
             serializer.Html = this.Html;
-            serializer.ImageFormat = ImageHelper.GetImageFormat(extension);
             serializer.ImageSaved += this.Serializer_ImageSaved;
             serializer.TempDirectory = "~/Resource/Temp/Images/";
             serializer.Serialize();

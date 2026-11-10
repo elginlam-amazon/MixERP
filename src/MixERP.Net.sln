@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Common", "Libraries\Logic\MixERP.net.Common\MixERP.Net.Common.csproj", "{D5A09C22-8F48-4FB2-A14D-C62C8C8FCEC0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.Common", "Libraries\Logic\MixERP.Net.Common\MixERP.Net.Common.csproj", "{D5A09C22-8F48-4FB2-A14D-C62C8C8FCEC0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.FrontEnd", "FrontEnd\MixERP.net.FrontEnd\MixERP.Net.FrontEnd.csproj", "{ACE1017D-71BC-4417-A906-72C4B9C55823}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.FrontEnd", "FrontEnd\MixERP.Net.FrontEnd\MixERP.Net.FrontEnd.csproj", "{ACE1017D-71BC-4417-A906-72C4B9C55823}"
 	ProjectSection(ProjectDependencies) = postProject
 		{5A14E96A-3807-4109-B0C7-4B23D151FD14} = {5A14E96A-3807-4109-B0C7-4B23D151FD14}
 	EndProjectSection
@@ -32,7 +32,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.WebControls.Comm
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.WebControls.ReportEngine.Data", "Libraries\Server Controls\Data\MixERP.Net.WebControls.ReportEngine.Data\MixERP.Net.WebControls.ReportEngine.Data.csproj", "{DAAAD018-FCD1-4231-BB11-EF765F41463D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.DbFactory", "Libraries\Logic\MixERP.Net.DbFactory\MixERP.Net.DbFactory.csproj", "{8FD9661C-2473-4581-8722-18B08D4DB252}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.DbFactory", "Libraries\Logic\MixERP.Net.DbFactory\MixERP.Net.DBFactory.csproj", "{8FD9661C-2473-4581-8722-18B08D4DB252}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MixERP.Net.WebControls.ScrudFactory.Data", "Libraries\Server Controls\Data\MixERP.Net.WebControls.ScrudFactory.Data\MixERP.Net.WebControls.ScrudFactory.Data.csproj", "{6CCF0B3B-AA69-42D2-ABFF-0085AA160501}"
 EndProject
