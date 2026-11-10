@@ -14,7 +14,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Configuration;
 using System.Data.Common;
 using System.Data;
 using System.Text.RegularExpressions;
@@ -157,16 +156,33 @@ namespace PetaPoco
 
         public Database(string connectionStringName)
         {
+            // ConfigurationManager.ConnectionStrings does not exist on modern .NET. The
+            // named connection strings now come from IConnectionStringSource (backed by the
+            // host's IConfiguration); all four original behaviours are preserved: an empty
+            // name selects the first configured entry, the provider name defaults to
+            // System.Data.SqlClient, a blank configured provider name falls back to that
+            // default, and an unknown name raises the same InvalidOperationException.
+            var connectionStrings = PetaPocoConfiguration.ConnectionStrings;
+
+            ConnectionStringEntry entry;
+
             // Use first?
             if (connectionStringName == "")
-                connectionStringName = ConfigurationManager.ConnectionStrings[0].Name;
+            {
+                entry = connectionStrings.First;
+                connectionStringName = entry == null ? connectionStringName : entry.Name;
+            }
+            else
+            {
+                entry = connectionStrings.Get(connectionStringName);
+            }
 
             // Work out connection string and provider name
             var providerName = "System.Data.SqlClient";
-            if (ConfigurationManager.ConnectionStrings[connectionStringName] != null)
+            if (entry != null)
             {
-                if (!string.IsNullOrEmpty(ConfigurationManager.ConnectionStrings[connectionStringName].ProviderName))
-                    providerName = ConfigurationManager.ConnectionStrings[connectionStringName].ProviderName;
+                if (!string.IsNullOrEmpty(entry.ProviderName))
+                    providerName = entry.ProviderName;
             }
             else
             {
@@ -174,7 +190,7 @@ namespace PetaPoco
             }
 
             // Store factory and connection string
-            _connectionString = ConfigurationManager.ConnectionStrings[connectionStringName].ConnectionString;
+            _connectionString = entry.ConnectionString;
             _providerName = providerName;
             CommonConstruct();
         }
@@ -190,6 +206,56 @@ namespace PetaPoco
         }
         DBType _dbType = DBType.SqlServer;
 
+        // On .NET Framework, DbProviderFactories read its provider registry out of
+        // machine.config, so GetFactory("Npgsql") just worked. Modern .NET has no such
+        // registry: an unregistered invariant name throws ArgumentException, which would
+        // make EVERY Factory.Get/Scalar/NonQuery/Insert call fail at runtime while the
+        // build stays green. The Npgsql factory is therefore registered up front, and a
+        // direct fast path resolves it without consulting the registry at all. Any other
+        // provider name still goes through DbProviderFactories, so a host that registers
+        // its own factory (SQL Server, MySQL, SQLite, Oracle) keeps working.
+        static Database()
+        {
+            // Npgsql 6+ rejects writing a DateTime whose Kind is Unspecified or Local to a
+            // timestamptz column and returns UTC DateTimes when reading one. PetaPoco sets
+            // ForceDateTimesToUtc, but callers across the solution still pass local and
+            // unspecified values, so the Npgsql 2.x semantics are kept via the legacy
+            // switch. This must be set before any Npgsql type is touched, hence first.
+            AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
+            if (!DbProviderFactories.GetProviderInvariantNames().Any(
+                    name => name.Equals("Npgsql", StringComparison.OrdinalIgnoreCase)))
+            {
+                DbProviderFactories.RegisterFactory("Npgsql", Npgsql.NpgsqlFactory.Instance);
+            }
+        }
+
+        private static DbProviderFactory ResolveProviderFactory(string providerName)
+        {
+            if (providerName.IndexOf("Npgsql", StringComparison.OrdinalIgnoreCase) >= 0)
+                return Npgsql.NpgsqlFactory.Instance;
+
+            try
+            {
+                return DbProviderFactories.GetFactory(providerName);
+            }
+            catch (ArgumentException exception)
+            {
+                // Modern .NET has no machine.config provider registry, so any provider
+                // other than Npgsql — including the "System.Data.SqlClient" default of the
+                // Database(string) constructor — must be registered by the host via
+                // DbProviderFactories.RegisterFactory. The framework's ArgumentException
+                // does not say that, so it is restated here instead of surfacing as an
+                // opaque failure at the first data access.
+                throw new InvalidOperationException(
+                    "The ADO.NET provider '" + providerName +
+                    "' is not registered. Modern .NET has no machine.config provider registry, so the host must call " +
+                    "DbProviderFactories.RegisterFactory(\"" + providerName +
+                    "\", <factory>.Instance) during startup (PetaPoco registers \"Npgsql\" itself).",
+                    exception);
+            }
+        }
+
         // Common initialization
         private void CommonConstruct()
         {
@@ -199,7 +265,7 @@ namespace PetaPoco
             ForceDateTimesToUtc = true;
 
             if (_providerName != null)
-                _factory = DbProviderFactories.GetFactory(_providerName);
+                _factory = ResolveProviderFactory(_providerName);
 
             string dbtype = (_factory == null ? _sharedConnection.GetType() : _factory.GetType()).Name;
 
