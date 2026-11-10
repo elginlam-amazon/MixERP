@@ -17,10 +17,16 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Runtime.Caching;
-
 namespace MixERP.Net.i18n
 {
+    /// <summary>
+    ///     Thin delegation to the application-wide
+    ///     <see cref="MixERP.Net.Framework.ICacheFactory" />, which is
+    ///     <c>IMemoryCache</c>-backed. Replaces the former
+    ///     <c>System.Runtime.Caching.MemoryCache.Default</c> usage, so the localization
+    ///     cache and the rest of MixERP now share one cache instance instead of two
+    ///     parallel ones.
+    /// </summary>
     internal static class CacheFactory
     {
         internal static void AddToDefaultCache(string key, object value)
@@ -35,16 +41,7 @@ namespace MixERP.Net.i18n
                 return;
             }
 
-            var cacheItem = new CacheItem(key, value);
-
-            if (MemoryCache.Default[key] == null)
-            {
-                MemoryCache.Default.Add(cacheItem, new CacheItemPolicy());
-            }
-            else
-            {
-                MemoryCache.Default[key] = cacheItem;
-            }
+            MixERP.Net.Framework.CacheFactory.AddToDefaultCache(key, value);
         }
 
         internal static object GetFromDefaultCacheByKey(string key)
@@ -54,7 +51,7 @@ namespace MixERP.Net.i18n
                 return null;
             }
 
-            return MemoryCache.Default.Get(key);
+            return MixERP.Net.Framework.CacheFactory.GetFromDefaultCacheByKey(key);
         }
     }
 }

@@ -1,16 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Globalization;
+﻿using System.Globalization;
 using System.Resources;
-using System.Runtime.Caching;
-using System.Threading;
 
 namespace MixERP.Net.i18n
 {
     public class ResourceManager
     {
-        private static readonly bool supressException = ConfigurationManager.AppSettings["SupressMissingResourceException"].ToUpperInvariant().Equals("TRUE");
+        private static bool SupressException
+        {
+            get { return I18nSettings.Current.SupressMissingResourceException; }
+        }
 
         public static string GetString(string resourceClass, string resourceKey, string cultureCode = null)
         {
@@ -18,7 +16,7 @@ namespace MixERP.Net.i18n
 
             if (result == null)
             {
-                if (supressException)
+                if (SupressException)
                 {
                     return resourceKey;
                 }
@@ -31,33 +29,37 @@ namespace MixERP.Net.i18n
 
         public static string TryGetResourceFromCache(string resourceClass, string resourceKey, string cultureCode = null)
         {
-            CultureInfo culture = Thread.CurrentThread.CurrentCulture;
+            return TryGetResourceFromCache(resourceClass, resourceKey, cultureCode, false);
+        }
+
+        private static string TryGetResourceFromCache(string resourceClass, string resourceKey, string cultureCode,
+            bool initialized)
+        {
+            CultureInfo culture = CultureInfo.CurrentCulture;
 
             if (!string.IsNullOrWhiteSpace(cultureCode))
             {
                 culture = new CultureInfo(cultureCode);
             }
 
-
-            IDictionary<string, string> cache;
-            var cacheItem = MemoryCache.Default.Get("Resources");
-
-            if (cacheItem is CacheItem)
-            {
-                CacheItem item = (CacheItem) cacheItem;
-
-                cache = (IDictionary<string, string>)item.Value;
-            }
-            else
-            {
-                cache = (IDictionary<string, string>)cacheItem;                
-            }
-
+            // IMemoryCache stores the value itself (there is no CacheItem wrapper type as
+            // there was in System.Runtime.Caching), so the cached object is the dictionary.
+            IDictionary<string, string> cache =
+                CacheFactory.GetFromDefaultCacheByKey("Resources") as IDictionary<string, string>;
 
             if (cache == null || cache.Count.Equals(0))
             {
+                if (initialized)
+                {
+                    // Already tried to populate the cache once during this call; the
+                    // resources are genuinely unavailable. Returning null lets
+                    // GetString apply the SupressMissingResourceException policy rather
+                    // than recursing forever.
+                    return null;
+                }
+
                 InitializeResources();
-                return TryGetResourceFromCache(resourceClass, resourceKey, cultureCode);
+                return TryGetResourceFromCache(resourceClass, resourceKey, cultureCode, true);
             }
 
             string cacheKey = resourceClass + "." + culture.Name + "." + resourceKey;
@@ -94,12 +96,6 @@ namespace MixERP.Net.i18n
 
             return result;
         }
-
-        private static string GetFallBackResource(ref IDictionary<string, string> cache, CultureInfo culture, string resourceClass, string resourceKey)
-        {
-            throw new NotImplementedException();
-        }
-
 
         private static void InitializeResources()
         {
