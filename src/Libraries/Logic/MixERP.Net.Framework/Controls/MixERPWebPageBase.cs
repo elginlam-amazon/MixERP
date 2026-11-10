@@ -17,101 +17,190 @@ You should have received a copy of the GNU General Public License
 along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
-using System.Web.UI;
-using System.Web.UI.WebControls;
+using Microsoft.AspNetCore.Components;
 
 namespace MixERP.Net.Framework.Controls
 {
-    public class MixERPWebPageBase : Page
+    /// <summary>
+    ///     Base class for every MixERP page. Previously derived from
+    ///     <c>System.Web.UI.Page</c>; it is now a Blazor component base class.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The WebForms version injected controls into the master page's
+    ///         <c>ContentPlaceHolder</c>s and into arbitrary naming containers by walking the
+    ///         control tree. Blazor has no server-side control tree, so the equivalent
+    ///         mechanism is a set of NAMED RENDER-FRAGMENT SLOTS: a page (or any code running
+    ///         on it) contributes content to a slot by name through
+    ///         <see cref="AddToMasterPage" /> / <see cref="AddToPage" />, and the layout or
+    ///         markup renders that slot through
+    ///         <see cref="GetMasterPageSection" /> / <see cref="GetPageSection" />, e.g.
+    ///         <c>@GetMasterPageSection("TitlePlaceHolder")</c>.
+    ///     </para>
+    ///     <para>
+    ///         The <c>MixERPPageStatePersister</c> override is not carried over: ViewState does
+    ///         not exist in Blazor (component fields survive re-renders on their own), and the
+    ///         original persister's <c>Load</c>/<c>Save</c> were both empty, so no behaviour is
+    ///         lost.
+    ///     </para>
+    /// </remarks>
+    public class MixERPWebPageBase : ComponentBase
     {
-        private MixERPPageStatePersister pageStatePersister;
+        private readonly Dictionary<string, List<RenderFragment>> masterPageSections =
+            new Dictionary<string, List<RenderFragment>>(StringComparer.Ordinal);
 
-        protected override PageStatePersister PageStatePersister
+        private readonly Dictionary<string, List<RenderFragment>> pageSections =
+            new Dictionary<string, List<RenderFragment>>(StringComparer.Ordinal);
+
+        /// <summary>
+        ///     Adds content to the named slot on the layout (the Blazor replacement for a
+        ///     master page's <c>ContentPlaceHolder</c>). The layout renders the slot with
+        ///     <see cref="GetMasterPageSection" />.
+        /// </summary>
+        /// <param name="placeHolderId">Name of the layout slot.</param>
+        /// <param name="content">The content to add. Ignored when null.</param>
+        public void AddToMasterPage(string placeHolderId, RenderFragment content)
         {
-            get
-            {
-                if (this.pageStatePersister == null)
-                {
-                    this.pageStatePersister = new MixERPPageStatePersister(this);
-                }
-
-                return this.pageStatePersister;
-            }
+            Add(this.masterPageSections, placeHolderId, content);
         }
 
         /// <summary>
-        ///     Adds the control to the Master Pages' Content Place Holder.
+        ///     Adds content to the named slot on this page (the Blazor replacement for adding
+        ///     a control to a naming container). The page's markup renders the slot with
+        ///     <see cref="GetPageSection" />.
         /// </summary>
-        /// <param name="placeHolderId"></param>
-        /// <param name="control"></param>
-        public void AddToMasterPage(string placeHolderId, Control control)
+        /// <param name="namingContainerId">Name of the page slot.</param>
+        /// <param name="content">The content to add. Ignored when null.</param>
+        public void AddToPage(string namingContainerId, RenderFragment content)
         {
-            var master = this.Page.Master;
-
-            if (master != null)
-            {
-                using (
-                    ContentPlaceHolder placeHolder = FindControlIterative(master, placeHolderId) as ContentPlaceHolder)
-                {
-                    if (placeHolder != null)
-                    {
-                        placeHolder.Controls.Add(control);
-                    }
-                }
-            }
+            Add(this.pageSections, namingContainerId, content);
         }
 
-        public void AddToPage(string namingContainerId, Control control)
+        /// <summary>
+        ///     Adds a child component of the given type, with the supplied parameters, to the
+        ///     named layout slot. This is the direct counterpart of the WebForms
+        ///     <c>placeHolder.Controls.Add(control)</c> call.
+        /// </summary>
+        public void AddToMasterPage(string placeHolderId, Type componentType,
+            IDictionary<string, object> parameters = null)
         {
-            using (Control namingContainer = FindControlIterative(this.Page, namingContainerId))
-            {
-                if (namingContainer != null)
-                {
-                    if (control != null)
-                    {
-                        namingContainer.Controls.Add(control);
-                    }
-                }
-            }
+            this.AddToMasterPage(placeHolderId, BuildComponentFragment(componentType, parameters));
         }
 
-        private static Control FindControlIterative(Control root, string id)
+        /// <summary>
+        ///     Adds a child component of the given type, with the supplied parameters, to the
+        ///     named page slot.
+        /// </summary>
+        public void AddToPage(string namingContainerId, Type componentType,
+            IDictionary<string, object> parameters = null)
         {
-            if (root == null)
+            this.AddToPage(namingContainerId, BuildComponentFragment(componentType, parameters));
+        }
+
+        /// <summary>
+        ///     Renders everything contributed to the named layout slot, or null when nothing
+        ///     was contributed (so <c>@GetMasterPageSection("x")</c> emits nothing, exactly as
+        ///     an empty <c>ContentPlaceHolder</c> did).
+        /// </summary>
+        public RenderFragment GetMasterPageSection(string placeHolderId)
+        {
+            return Combine(this.masterPageSections, placeHolderId);
+        }
+
+        /// <summary>
+        ///     Renders everything contributed to the named page slot, or null when nothing was
+        ///     contributed.
+        /// </summary>
+        public RenderFragment GetPageSection(string namingContainerId)
+        {
+            return Combine(this.pageSections, namingContainerId);
+        }
+
+        /// <summary>
+        ///     True when content has been contributed to the named layout slot.
+        /// </summary>
+        public bool HasMasterPageSection(string placeHolderId)
+        {
+            return !string.IsNullOrWhiteSpace(placeHolderId) &&
+                   this.masterPageSections.ContainsKey(placeHolderId);
+        }
+
+        /// <summary>
+        ///     True when content has been contributed to the named page slot.
+        /// </summary>
+        public bool HasPageSection(string namingContainerId)
+        {
+            return !string.IsNullOrWhiteSpace(namingContainerId) &&
+                   this.pageSections.ContainsKey(namingContainerId);
+        }
+
+        private static void Add(IDictionary<string, List<RenderFragment>> sections, string id,
+            RenderFragment content)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return;
+            }
+
+            if (content == null)
+            {
+                return;
+            }
+
+            if (!sections.TryGetValue(id, out List<RenderFragment> fragments))
+            {
+                fragments = new List<RenderFragment>();
+                sections[id] = fragments;
+            }
+
+            fragments.Add(content);
+        }
+
+        private static RenderFragment Combine(IDictionary<string, List<RenderFragment>> sections,
+            string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
             {
                 return null;
             }
 
-            if (root.ID == id)
+            if (!sections.TryGetValue(id, out List<RenderFragment> fragments) || fragments.Count == 0)
             {
-                return root;
+                return null;
             }
-            foreach (Control c in root.Controls)
+
+            return builder =>
             {
-                Control t = FindControlIterative(c, id);
-                if (t != null)
+                foreach (RenderFragment fragment in fragments)
                 {
-                    return t;
+                    fragment(builder);
                 }
-            }
-            return null;
+            };
         }
 
-
-        private class MixERPPageStatePersister : PageStatePersister
+        private static RenderFragment BuildComponentFragment(Type componentType,
+            IDictionary<string, object> parameters)
         {
-            public MixERPPageStatePersister(Page p)
-                : base(p)
+            if (componentType == null)
             {
+                return null;
             }
 
-            public override void Load()
+            return builder =>
             {
-            }
+                int sequence = 0;
+                builder.OpenComponent(sequence++, componentType);
 
-            public override void Save()
-            {
-            }
+                if (parameters != null)
+                {
+                    foreach (KeyValuePair<string, object> parameter in parameters)
+                    {
+                        builder.AddComponentParameter(sequence++, parameter.Key, parameter.Value);
+                    }
+                }
+
+                builder.CloseComponent();
+            };
         }
     }
 }
