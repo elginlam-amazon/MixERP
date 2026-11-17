@@ -199,7 +199,14 @@ namespace PetaPoco
             ForceDateTimesToUtc = true;
 
             if (_providerName != null)
+            {
+#if NETSTANDARD2_0
+                // The DbProviderFactories registry is not part of netstandard2.0; pass a DbProviderFactory instead.
+                throw new PlatformNotSupportedException("Resolving a provider by name is not supported on netstandard2.0. Use the Database(string, DbProviderFactory) constructor.");
+#else
                 _factory = DbProviderFactories.GetFactory(_providerName);
+#endif
+            }
 
             string dbtype = (_factory == null ? _sharedConnection.GetType() : _factory.GetType()).Name;
 

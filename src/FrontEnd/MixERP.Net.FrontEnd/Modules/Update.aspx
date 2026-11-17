@@ -47,33 +47,33 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
             <tbody>
                 <tr>
                     <td><%=Titles.ReleaseId %></td>
-                    <td><%= this._release.Id %></td>
+                    <td><%= this.release.Id %></td>
                 </tr>
                 <tr>
                     <td><%=Titles.VersionName %></td>
-                    <td><%= this._release.Name %></td>
+                    <td><%= this.release.Name %></td>
                 </tr>
                 <tr>
                     <td><%=Titles.TagName %></td>
-                    <td><%= this._release.TagName %></td>
+                    <td><%= this.release.TagName %></td>
                 </tr>
                 <tr>
                     <td><%= Titles.CreatedOn %></td>
-                    <td><%= this._release.CreatedAt %></td>
+                    <td><%= this.release.CreatedAt %></td>
                 </tr>
                 <tr>
                     <td><%=Titles.PublishedOn %></td>
-                    <td><%= this._release.PublishedAt %></td>
+                    <td><%= this.release.PublishedAt %></td>
                 </tr>
                 <tr>
                     <td><%=Titles.DownloadingFrom %></td>
                     <td>
-                        <a href="<%= this._downloadUrl %>"><%= this._downloadUrl %></a>
+                        <a href="<%= this.downloadUrl %>"><%= this.downloadUrl %></a>
                     </td>
                 </tr>
                 <tr>
                     <td><%=Titles.Message %></td>
-                    <td><%= this._release.Body %></td>
+                    <td><%= this.release.Body %></td>
                 </tr>
             </tbody>
         </table>

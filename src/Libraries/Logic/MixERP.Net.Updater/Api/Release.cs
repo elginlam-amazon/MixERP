@@ -1,6 +1,7 @@
 using MixERP.Net.Common;
 using System;
 using System.Collections.Generic;
+using Markdig;
 
 namespace MixERP.Net.Updater.Api
 {
@@ -42,11 +43,11 @@ namespace MixERP.Net.Updater.Api
 
         private static string ParseMarkdown(string markdown)
         {
-            var md = new MarkdownDeep.Markdown();
-            md.ExtraMode = true;
-            md.SafeMode = false;
+            // MarkdownDeep (ExtraMode, raw HTML allowed) was .NET Framework only; Markdig's advanced
+            // extensions cover the Markdown Extra syntax (tables, footnotes, definition lists, fenced code).
+            var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
 
-            return md.Transform(markdown);
+            return Markdown.ToHtml(markdown ?? string.Empty, pipeline);
         }
     }
 }
