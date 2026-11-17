@@ -1,6 +1,5 @@
 ﻿using MixERP.Net.i18n.Resources;
 using MixERP.Net.WebControls.Flag.Data;
-using System.Security.Permissions;
 using System.Web;
 using System.Web.UI;
 using System.Web.UI.HtmlControls;
@@ -9,7 +8,6 @@ using System.Web.UI.WebControls;
 namespace MixERP.Net.WebControls.Flag
 {
     [ToolboxData("<{0}:Flag runat=server />")]
-    [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
     public sealed partial class FlagControl : CompositeControl
     {
         private Panel container;

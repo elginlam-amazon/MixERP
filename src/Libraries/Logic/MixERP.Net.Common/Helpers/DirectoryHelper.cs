@@ -18,7 +18,9 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System.IO;
+#if !NETSTANDARD2_0
 using Microsoft.VisualBasic.FileIO;
+#endif
 
 namespace MixERP.Net.Common.Helpers
 {
@@ -43,7 +45,22 @@ namespace MixERP.Net.Common.Helpers
 
         public static void CopyDirectory(string source, string destination)
         {
+#if NETSTANDARD2_0
+            // Microsoft.VisualBasic.FileIO is not part of netstandard2.0: copy recursively, overwriting existing files.
+            Directory.CreateDirectory(destination);
+
+            foreach (string file in Directory.GetFiles(source))
+            {
+                File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), true);
+            }
+
+            foreach (string directory in Directory.GetDirectories(source))
+            {
+                CopyDirectory(directory, Path.Combine(destination, Path.GetFileName(directory)));
+            }
+#else
             FileSystem.CopyDirectory(source, destination, true);
+#endif
         }
     }
 }

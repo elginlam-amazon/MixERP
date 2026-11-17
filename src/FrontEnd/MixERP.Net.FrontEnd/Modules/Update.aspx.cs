@@ -33,8 +33,8 @@ namespace MixERP.Net.FrontEnd.Modules
 {
     public partial class Update : MixERPWebpage
     {
-        protected string _downloadUrl = string.Empty;
-        protected Release _release = new Release();
+        protected string downloadUrl = string.Empty;
+        protected Release release = new Release();
 
         protected async void Page_Init(object sender, EventArgs e)
         {
@@ -72,7 +72,7 @@ namespace MixERP.Net.FrontEnd.Modules
             try
             {
                 UpdateManager updater = new UpdateManager();
-                this._release = await updater.GetLatestRelease();
+                this.release = await updater.GetLatestRelease();
             }
             catch
             {
@@ -85,14 +85,14 @@ namespace MixERP.Net.FrontEnd.Modules
             string keyword = Config.UpdateKeyword;
 
             Asset ass =
-                this._release.Assets.FirstOrDefault(a => a.Name.ToUpperInvariant().Contains(keyword.ToUpperInvariant()));
+                this.release.Assets.FirstOrDefault(a => a.Name.ToUpperInvariant().Contains(keyword.ToUpperInvariant()));
 
             if (ass != null)
             {
-                this._downloadUrl = ass.DownloadUrl;
+                this.downloadUrl = ass.DownloadUrl;
             }
 
-            if (string.IsNullOrWhiteSpace(this._downloadUrl))
+            if (string.IsNullOrWhiteSpace(this.downloadUrl))
             {
                 this.ErrorLabel.Text = "This release does not contain any update.";
             }

@@ -18,7 +18,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 ***********************************************************************************/
 
 using System;
-using System.Security.Permissions;
 using System.Web;
 using System.Web.UI;
 using System.Web.UI.HtmlControls;
@@ -31,7 +30,6 @@ namespace MixERP.Net.WebControls.StockTransactionFactory
     {
         private const string resource = "MixERP.Net.WebControls.StockTransactionFactory.Includes.Style.StockTransactionFactory.css";
 
-        [AspNetHostingPermission(SecurityAction.Demand, Level = AspNetHostingPermissionLevel.Minimal)]
         private void AddStylesheet()
         {
             string href = this.Page.Request.Url.GetLeftPart(UriPartial.Authority) + this.Page.ClientScript.GetWebResourceUrl(typeof(StockTransactionForm), resource);

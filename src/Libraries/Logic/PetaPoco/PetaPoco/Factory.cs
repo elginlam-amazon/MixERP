@@ -7,21 +7,20 @@ namespace PetaPoco
 {
     public sealed class Factory
     {
-        private const string ProviderName = "Npgsql";
         public static string MetaDatabase = ConfigurationHelper.GetDbServerParameter("MetaDatabase");
 
         public static IEnumerable<T> Get<T>(string catalog, string sql, params object[] args)
         {
             try
             {
-                using (Database db = new Database(GetConnectionString(catalog), ProviderName))
+                using (Database db = new Database(GetConnectionString(catalog), NpgsqlFactory.Instance))
                 {
                     return db.Query<T>(sql, args);
                 }
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (((ex as PostgresException)?.SqlState ?? string.Empty).StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -35,14 +34,14 @@ namespace PetaPoco
         {
             try
             {
-                using (Database db = new Database(GetConnectionString(catalog), ProviderName))
+                using (Database db = new Database(GetConnectionString(catalog), NpgsqlFactory.Instance))
                 {
                     return db.Insert(poco);
                 }
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (((ex as PostgresException)?.SqlState ?? string.Empty).StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -56,14 +55,14 @@ namespace PetaPoco
         {
             try
             {
-                using (Database db = new Database(GetConnectionString(catalog), ProviderName))
+                using (Database db = new Database(GetConnectionString(catalog), NpgsqlFactory.Instance))
                 {
                     return db.ExecuteScalar<T>(sql, args);
                 }
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (((ex as PostgresException)?.SqlState ?? string.Empty).StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -77,14 +76,14 @@ namespace PetaPoco
         {
             try
             {
-                using (Database db = new Database(GetConnectionString(catalog), ProviderName))
+                using (Database db = new Database(GetConnectionString(catalog), NpgsqlFactory.Instance))
                 {
                     db.Execute(sql, args);
                 }
             }
             catch (NpgsqlException ex)
             {
-                if (ex.Code.StartsWith("P"))
+                if (((ex as PostgresException)?.SqlState ?? string.Empty).StartsWith("P"))
                 {
                     string errorMessage = GetDBErrorResource(ex);
                     throw new MixERPException(errorMessage, ex);
@@ -96,9 +95,10 @@ namespace PetaPoco
 
         private static string GetDBErrorResource(NpgsqlException ex)
         {
-            string message = DbErrors.Get(ex.Code);
+            string sqlState = (ex as PostgresException)?.SqlState;
+            string message = DbErrors.Get(sqlState);
 
-            if (message == ex.Code)
+            if (message == sqlState)
             {
                 return ex.Message;
             }
@@ -119,12 +119,10 @@ namespace PetaPoco
             {
                 Host = ConfigurationHelper.GetDbServerParameter("Server"),
                 Database = database,
-                UserName = ConfigurationHelper.GetDbServerParameter("UserId"),
+                Username = ConfigurationHelper.GetDbServerParameter("UserId"),
                 Password = ConfigurationHelper.GetDbServerParameter("Password"),
                 Port = int.Parse(ConfigurationHelper.GetDbServerParameter("Port")),
-                SyncNotification = true,
                 Pooling = true,
-                SSL = true,
                 SslMode = SslMode.Prefer,
                 MinPoolSize = 10,
                 MaxPoolSize = 100,

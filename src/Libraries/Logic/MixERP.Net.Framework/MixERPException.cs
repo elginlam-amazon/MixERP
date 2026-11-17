@@ -19,7 +19,6 @@ along with MixERP.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Runtime.Serialization;
-using System.Security.Permissions;
 using System.Web;
 using Serilog;
 
@@ -50,21 +49,25 @@ namespace MixERP.Net.Framework
             this.dbConstraintName = dbConstraintName;
         }
 
+#if NETSTANDARD2_0
+        // Formatter-based serialization is obsolete on .NET (SYSLIB0051); kept for .NET Framework callers.
         public MixERPException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }
+#endif
 
         public string DBConstraintName
         {
             get { return this.dbConstraintName; }
         }
 
-        [SecurityPermission(SecurityAction.Demand, SerializationFormatter = true)]
+#if NETSTANDARD2_0
         public override void GetObjectData(SerializationInfo info, StreamingContext context)
         {
             base.GetObjectData(info, context);
         }
+#endif
 
         public static void Handle(MixERPException ex)
         {
@@ -78,7 +81,9 @@ namespace MixERP.Net.Framework
                 HttpContext.Current.Session["ex"] = ex;
                 Log.Information("Exception object was added to session.");
 
+#pragma warning disable SYSWEB0001 // The netstandard2.0 build runs on the .NET Framework System.Web, where TransferRequest is supported.
                 HttpContext.Current.Server.TransferRequest("~/Site/RuntimeError.aspx", true);
+#pragma warning restore SYSWEB0001
             }
         }
 

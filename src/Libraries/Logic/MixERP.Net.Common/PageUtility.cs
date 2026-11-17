@@ -23,18 +23,22 @@ using System;
 using System.Configuration;
 using System.Globalization;
 using System.IO;
-using System.Net;
+using System.Net.Http;
+using System.Threading.Tasks;
 using System.Web;
 using System.Web.Hosting;
+#if !NETSTANDARD2_0
 using System.Web.SessionState;
 using System.Web.UI;
 using System.Web.UI.HtmlControls;
+#endif
 using MixERP.Net.Common.Helpers;
 
 namespace MixERP.Net.Common
 {
     public static class PageUtility
     {
+#if !NETSTANDARD2_0
         public static void AddMeta(Page page, string name, string content)
         {
             using (HtmlMeta meta = new HtmlMeta())
@@ -93,6 +97,8 @@ namespace MixERP.Net.Common
             }
         }
 
+#endif
+
         public static string MapPath(string path)
         {
             if (Path.IsPathRooted(path))
@@ -125,22 +131,35 @@ namespace MixERP.Net.Common
                 url = prefix + "://" + url;
             }
 
-            using (MyClient client = new MyClient())
+            using (HttpClient client = new HttpClient())
             {
-                client.HeadOnly = true;
-                try
+                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Head, url))
                 {
-                    client.DownloadString(url);
-                }
-                catch (WebException)
-                {
-                    url = string.Empty;
+                    try
+                    {
+                        using (HttpResponseMessage response = client.SendAsync(request).GetAwaiter().GetResult())
+                        {
+                            if (!response.IsSuccessStatusCode)
+                            {
+                                url = string.Empty;
+                            }
+                        }
+                    }
+                    catch (HttpRequestException)
+                    {
+                        url = string.Empty;
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        url = string.Empty;
+                    }
                 }
 
                 return url;
             }
         }
 
+#if !NETSTANDARD2_0
         public static Control FindControlIterative(Control root, string id)
         {
             if (root == null)
@@ -163,6 +182,8 @@ namespace MixERP.Net.Common
             return null;
         }
 
+#endif
+
         public static string GetCurrentDomainName()
         {
             if (HttpContext.Current == null)
@@ -180,6 +201,7 @@ namespace MixERP.Net.Common
             return url;
         }
 
+#if !NETSTANDARD2_0
         public static string GetCurrentPageUrl(Page p)
         {
             if (p == null)
@@ -325,20 +347,6 @@ namespace MixERP.Net.Common
             return relativeUrl;
         }
 
-        private class MyClient : WebClient
-        {
-            public bool HeadOnly { private get; set; }
-
-            protected override WebRequest GetWebRequest(Uri address)
-            {
-                WebRequest req = base.GetWebRequest(address);
-
-                if (req != null && (this.HeadOnly && req.Method == "GET"))
-                {
-                    req.Method = "HEAD";
-                }
-                return req;
-            }
-        }
+#endif
     }
 }
